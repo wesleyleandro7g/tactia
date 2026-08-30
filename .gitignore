@@ -1,0 +1,15 @@
+node_modules
+.turbo
+.next
+dist
+coverage
+.env
+.env.local
+.env.test
+.env.*.local
+*.log
+.DS_Store
+packages/database/src/generated
+apps/web/next-env.d.ts
+tsconfig.tsbuildinfo
+*.tsbuildinfo

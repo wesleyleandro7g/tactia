@@ -1,0 +1,55 @@
+import type { AuditLogRepository, CreateAuditLogInput } from '@tactia/database';
+import type { RequestContext } from '@tactia/shared';
+
+export const AuditAction = {
+  USER_CREATED: 'USER_CREATED',
+  TENANT_CREATED: 'TENANT_CREATED',
+  MEMBERSHIP_CREATED: 'MEMBERSHIP_CREATED',
+  MEMBERSHIP_UPDATED: 'MEMBERSHIP_UPDATED',
+  MEMBERSHIP_REMOVED: 'MEMBERSHIP_REMOVED',
+  CUSTOMER_CREATED: 'CUSTOMER_CREATED',
+  CUSTOMER_UPDATED: 'CUSTOMER_UPDATED',
+  CUSTOMER_DELETED: 'CUSTOMER_DELETED',
+  LEAD_CREATED: 'LEAD_CREATED',
+  LEAD_UPDATED: 'LEAD_UPDATED',
+  LEAD_DELETED: 'LEAD_DELETED',
+  PRODUCT_CREATED: 'PRODUCT_CREATED',
+  PRODUCT_UPDATED: 'PRODUCT_UPDATED',
+  PRODUCT_DELETED: 'PRODUCT_DELETED',
+  SELLER_CREATED: 'SELLER_CREATED',
+  SELLER_UPDATED: 'SELLER_UPDATED',
+  SELLER_DELETED: 'SELLER_DELETED',
+  SALE_CREATED: 'SALE_CREATED',
+  SALE_UPDATED: 'SALE_UPDATED',
+  SALE_DELETED: 'SALE_DELETED',
+  ACTIVITY_CREATED: 'ACTIVITY_CREATED',
+  ACTIVITY_UPDATED: 'ACTIVITY_UPDATED',
+  ACTIVITY_DELETED: 'ACTIVITY_DELETED',
+} as const;
+
+export class AuditLogService {
+  constructor(private readonly auditLogs: AuditLogRepository) {}
+
+  async record(
+    ctx: Pick<RequestContext, 'tenantId' | 'userId' | 'ip'>,
+    input: Omit<CreateAuditLogInput, 'tenantId' | 'userId' | 'ip' | 'actorType'> & {
+      actorType?: string;
+    },
+  ) {
+    if (!ctx.tenantId) return;
+    return this.auditLogs.create({
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      ip: ctx.ip,
+      actorType: input.actorType ?? 'user',
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
+  }
+
+  list(params: Parameters<AuditLogRepository['list']>[0]) {
+    return this.auditLogs.list(params);
+  }
+}

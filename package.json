@@ -1,0 +1,28 @@
+{
+  "name": "tactia",
+  "private": true,
+  "packageManager": "pnpm@11.11.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "db:generate": "pnpm --filter @tactia/database generate",
+    "db:migrate": "pnpm --filter @tactia/database migrate",
+    "db:migrate:deploy": "pnpm --filter @tactia/database migrate:deploy",
+    "db:seed": "pnpm --filter @tactia/web seed",
+    "db:studio": "pnpm --filter @tactia/database studio",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "eslint": "^9.34.0",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0"
+  }
+}

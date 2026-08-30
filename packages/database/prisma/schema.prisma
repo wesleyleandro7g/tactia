@@ -1,0 +1,417 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  active
+  suspended
+  deleted
+}
+
+enum MembershipRole {
+  owner
+  admin
+  member
+  viewer
+}
+
+enum MembershipStatus {
+  active
+  invited
+  suspended
+  removed
+}
+
+enum CustomerStatus {
+  active
+  inactive
+  blocked
+}
+
+enum LeadStatus {
+  new
+  contacted
+  qualified
+  proposal
+  won
+  lost
+}
+
+enum ProductStatus {
+  active
+  inactive
+  discontinued
+}
+
+enum SellerStatus {
+  active
+  inactive
+}
+
+enum SaleStatus {
+  pending
+  confirmed
+  cancelled
+  refunded
+}
+
+enum ActivityType {
+  call
+  email
+  meeting
+  message
+  note
+  task
+  proposal
+  status_change
+}
+
+// ---------------------------------------------------------------------------
+// Better Auth tables (provider-owned). Domain User maps via externalAuthId.
+// ---------------------------------------------------------------------------
+
+model AuthUser {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      AuthSession[]
+  accounts      AuthAccount[]
+  domainUser    User?
+
+  @@unique([email])
+  @@map("auth_users")
+}
+
+model AuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+model AuthAccount {
+  id                    String    @id
+  issuer                String    @default("credential")
+  accountId             String
+  providerId            String
+  userId                String
+  user                  AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([issuer, accountId])
+  @@index([userId])
+  @@map("auth_accounts")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("auth_verifications")
+}
+
+// ---------------------------------------------------------------------------
+// Domain identity
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id           String       @id @db.Uuid
+  name         String
+  slug         String
+  status       TenantStatus @default(active)
+  timezone     String       @default("America/Sao_Paulo")
+  currency     String       @default("BRL")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  memberships  Membership[]
+  auditLogs    AuditLog[]
+  customers    Customer[]
+  leads        Lead[]
+  products     Product[]
+  sellers      Seller[]
+  sales        Sale[]
+  saleItems    SaleItem[]
+  activities   Activity[]
+
+  @@unique([slug])
+  @@index([status])
+  @@index([createdAt])
+  @@map("tenants")
+}
+
+model User {
+  id             String       @id @db.Uuid
+  externalAuthId String       @unique @map("external_auth_id")
+  name           String
+  email          String
+  avatarUrl      String?      @map("avatar_url")
+  deletedAt      DateTime?    @map("deleted_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  authUser       AuthUser     @relation(fields: [externalAuthId], references: [id], onDelete: Restrict)
+  memberships    Membership[]
+  auditLogs      AuditLog[]
+  sellers        Seller[]
+
+  @@index([email])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Membership {
+  id        String           @id @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  role      MembershipRole
+  status    MembershipStatus @default(active)
+  deletedAt DateTime?        @map("deleted_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, status])
+  @@index([userId])
+  @@index([tenantId, createdAt])
+  @@index([deletedAt])
+  @@map("memberships")
+}
+
+model AuditLog {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  actorType  String   @map("actor_type")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@index([tenantId, entityType, entityId])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Canonical business data (Etapa 2)
+// data_source_id is nullable until DataSource lands in Etapa 3.
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id           String         @id @db.Uuid
+  tenantId     String         @map("tenant_id") @db.Uuid
+  dataSourceId String?        @map("data_source_id") @db.Uuid
+  externalId   String?        @map("external_id")
+  name         String
+  email        String?
+  phone        String?
+  document     String?
+  status       CustomerStatus @default(active)
+  metadata     Json?
+  deletedAt    DateTime?      @map("deleted_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leads        Lead[]
+  sales        Sale[]
+  activities   Activity[]
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, externalId])
+  @@index([tenantId, email])
+  @@index([deletedAt])
+  @@map("customers")
+}
+
+model Lead {
+  id           String     @id @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  dataSourceId String?    @map("data_source_id") @db.Uuid
+  externalId   String?    @map("external_id")
+  customerId   String?    @map("customer_id") @db.Uuid
+  name         String
+  email        String?
+  phone        String?
+  source       String?
+  status       LeadStatus @default(new)
+  score        Int?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  activities   Activity[]
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, externalId])
+  @@index([tenantId, customerId])
+  @@map("leads")
+}
+
+model Product {
+  id           String        @id @db.Uuid
+  tenantId     String        @map("tenant_id") @db.Uuid
+  dataSourceId String?       @map("data_source_id") @db.Uuid
+  externalId   String?       @map("external_id")
+  name         String
+  sku          String?
+  category     String?
+  cost         Decimal?      @db.Decimal(18, 4)
+  price        Decimal?      @db.Decimal(18, 4)
+  status       ProductStatus @default(active)
+  metadata     Json?
+  deletedAt    DateTime?     @map("deleted_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  saleItems    SaleItem[]
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, externalId])
+  @@index([tenantId, sku])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+model Seller {
+  id           String       @id @db.Uuid
+  tenantId     String       @map("tenant_id") @db.Uuid
+  dataSourceId String?      @map("data_source_id") @db.Uuid
+  externalId   String?      @map("external_id")
+  userId       String?      @map("user_id") @db.Uuid
+  name         String
+  email        String?
+  status       SellerStatus @default(active)
+  deletedAt    DateTime?    @map("deleted_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sales        Sale[]
+  activities   Activity[]
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, externalId])
+  @@index([tenantId, userId])
+  @@index([deletedAt])
+  @@map("sellers")
+}
+
+model Sale {
+  id             String     @id @db.Uuid
+  tenantId       String     @map("tenant_id") @db.Uuid
+  dataSourceId   String?    @map("data_source_id") @db.Uuid
+  externalId     String?    @map("external_id")
+  customerId     String     @map("customer_id") @db.Uuid
+  sellerId       String?    @map("seller_id") @db.Uuid
+  totalAmount    Decimal    @map("total_amount") @db.Decimal(18, 4)
+  discountAmount Decimal    @default(0) @map("discount_amount") @db.Decimal(18, 4)
+  currency       String     @default("BRL") @db.Char(3)
+  status         SaleStatus @default(confirmed)
+  soldAt         DateTime   @map("sold_at")
+  metadata       Json?
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  seller         Seller?    @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  items          SaleItem[]
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, soldAt])
+  @@index([tenantId, externalId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, sellerId])
+  @@map("sales")
+}
+
+model SaleItem {
+  id             String  @id @db.Uuid
+  tenantId       String  @map("tenant_id") @db.Uuid
+  saleId         String  @map("sale_id") @db.Uuid
+  productId      String  @map("product_id") @db.Uuid
+  quantity       Decimal @db.Decimal(18, 4)
+  unitPrice      Decimal @map("unit_price") @db.Decimal(18, 4)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(18, 4)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(18, 4)
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sale           Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product        Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, saleId])
+  @@index([tenantId, productId])
+  @@map("sale_items")
+}
+
+model Activity {
+  id         String       @id @db.Uuid
+  tenantId   String       @map("tenant_id") @db.Uuid
+  type       ActivityType
+  customerId String?      @map("customer_id") @db.Uuid
+  leadId     String?      @map("lead_id") @db.Uuid
+  sellerId   String?      @map("seller_id") @db.Uuid
+  occurredAt DateTime     @map("occurred_at")
+  metadata   Json?
+  createdAt  DateTime     @default(now()) @map("created_at")
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lead       Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  seller     Seller?      @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, type])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerId])
+  @@index([tenantId, leadId])
+  @@index([tenantId, sellerId])
+  @@map("activities")
+}
