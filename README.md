@@ -8,6 +8,7 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 - Next.js (App Router) em `apps/web` — UI e `/api/v1/*`
 - PostgreSQL 16 + Prisma
 - Better Auth (email/senha), desacoplado do domínio via `external_auth_id`
+- Vercel AI SDK atrás de um `LLMAdapter` próprio (provider e modelo via env)
 - MinIO (S3-compatible) para etapas futuras
 
 ## Setup
@@ -15,6 +16,7 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 ```bash
 cp .env.example .env
 # preencha BETTER_AUTH_SECRET (mín. 32 chars) e ENCRYPTION_KEY (64 hex)
+# para o chat: LLM_API_KEY (ou LLM_PROVIDER=mock)
 
 PostgreSQL local usa a porta **5433** (5432 costuma estar ocupada). MinIO: 9000.
 pnpm install
@@ -52,8 +54,8 @@ apps/web              Next.js (UI + route handlers)
 packages/database     Prisma, client, repositories
 packages/domain       Services, autorização, portas
 packages/shared       Erros, logger, UUID v7, helpers de API
-packages/connectors   (Etapa 3)
-packages/intelligence (Etapas 4–5)
-packages/execution    (Etapa 7)
-packages/ai           (Etapa 6)
+packages/connectors     CSV/Postgres connectors, normalização, data quality
+packages/intelligence   Metric engine, rules, insights, recommendations
+packages/execution      (Etapa 7)
+packages/ai             Tool registry, context builder, LLM adapter, orchestrator
 ```

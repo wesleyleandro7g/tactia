@@ -15,6 +15,7 @@ export type {
   InsightStatus,
   RecommendationPriority,
   RecommendationStatus,
+  MessageRole,
   Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
@@ -37,6 +38,8 @@ export { DataQualityReportRepository } from './repositories/data-quality-report-
 export { MetricRepository } from './repositories/metric-repository';
 export { InsightRepository } from './repositories/insight-repository';
 export { RecommendationRepository } from './repositories/recommendation-repository';
+export { ConversationRepository } from './repositories/conversation-repository';
+export { MessageRepository } from './repositories/message-repository';
 export type { CreateTenantInput } from './repositories/tenant-repository';
 export type { CreateUserInput } from './repositories/user-repository';
 export type { CreateMembershipInput } from './repositories/membership-repository';
@@ -57,4 +60,6 @@ export type { CreateDataQualityReportInput } from './repositories/data-quality-r
 export type { CreateMetricInput } from './repositories/metric-repository';
 export type { CreateInsightInput, UpdateInsightInput } from './repositories/insight-repository';
 export type { CreateRecommendationInput } from './repositories/recommendation-repository';
+export type { CreateConversationInput } from './repositories/conversation-repository';
+export type { CreateMessageInput } from './repositories/message-repository';
 

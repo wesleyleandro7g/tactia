@@ -17,6 +17,7 @@ export { MetricService } from './services/metric-service';
 export { InsightService } from './services/insight-service';
 export { RecommendationService } from './services/recommendation-service';
 export { IntelligencePipelineService } from './services/intelligence-pipeline-service';
+export { ConversationService } from './services/conversation-service';
 export type { AuthProvider } from './ports/auth-provider';
 export {
   createTenantSchema,
@@ -48,3 +49,9 @@ export {
   updateMappingSchema,
   createCredentialSchema,
 } from './schemas/data-platform';
+export {
+  createConversationSchema,
+  listConversationsQuerySchema,
+  sendMessageSchema,
+  appendMessageSchema,
+} from './schemas/ai';

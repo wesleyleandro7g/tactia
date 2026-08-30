@@ -12,6 +12,7 @@
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@tactia/ai": "workspace:*",
     "@tactia/database": "workspace:*",
     "@tactia/domain": "workspace:*",
     "@tactia/intelligence": "workspace:*",
