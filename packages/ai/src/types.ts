@@ -35,6 +35,22 @@ export type MessageSource = {
 export type ToolResult<TData = unknown> = {
   data: TData;
   sources: MessageSource[];
+  /**
+   * Set when the tool created an action proposal awaiting human approval
+   * (Etapa 7). The LLM never executes anything — it can only propose.
+   */
+  proposal?: ActionProposal;
+};
+
+/** Structured action proposed during the conversation (spec §44). */
+export type ActionProposal = {
+  id: string;
+  actionType: string;
+  status: string;
+  requiresApproval: boolean;
+  approvalId?: string | null;
+  /** Payload validated by the action schema, echoed for the UI. */
+  input?: Record<string, unknown>;
 };
 
 /** Tool as stored in the registry — input is validated before `execute` runs. */
@@ -125,6 +141,8 @@ export type ChatAnswer = {
   content: string;
   sources: MessageSource[];
   toolCalls: ExecutedToolCall[];
+  /** Actions proposed in this turn, awaiting human approval (Etapa 7). */
+  proposals: ActionProposal[];
   provider: string;
   model: string;
   usage?: LLMUsage;
@@ -134,7 +152,13 @@ export type ChatAnswer = {
 
 export type ChatStreamEvent =
   | { type: 'tool_call'; name: string; input: unknown }
-  | { type: 'tool_result'; name: string; sources: MessageSource[]; error?: string }
+  | {
+      type: 'tool_result';
+      name: string;
+      sources: MessageSource[];
+      proposal?: ActionProposal;
+      error?: string;
+    }
   | { type: 'text'; delta: string }
   | { type: 'done'; answer: ChatAnswer }
   | { type: 'error'; code: string; message: string };

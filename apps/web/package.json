@@ -15,6 +15,7 @@
     "@tactia/ai": "workspace:*",
     "@tactia/database": "workspace:*",
     "@tactia/domain": "workspace:*",
+    "@tactia/execution": "workspace:*",
     "@tactia/intelligence": "workspace:*",
     "@tactia/shared": "workspace:*",
     "better-auth": "^1.3.34",

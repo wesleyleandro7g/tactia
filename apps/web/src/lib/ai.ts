@@ -4,12 +4,14 @@ import {
   ToolRegistry,
   createDefaultTools,
   requireLLMAdapter,
+  type ActionProposalPort,
   type ChatAnswer,
   type ToolContext,
 } from '@tactia/ai';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
 import {
   customerService,
+  executionEngine,
   insightService,
   metricService,
   productService,
@@ -20,19 +22,30 @@ import {
 } from './services';
 
 /**
+ * Bridge between the AI layer and the Execution Engine: the assistant can only
+ * *propose* an action, which lands in `awaiting_approval` (spec §44).
+ */
+const actionProposer: ActionProposalPort = {
+  propose: (ctx, input) => executionEngine.proposeFromAi(ctx, input),
+};
+
+/**
  * The registry is the only path from the LLM to company data — no repository or
  * Prisma client is ever handed to the AI layer (spec §43).
  */
 export const toolRegistry = new ToolRegistry(
-  createDefaultTools({
-    metrics: metricService,
-    customers: customerService,
-    products: productService,
-    sellers: sellerService,
-    sales: saleService,
-    insights: insightService,
-    recommendations: recommendationService,
-  }),
+  createDefaultTools(
+    {
+      metrics: metricService,
+      customers: customerService,
+      products: productService,
+      sellers: sellerService,
+      sales: saleService,
+      insights: insightService,
+      recommendations: recommendationService,
+    },
+    { actionProposer },
+  ),
 );
 
 export const contextBuilder = new ContextBuilder({
@@ -78,6 +91,7 @@ export function answerMetadata(answer: ChatAnswer) {
       durationMs: call.durationMs,
       ...(call.error ? { error: call.error } : {}),
     })),
+    ...(answer.proposals.length > 0 ? { proposals: answer.proposals } : {}),
     provider: answer.provider,
     model: answer.model,
     ...(answer.usage ? { usage: answer.usage } : {}),

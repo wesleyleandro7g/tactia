@@ -1,5 +1,8 @@
 import {
+  ActionExecutionRepository,
+  ActionRepository,
   ActivityRepository,
+  ApprovalRepository,
   AuditLogRepository,
   ConversationRepository,
   CredentialRepository,
@@ -45,6 +48,13 @@ import {
   UserService,
 } from '@tactia/domain';
 import { MetricEngine } from '@tactia/intelligence';
+import {
+  ActionService,
+  ApprovalService,
+  ConsoleEmailSender,
+  ExecutionEngine,
+  createDefaultActionRegistry,
+} from '@tactia/execution';
 import { betterAuthProvider } from './auth-provider';
 
 // ---------------------------------------------------------------------------
@@ -73,6 +83,9 @@ const insightRepository = new InsightRepository(prisma);
 const recommendationRepository = new RecommendationRepository(prisma);
 const conversationRepository = new ConversationRepository(prisma);
 const messageRepository = new MessageRepository(prisma);
+const actionRepository = new ActionRepository(prisma);
+const actionExecutionRepository = new ActionExecutionRepository(prisma);
+const approvalRepository = new ApprovalRepository(prisma);
 
 // ---------------------------------------------------------------------------
 // Services
@@ -159,3 +172,39 @@ export const conversationService = new ConversationService(
   messageRepository,
   auditLogService,
 );
+
+// ---------------------------------------------------------------------------
+// Execution (Etapa 7)
+// ---------------------------------------------------------------------------
+
+/**
+ * Executors receive repositories, not services: an execution may run after the
+ * request that proposed it, so there is no session to authorize against.
+ * Authorization happens when proposing and approving.
+ */
+export const emailSender = new ConsoleEmailSender();
+
+export const actionRegistry = createDefaultActionRegistry({
+  activities: activityRepository,
+  customers: customerRepository,
+  leads: leadRepository,
+  sellers: sellerRepository,
+  emailSender,
+});
+
+export const executionEngine = new ExecutionEngine({
+  actions: actionRepository,
+  executions: actionExecutionRepository,
+  approvals: approvalRepository,
+  registry: actionRegistry,
+  auditLogs: auditLogService,
+});
+
+export const actionService = new ActionService(
+  actionRepository,
+  actionExecutionRepository,
+  actionRegistry,
+  auditLogService,
+);
+
+export const approvalService = new ApprovalService(approvalRepository, executionEngine);

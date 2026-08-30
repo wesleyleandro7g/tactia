@@ -1,0 +1,439 @@
+import type {
+  ActionExecutionRepository,
+  ActionRepository,
+  ActionType,
+  ApprovalRepository,
+} from '@tactia/database';
+import { AuditAction, type AuditLogService } from '@tactia/domain';
+import { assertOwnerOrAdmin, assertRole, assertTenantContext } from '@tactia/domain';
+import { AppError, ErrorCode, createId, isAppError, logger, type RequestContext } from '@tactia/shared';
+import type { ActionRegistry } from './action-registry';
+import { InlineJobQueue } from './job-queue';
+import type { ExecutionOrigin, JobQueue, ProposeActionInput } from './types';
+
+export type ExecutionEngineDeps = {
+  actions: ActionRepository;
+  executions: ActionExecutionRepository;
+  approvals: ApprovalRepository;
+  registry: ActionRegistry;
+  auditLogs: AuditLogService;
+  /** Defaults to `InlineJobQueue` (spec §46). */
+  queue?: JobQueue;
+};
+
+/** Statuses from which an execution may still transition to `running`. */
+const RUNNABLE = new Set(['pending', 'approved']);
+const CANCELLABLE = new Set(['pending', 'awaiting_approval', 'approved']);
+
+/**
+ * Execution Engine (spec §44–45).
+ *
+ * Lifecycle:
+ *   propose → validate schema → (requires approval? → Approval pendente)
+ *           → run (background/inline) → output ou erro registrados
+ *
+ * Nothing here trusts free text: the action type must exist in the registry and
+ * the input must satisfy its Zod schema before an execution row is created.
+ */
+export class ExecutionEngine {
+  private readonly queue: JobQueue;
+
+  constructor(private readonly deps: ExecutionEngineDeps) {
+    this.queue = deps.queue ?? new InlineJobQueue();
+  }
+
+  /**
+   * Proposes an action. Returns the execution with its action and approvals.
+   *
+   * - `origin: 'ai'` always goes through approval, no matter the action config
+   *   (an LLM never triggers a side effect on its own — spec §44).
+   * - A repeated `idempotencyKey` returns the original execution (spec §52).
+   */
+  async propose(
+    ctx: RequestContext,
+    raw: ProposeActionInput,
+    options: { origin?: ExecutionOrigin } = {},
+  ) {
+    assertRole(ctx, 'member');
+    const origin = options.origin ?? 'user';
+
+    if (raw.idempotencyKey) {
+      const existing = await this.deps.executions.findByIdempotencyKey({
+        tenantId: ctx.tenantId,
+        key: raw.idempotencyKey,
+      });
+      if (existing) {
+        logger.info({
+          request_id: ctx.requestId,
+          tenant_id: ctx.tenantId,
+          operation: 'action_propose_idempotent_hit',
+          execution_id: existing.id,
+        });
+        return existing;
+      }
+    }
+
+    const action = await this.resolveAction(ctx, raw);
+    if (!action.enabled) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, `Ação '${action.type}' está desativada`);
+    }
+
+    // Schema validation before anything is persisted (spec §45)
+    const input = this.deps.registry.validate(action.type, raw.input);
+
+    const requiresApproval = action.requiresApproval || origin === 'ai';
+
+    let execution;
+    try {
+      execution = await this.deps.executions.create({
+        tenantId: ctx.tenantId,
+        actionId: action.id,
+        requestedBy: ctx.userId,
+        origin,
+        status: requiresApproval ? 'awaiting_approval' : 'pending',
+        input,
+        idempotencyKey: raw.idempotencyKey ?? null,
+      });
+    } catch (error) {
+      // Concurrent request with the same Idempotency-Key won the race.
+      if (raw.idempotencyKey && isUniqueViolation(error)) {
+        const existing = await this.deps.executions.findByIdempotencyKey({
+          tenantId: ctx.tenantId,
+          key: raw.idempotencyKey,
+        });
+        if (existing) return existing;
+      }
+      throw error;
+    }
+
+    if (requiresApproval) {
+      await this.deps.approvals.create({
+        tenantId: ctx.tenantId,
+        actionExecutionId: execution.id,
+        requestedBy: ctx.userId,
+        reason: raw.reason ?? null,
+      });
+    }
+
+    await this.deps.auditLogs.record(ctx, {
+      action: AuditAction.ACTION_PROPOSED,
+      entityType: 'action_execution',
+      entityId: execution.id,
+      actorType: origin === 'ai' ? 'ai' : 'user',
+      metadata: {
+        actionType: action.type,
+        origin,
+        requiresApproval,
+        ...(raw.reason ? { reason: raw.reason } : {}),
+      },
+    });
+
+    if (!requiresApproval) {
+      await this.enqueue(ctx, execution.id);
+    }
+
+    return this.requireExecution(ctx, execution.id);
+  }
+
+  /**
+   * Entry point used by the AI orchestrator. Never executes: the proposal is
+   * always parked in `awaiting_approval` for a human (spec §44).
+   */
+  async proposeFromAi(
+    ctx: RequestContext,
+    input: { actionType: string; input: unknown; reason?: string | null },
+  ) {
+    const type = input.actionType as ActionType;
+    if (!this.deps.registry.has(type)) {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        `Ação '${input.actionType}' não é suportada. Disponíveis: ${this.deps.registry.types().join(', ')}.`,
+      );
+    }
+
+    const execution = await this.propose(
+      ctx,
+      { actionType: type, input: input.input, reason: input.reason ?? null },
+      { origin: 'ai' },
+    );
+
+    return {
+      id: execution.id,
+      actionType: type,
+      status: execution.status,
+      requiresApproval: true,
+      approvalId: execution.approvals.find((approval) => approval.status === 'pending')?.id ?? null,
+    };
+  }
+
+  /** Approves a pending approval and runs the execution. */
+  async approve(ctx: RequestContext, approvalId: string, reason?: string | null) {
+    assertOwnerOrAdmin(ctx);
+
+    const approval = await this.deps.approvals.findById({ tenantId: ctx.tenantId, id: approvalId });
+    if (!approval) throw new AppError(ErrorCode.NOT_FOUND, 'Approval not found');
+    if (approval.status !== 'pending') {
+      throw new AppError(ErrorCode.CONFLICT, `Approval já está ${approval.status}`);
+    }
+
+    await this.deps.approvals.resolve(
+      { tenantId: ctx.tenantId, id: approvalId },
+      {
+        status: 'approved',
+        approvedBy: ctx.userId,
+        ...(reason === undefined ? {} : { reason }),
+      },
+    );
+    await this.deps.executions.update(
+      { tenantId: ctx.tenantId, id: approval.actionExecutionId },
+      { status: 'approved' },
+    );
+
+    await this.deps.auditLogs.record(ctx, {
+      action: AuditAction.ACTION_APPROVED,
+      entityType: 'action_execution',
+      entityId: approval.actionExecutionId,
+      metadata: { approvalId, actionType: approval.actionExecution.action.type },
+    });
+
+    await this.enqueue(ctx, approval.actionExecutionId);
+    return this.requireExecution(ctx, approval.actionExecutionId);
+  }
+
+  /** Rejects a pending approval — the execution is cancelled, never run. */
+  async reject(ctx: RequestContext, approvalId: string, reason?: string | null) {
+    assertOwnerOrAdmin(ctx);
+
+    const approval = await this.deps.approvals.findById({ tenantId: ctx.tenantId, id: approvalId });
+    if (!approval) throw new AppError(ErrorCode.NOT_FOUND, 'Approval not found');
+    if (approval.status !== 'pending') {
+      throw new AppError(ErrorCode.CONFLICT, `Approval já está ${approval.status}`);
+    }
+
+    await this.deps.approvals.resolve(
+      { tenantId: ctx.tenantId, id: approvalId },
+      {
+        status: 'rejected',
+        approvedBy: ctx.userId,
+        ...(reason === undefined ? {} : { reason }),
+      },
+    );
+    await this.deps.executions.update(
+      { tenantId: ctx.tenantId, id: approval.actionExecutionId },
+      { status: 'cancelled', finishedAt: new Date() },
+    );
+
+    await this.deps.auditLogs.record(ctx, {
+      action: AuditAction.ACTION_REJECTED,
+      entityType: 'action_execution',
+      entityId: approval.actionExecutionId,
+      metadata: { approvalId, ...(reason ? { reason } : {}) },
+    });
+
+    return this.requireExecution(ctx, approval.actionExecutionId);
+  }
+
+  /** Cancels an execution that has not run yet. */
+  async cancel(ctx: RequestContext, executionId: string, reason?: string | null) {
+    assertRole(ctx, 'member');
+    const execution = await this.requireExecution(ctx, executionId);
+
+    if (!CANCELLABLE.has(execution.status)) {
+      throw new AppError(
+        ErrorCode.CONFLICT,
+        `Execução com status '${execution.status}' não pode ser cancelada`,
+      );
+    }
+
+    const pending = await this.deps.approvals.findPendingByExecution({
+      tenantId: ctx.tenantId,
+      actionExecutionId: executionId,
+    });
+    if (pending) {
+      await this.deps.approvals.resolve(
+        { tenantId: ctx.tenantId, id: pending.id },
+        { status: 'rejected', approvedBy: ctx.userId, reason: reason ?? 'Cancelada pelo autor' },
+      );
+    }
+
+    await this.deps.executions.update(
+      { tenantId: ctx.tenantId, id: executionId },
+      { status: 'cancelled', finishedAt: new Date() },
+    );
+
+    await this.deps.auditLogs.record(ctx, {
+      action: AuditAction.ACTION_CANCELLED,
+      entityType: 'action_execution',
+      entityId: executionId,
+      metadata: reason ? { reason } : undefined,
+    });
+
+    return this.requireExecution(ctx, executionId);
+  }
+
+  /**
+   * Runs an execution. Never throws for executor failures: the failure is the
+   * record (`status: failed` + `error`), which is what the spec asks for.
+   */
+  async run(tenantId: string, executionId: string, requestId = createId()) {
+    const execution = await this.deps.executions.findById({ tenantId, id: executionId });
+    if (!execution) throw new AppError(ErrorCode.NOT_FOUND, 'ActionExecution not found');
+
+    if (!RUNNABLE.has(execution.status)) {
+      throw new AppError(
+        ErrorCode.CONFLICT,
+        `Execução com status '${execution.status}' não pode ser executada`,
+      );
+    }
+
+    await this.deps.executions.update(
+      { tenantId, id: executionId },
+      { status: 'running', startedAt: new Date(), error: null },
+    );
+
+    const started = Date.now();
+
+    try {
+      const definition = this.deps.registry.get(execution.action.type);
+      // Defense in depth: revalidate the stored input at execution time.
+      const input = this.deps.registry.validate(execution.action.type, execution.input);
+
+      const output = await definition.execute(
+        {
+          tenantId,
+          requestedBy: execution.requestedBy,
+          requestId,
+          executionId,
+          configuration: (execution.action.configuration ?? {}) as Record<string, unknown>,
+        },
+        input,
+      );
+
+      await this.deps.executions.update(
+        { tenantId, id: executionId },
+        { status: 'completed', output, finishedAt: new Date() },
+      );
+
+      logger.info({
+        request_id: requestId,
+        tenant_id: tenantId,
+        operation: `action:${execution.action.type}`,
+        duration_ms: Date.now() - started,
+        status: 200,
+        execution_id: executionId,
+      });
+
+      await this.deps.auditLogs.record(
+        { tenantId, userId: execution.requestedBy },
+        {
+          action: AuditAction.ACTION_EXECUTED,
+          entityType: 'action_execution',
+          entityId: executionId,
+          actorType: 'system',
+          metadata: { actionType: execution.action.type, output },
+        },
+      );
+    } catch (error) {
+      const message = isAppError(error)
+        ? `${error.code}: ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : 'Erro interno ao executar a ação';
+
+      await this.deps.executions.update(
+        { tenantId, id: executionId },
+        { status: 'failed', error: message, finishedAt: new Date() },
+      );
+
+      logger.error({
+        request_id: requestId,
+        tenant_id: tenantId,
+        operation: `action:${execution.action.type}`,
+        duration_ms: Date.now() - started,
+        status: isAppError(error) ? error.statusCode : 500,
+        error: isAppError(error) ? error.code : ErrorCode.ACTION_ERROR,
+        execution_id: executionId,
+      });
+
+      await this.deps.auditLogs.record(
+        { tenantId, userId: execution.requestedBy },
+        {
+          action: AuditAction.ACTION_FAILED,
+          entityType: 'action_execution',
+          entityId: executionId,
+          actorType: 'system',
+          metadata: { actionType: execution.action.type, error: message },
+        },
+      );
+    }
+
+    return this.deps.executions.findById({ tenantId, id: executionId });
+  }
+
+  /**
+   * Returns the tenant's action definition, provisioning it from the registry
+   * defaults on first use so the AI/API never fails for a missing catalog row.
+   */
+  async ensureAction(ctx: RequestContext, type: ActionType) {
+    assertTenantContext(ctx);
+    const existing = await this.deps.actions.findByType({ tenantId: ctx.tenantId, type });
+    if (existing) return existing;
+
+    const definition = this.deps.registry.get(type);
+    const action = await this.deps.actions.create({
+      tenantId: ctx.tenantId,
+      type,
+      name: definition.name,
+      description: definition.description,
+      configuration: {},
+      requiresApproval: definition.defaultRequiresApproval,
+    });
+
+    await this.deps.auditLogs.record(ctx, {
+      action: AuditAction.ACTION_CREATED,
+      entityType: 'action',
+      entityId: action.id,
+      actorType: 'system',
+      metadata: { type, provisioned: 'default' },
+    });
+
+    return action;
+  }
+
+  // -------------------------------------------------------------------------
+
+  private async resolveAction(ctx: RequestContext & { tenantId: string }, raw: ProposeActionInput) {
+    if (raw.actionId) {
+      const action = await this.deps.actions.findById({ tenantId: ctx.tenantId, id: raw.actionId });
+      if (!action) throw new AppError(ErrorCode.NOT_FOUND, 'Action not found');
+      return action;
+    }
+    if (raw.actionType) {
+      return this.ensureAction(ctx, raw.actionType);
+    }
+    throw new AppError(ErrorCode.VALIDATION_ERROR, 'Informe actionId ou actionType');
+  }
+
+  private async enqueue(ctx: RequestContext & { tenantId: string }, executionId: string) {
+    const { tenantId, requestId } = ctx;
+    await this.queue.enqueue({
+      tenantId,
+      executionId,
+      run: () => this.run(tenantId, executionId, requestId).then(() => undefined),
+    });
+  }
+
+  private async requireExecution(ctx: RequestContext & { tenantId: string }, id: string) {
+    const execution = await this.deps.executions.findById({ tenantId: ctx.tenantId, id });
+    if (!execution) throw new AppError(ErrorCode.NOT_FOUND, 'ActionExecution not found');
+    return execution;
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: string }).code === 'P2002'
+  );
+}

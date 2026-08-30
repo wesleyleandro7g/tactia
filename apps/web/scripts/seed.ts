@@ -263,10 +263,49 @@ async function seedBusiness(tenantId: string) {
   );
 }
 
+async function seedActions(tenantId: string) {
+  // Built-in action definitions (Etapa 7). Idempotent: skips existing types.
+  const defaults = [
+    {
+      type: 'create_task' as const,
+      name: 'Criar tarefa',
+      description:
+        'Cria uma tarefa (Activity do tipo task) para acompanhamento de um cliente, lead ou vendedor.',
+    },
+    {
+      type: 'send_email' as const,
+      name: 'Enviar e-mail',
+      description: 'Envia um e-mail para um contato (cliente, lead ou vendedor).',
+    },
+  ];
+
+  let created = 0;
+  for (const definition of defaults) {
+    const existing = await prisma.action.findFirst({
+      where: { tenantId, type: definition.type },
+    });
+    if (existing) continue;
+    await prisma.action.create({
+      data: {
+        id: createId(),
+        tenantId,
+        type: definition.type,
+        name: definition.name,
+        description: definition.description,
+        configuration: {},
+        requiresApproval: true,
+      },
+    });
+    created += 1;
+  }
+  console.log(`Actions seed: ${created} new definition(s), ${defaults.length} total`);
+}
+
 async function main() {
   const { tenant } = await ensureIdentity();
   console.log(`Identity ready: ${DEMO_EMAIL} / password123 (${tenant.name})`);
   await seedBusiness(tenant.id);
+  await seedActions(tenant.id);
 }
 
 main()

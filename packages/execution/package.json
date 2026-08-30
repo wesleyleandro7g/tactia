@@ -12,12 +12,19 @@
   "scripts": {
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "build": "tsc --noEmit"
   },
+  "dependencies": {
+    "@tactia/database": "workspace:*",
+    "@tactia/domain": "workspace:*",
+    "@tactia/shared": "workspace:*",
+    "zod": "^3.25.76"
+  },
   "devDependencies": {
+    "@types/node": "^24.3.0",
+    "eslint": "^9.34.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "eslint": "^9.34.0"
+    "vitest": "^3.2.4"
   }
 }

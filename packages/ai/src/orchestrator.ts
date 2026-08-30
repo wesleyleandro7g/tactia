@@ -3,6 +3,7 @@ import type { AiContext } from './context-builder';
 import { buildSystemPrompt } from './system-prompt';
 import type { ToolRegistry } from './tool-registry';
 import type {
+  ActionProposal,
   ChatAnswer,
   ChatStreamEvent,
   ChatTurn,
@@ -113,6 +114,7 @@ export class Orchestrator {
     const { context, system, messages } = await this.prepare(request);
     const sources: MessageSource[] = [...context.sources];
     const executed: ExecutedToolCall[] = [];
+    const proposals: ActionProposal[] = [];
     let usage: LLMUsage | undefined;
 
     for (let round = 0; round < this.maxIterations; round += 1) {
@@ -124,7 +126,7 @@ export class Orchestrator {
       usage = sumUsage(usage, completion.usage);
 
       if (completion.toolCalls.length === 0) {
-        return this.finalize(completion.text, sources, executed, usage);
+        return this.finalize(completion.text, sources, executed, proposals, usage);
       }
 
       messages.push({
@@ -143,13 +145,14 @@ export class Orchestrator {
         });
         executed.push(outcome.executed);
         sources.push(...outcome.executed.sources);
+        if (outcome.proposal) proposals.push(outcome.proposal);
       }
     }
 
     // Tool budget exhausted: force a final answer with the data already gathered.
     const forced = await this.deps.llm.complete({ system, messages });
     usage = sumUsage(usage, forced.usage);
-    return this.finalize(forced.text, sources, executed, usage, 'max_iterations');
+    return this.finalize(forced.text, sources, executed, proposals, usage, 'max_iterations');
   }
 
   /**
@@ -160,6 +163,7 @@ export class Orchestrator {
     const { context, system, messages } = await this.prepare(request);
     const sources: MessageSource[] = [...context.sources];
     const executed: ExecutedToolCall[] = [];
+    const proposals: ActionProposal[] = [];
     let usage: LLMUsage | undefined;
 
     for (let round = 0; round < this.maxIterations; round += 1) {
@@ -191,7 +195,10 @@ export class Orchestrator {
       }
 
       if (toolCalls.length === 0) {
-        yield { type: 'done', answer: this.finalize(text, sources, executed, usage) };
+        yield {
+          type: 'done',
+          answer: this.finalize(text, sources, executed, proposals, usage),
+        };
         return;
       }
 
@@ -208,10 +215,12 @@ export class Orchestrator {
         });
         executed.push(outcome.executed);
         sources.push(...outcome.executed.sources);
+        if (outcome.proposal) proposals.push(outcome.proposal);
         yield {
           type: 'tool_result',
           name: toolCall.name,
           sources: outcome.executed.sources,
+          ...(outcome.proposal ? { proposal: outcome.proposal } : {}),
           ...(outcome.executed.error ? { error: outcome.executed.error } : {}),
         };
       }
@@ -222,7 +231,7 @@ export class Orchestrator {
     if (forced.text) yield { type: 'text', delta: forced.text };
     yield {
       type: 'done',
-      answer: this.finalize(forced.text, sources, executed, usage, 'max_iterations'),
+      answer: this.finalize(forced.text, sources, executed, proposals, usage, 'max_iterations'),
     };
   }
 
@@ -251,7 +260,7 @@ export class Orchestrator {
   private async executeToolCall(
     ctx: ToolContext,
     toolCall: LLMToolCall,
-  ): Promise<{ output: unknown; executed: ExecutedToolCall }> {
+  ): Promise<{ output: unknown; executed: ExecutedToolCall; proposal?: ActionProposal }> {
     const started = Date.now();
     try {
       const result = await this.deps.tools.execute(toolCall.name, ctx, toolCall.input);
@@ -263,6 +272,7 @@ export class Orchestrator {
           durationMs: Date.now() - started,
           sources: result.sources,
         },
+        ...(result.proposal ? { proposal: result.proposal } : {}),
       };
     } catch (error) {
       // Tool failures are fed back to the model instead of aborting the chat —
@@ -294,6 +304,7 @@ export class Orchestrator {
     text: string,
     sources: MessageSource[],
     toolCalls: ExecutedToolCall[],
+    proposals: ActionProposal[],
     usage: LLMUsage | undefined,
     guardrail?: ChatAnswer['guardrail'],
   ): ChatAnswer {
@@ -313,6 +324,7 @@ export class Orchestrator {
       content,
       sources: deduped,
       toolCalls,
+      proposals,
       provider: this.deps.llm.provider,
       model: this.deps.llm.model,
       ...(usage ? { usage } : {}),

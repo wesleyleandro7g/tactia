@@ -16,6 +16,9 @@ export type {
   RecommendationPriority,
   RecommendationStatus,
   MessageRole,
+  ActionType,
+  ActionExecutionStatus,
+  ApprovalStatus,
   Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
@@ -40,6 +43,9 @@ export { InsightRepository } from './repositories/insight-repository';
 export { RecommendationRepository } from './repositories/recommendation-repository';
 export { ConversationRepository } from './repositories/conversation-repository';
 export { MessageRepository } from './repositories/message-repository';
+export { ActionRepository } from './repositories/action-repository';
+export { ActionExecutionRepository } from './repositories/action-execution-repository';
+export { ApprovalRepository } from './repositories/approval-repository';
 export type { CreateTenantInput } from './repositories/tenant-repository';
 export type { CreateUserInput } from './repositories/user-repository';
 export type { CreateMembershipInput } from './repositories/membership-repository';
@@ -62,4 +68,13 @@ export type { CreateInsightInput, UpdateInsightInput } from './repositories/insi
 export type { CreateRecommendationInput } from './repositories/recommendation-repository';
 export type { CreateConversationInput } from './repositories/conversation-repository';
 export type { CreateMessageInput } from './repositories/message-repository';
+export type { CreateActionInput, UpdateActionInput } from './repositories/action-repository';
+export type {
+  CreateActionExecutionInput,
+  UpdateActionExecutionInput,
+} from './repositories/action-execution-repository';
+export type {
+  CreateApprovalInput,
+  ResolveApprovalInput,
+} from './repositories/approval-repository';
 

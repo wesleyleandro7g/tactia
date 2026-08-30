@@ -56,6 +56,6 @@ packages/domain       Services, autorização, portas
 packages/shared       Erros, logger, UUID v7, helpers de API
 packages/connectors     CSV/Postgres connectors, normalização, data quality
 packages/intelligence   Metric engine, rules, insights, recommendations
-packages/execution      (Etapa 7)
+packages/execution      Action registry, execution engine, approvals
 packages/ai             Tool registry, context builder, LLM adapter, orchestrator
 ```

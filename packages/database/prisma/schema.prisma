@@ -135,6 +135,29 @@ enum MessageRole {
   tool
 }
 
+enum ActionType {
+  create_task
+  send_email
+  send_whatsapp
+  generate_report
+}
+
+enum ActionExecutionStatus {
+  pending
+  awaiting_approval
+  approved
+  running
+  completed
+  failed
+  cancelled
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
 enum RecommendationStatus {
   pending
   accepted
@@ -245,6 +268,9 @@ model Tenant {
   insights       Insight[]
   recommendations Recommendation[]
   conversations  Conversation[]
+  actions          Action[]
+  actionExecutions ActionExecution[]
+  approvals        Approval[]
 
   @@unique([slug])
   @@index([status])
@@ -756,4 +782,73 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([tenantId, createdAt])
   @@map("messages")
+}
+
+// ---------------------------------------------------------------------------
+// Execution — Actions, ActionExecutions e Approvals (Etapa 7)
+// ---------------------------------------------------------------------------
+
+model Action {
+  id               String            @id @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
+  type             ActionType
+  name             String
+  description      String?
+  configuration    Json
+  requiresApproval Boolean           @default(true) @map("requires_approval")
+  enabled          Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  executions       ActionExecution[]
+
+  @@unique([tenantId, type])
+  @@index([tenantId, enabled])
+  @@map("actions")
+}
+
+model ActionExecution {
+  id             String                @id @db.Uuid
+  tenantId       String                @map("tenant_id") @db.Uuid
+  actionId       String                @map("action_id") @db.Uuid
+  requestedBy    String?               @map("requested_by") @db.Uuid
+  /// user | ai | system — who originated the proposal
+  origin         String                @default("user")
+  status         ActionExecutionStatus @default(pending)
+  input          Json
+  output         Json?
+  error          String?
+  idempotencyKey String?               @map("idempotency_key")
+  startedAt      DateTime?             @map("started_at")
+  finishedAt     DateTime?             @map("finished_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action         Action                @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  approvals      Approval[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([actionId])
+  @@map("action_executions")
+}
+
+model Approval {
+  id                String          @id @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  actionExecutionId String          @map("action_execution_id") @db.Uuid
+  requestedBy       String?         @map("requested_by") @db.Uuid
+  approvedBy        String?         @map("approved_by") @db.Uuid
+  status            ApprovalStatus  @default(pending)
+  reason            String?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  resolvedAt        DateTime?       @map("resolved_at")
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actionExecution   ActionExecution @relation(fields: [actionExecutionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([actionExecutionId])
+  @@map("approvals")
 }
