@@ -9,6 +9,7 @@ import {
   LeadRepository,
   MappingRepository,
   MembershipRepository,
+  MetricRepository,
   prisma,
   ProductRepository,
   RawRecordRepository,
@@ -27,6 +28,7 @@ import {
   ImportService,
   LeadService,
   MembershipService,
+  MetricService,
   ProductService,
   SaleService,
   SellerService,
@@ -34,7 +36,12 @@ import {
   TenantService,
   UserService,
 } from '@tactia/domain';
+import { MetricEngine } from '@tactia/intelligence';
 import { betterAuthProvider } from './auth-provider';
+
+// ---------------------------------------------------------------------------
+// Repositories
+// ---------------------------------------------------------------------------
 
 const tenantRepository = new TenantRepository(prisma);
 const userRepository = new UserRepository(prisma);
@@ -53,20 +60,33 @@ const rawRecordRepository = new RawRecordRepository(prisma);
 const mappingRepository = new MappingRepository(prisma);
 const importRepository = new ImportRepository(prisma);
 const dataQualityReportRepository = new DataQualityReportRepository(prisma);
+const metricRepository = new MetricRepository(prisma);
+
+// ---------------------------------------------------------------------------
+// Services
+// ---------------------------------------------------------------------------
 
 export const auditLogService = new AuditLogService(auditLogRepository);
+
 export const tenantService = new TenantService(tenantRepository, membershipRepository, auditLogService);
+
 export const userService = new UserService(
   userRepository,
   membershipRepository,
   auditLogService,
   betterAuthProvider,
 );
+
 export const membershipService = new MembershipService(membershipRepository, auditLogService);
+
 export const customerService = new CustomerService(customerRepository, auditLogService);
+
 export const leadService = new LeadService(leadRepository, customerRepository, auditLogService);
+
 export const productService = new ProductService(productRepository, auditLogService);
+
 export const sellerService = new SellerService(sellerRepository, auditLogService);
+
 export const saleService = new SaleService(
   saleRepository,
   customerRepository,
@@ -74,6 +94,7 @@ export const saleService = new SaleService(
   sellerRepository,
   auditLogService,
 );
+
 export const activityService = new ActivityService(
   activityRepository,
   customerRepository,
@@ -81,13 +102,16 @@ export const activityService = new ActivityService(
   sellerRepository,
   auditLogService,
 );
+
 export const credentialService = new CredentialService(credentialRepository);
+
 export const dataSourceService = new DataSourceService(
   dataSourceRepository,
   mappingRepository,
   credentialRepository,
   auditLogService,
 );
+
 export const syncService = new SyncService(
   dataSourceRepository,
   syncJobRepository,
@@ -98,5 +122,8 @@ export const syncService = new SyncService(
   credentialRepository,
   auditLogService,
 );
+
 export const importService = new ImportService(importRepository);
 
+const metricEngine = new MetricEngine(prisma);
+export const metricService = new MetricService(metricEngine, metricRepository);

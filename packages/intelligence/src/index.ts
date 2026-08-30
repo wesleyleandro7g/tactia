@@ -1,2 +1,11 @@
-/** Metric/Rule/Insight engines land in Etapas 4–5. */
-export const INTELLIGENCE_PACKAGE = '@tactia/intelligence';
+export { MetricEngine } from './metric-engine';
+export type {
+  MetricResult,
+  MetricInput,
+  MetricPeriod,
+  MetricKey,
+  MetricDimension,
+  MetricBreakdownItem,
+  PeriodGranularity,
+} from './types';
+export { METRIC_KEYS, METRIC_DEFINITIONS } from './types';

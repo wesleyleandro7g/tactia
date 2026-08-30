@@ -200,6 +200,7 @@ model Tenant {
   mappings     Mapping[]
   imports      Import[]
   qualityReports DataQualityReport[]
+  metrics        Metric[]
 
   @@unique([slug])
   @@index([status])
@@ -604,4 +605,24 @@ model DataQualityReport {
   @@index([tenantId, dataSourceId])
   @@index([tenantId, createdAt])
   @@map("data_quality_reports")
+}
+
+// ---------------------------------------------------------------------------
+// Intelligence — Metric Engine (Etapa 4)
+// ---------------------------------------------------------------------------
+
+model Metric {
+  id          String   @id @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  key         String
+  name        String
+  description String?
+  definition  Json
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("metrics")
 }

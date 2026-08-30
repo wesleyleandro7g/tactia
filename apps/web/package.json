@@ -14,6 +14,7 @@
   "dependencies": {
     "@tactia/database": "workspace:*",
     "@tactia/domain": "workspace:*",
+    "@tactia/intelligence": "workspace:*",
     "@tactia/shared": "workspace:*",
     "better-auth": "^1.3.34",
     "next": "^16.2.0",

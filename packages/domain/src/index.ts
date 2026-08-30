@@ -13,6 +13,7 @@ export { CredentialService, encrypt, decrypt } from './services/credential-servi
 export { DataSourceService } from './services/data-source-service';
 export { SyncService } from './services/sync-service';
 export { ImportService } from './services/import-service';
+export { MetricService } from './services/metric-service';
 export type { AuthProvider } from './ports/auth-provider';
 export {
   createTenantSchema,

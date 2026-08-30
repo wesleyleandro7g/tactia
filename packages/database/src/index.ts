@@ -10,6 +10,7 @@ export type {
   DataSourceStatus,
   SyncJobStatus,
   ImportStatus,
+  Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
 export { UserRepository } from './repositories/user-repository';
@@ -28,6 +29,7 @@ export { RawRecordRepository } from './repositories/raw-record-repository';
 export { MappingRepository } from './repositories/mapping-repository';
 export { ImportRepository } from './repositories/import-repository';
 export { DataQualityReportRepository } from './repositories/data-quality-report-repository';
+export { MetricRepository } from './repositories/metric-repository';
 export type { CreateTenantInput } from './repositories/tenant-repository';
 export type { CreateUserInput } from './repositories/user-repository';
 export type { CreateMembershipInput } from './repositories/membership-repository';
@@ -45,4 +47,5 @@ export type { UpsertRawRecordInput } from './repositories/raw-record-repository'
 export type { CreateMappingInput } from './repositories/mapping-repository';
 export type { CreateImportInput } from './repositories/import-repository';
 export type { CreateDataQualityReportInput } from './repositories/data-quality-report-repository';
+export type { CreateMetricInput } from './repositories/metric-repository';
 

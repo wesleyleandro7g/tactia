@@ -32,6 +32,9 @@ importers:
       '@tactia/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@tactia/intelligence':
+        specifier: workspace:*
+        version: link:../../packages/intelligence
       '@tactia/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -155,6 +158,9 @@ importers:
       '@tactia/database':
         specifier: workspace:*
         version: link:../database
+      '@tactia/intelligence':
+        specifier: workspace:*
+        version: link:../intelligence
       '@tactia/shared':
         specifier: workspace:*
         version: link:../shared
@@ -188,7 +194,17 @@ importers:
         version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
   packages/intelligence:
+    dependencies:
+      '@tactia/database':
+        specifier: workspace:*
+        version: link:../database
+      '@tactia/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
+      '@types/node':
+        specifier: ^24.3.0
+        version: 24.13.3
       eslint:
         specifier: ^9.34.0
         version: 9.39.5(jiti@2.7.0)

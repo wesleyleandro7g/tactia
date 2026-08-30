@@ -18,6 +18,7 @@
   "dependencies": {
     "@tactia/connectors": "workspace:*",
     "@tactia/database": "workspace:*",
+    "@tactia/intelligence": "workspace:*",
     "@tactia/shared": "workspace:*",
     "zod": "^3.25.76"
   },
