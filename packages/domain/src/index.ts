@@ -9,6 +9,10 @@ export { ProductService } from './services/product-service';
 export { SellerService } from './services/seller-service';
 export { SaleService } from './services/sale-service';
 export { ActivityService } from './services/activity-service';
+export { CredentialService, encrypt, decrypt } from './services/credential-service';
+export { DataSourceService } from './services/data-source-service';
+export { SyncService } from './services/sync-service';
+export { ImportService } from './services/import-service';
 export type { AuthProvider } from './ports/auth-provider';
 export {
   createTenantSchema,
@@ -33,3 +37,10 @@ export {
   updateActivitySchema,
   listQuerySchema,
 } from './schemas/business';
+export {
+  createDataSourceSchema,
+  updateDataSourceSchema,
+  createMappingSchema,
+  updateMappingSchema,
+  createCredentialSchema,
+} from './schemas/data-platform';

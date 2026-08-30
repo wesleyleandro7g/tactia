@@ -143,6 +143,38 @@ export class SaleRepository {
     });
   }
 
+  async upsertByExternalId(input: CreateSaleInput & { dataSourceId: string; externalId: string }) {
+    const existing = await this.db.sale.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        dataSourceId: input.dataSourceId,
+        externalId: input.externalId,
+      },
+      include: saleInclude,
+    });
+
+    if (existing) {
+      const updated = await this.db.sale.update({
+        where: { id: existing.id },
+        data: {
+          customerId: input.customerId,
+          sellerId: input.sellerId ?? null,
+          totalAmount: input.totalAmount,
+          discountAmount: input.discountAmount ?? 0,
+          currency: input.currency ?? 'BRL',
+          status: input.status ?? existing.status,
+          soldAt: input.soldAt,
+          metadata: asJson(input.metadata),
+        },
+        include: saleInclude,
+      });
+      return { entity: updated, created: false };
+    }
+
+    const created = await this.create(input);
+    return { entity: created, created: true };
+  }
+
   async delete({ tenantId, id }: { tenantId: string; id: string }) {
     const existing = await this.findById({ tenantId, id });
     if (!existing) return null;

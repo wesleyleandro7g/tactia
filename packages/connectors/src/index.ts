@@ -1,2 +1,11 @@
-/** Connector interface lands in Etapa 3. */
-export const CONNECTORS_PACKAGE = '@tactia/connectors';
+export type { Connector, FieldMapping, FieldTransform, MappingConfig, ConnectionTestResult, DiscoveryResult, DiscoveryResource, DiscoveryColumn, FetchOptions, RawRow, SyncContext, SyncResult } from './types';
+export { applyTransform } from './transforms';
+export { computeChecksum } from './checksum';
+export { CsvConnector } from './csv-connector';
+export type { CsvConnectorConfig } from './csv-connector';
+export { PostgresConnector } from './postgres-connector';
+export type { PostgresConnectorConfig } from './postgres-connector';
+export { runDataQualityChecks } from './data-quality';
+export type { DataQualityCheckResult, QualityIssue } from './data-quality';
+export { normalizeRow, normalizeToCanonical } from './normalizer';
+export type { NormalizerRepositories } from './normalizer';

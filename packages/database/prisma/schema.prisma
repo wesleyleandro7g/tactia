@@ -72,6 +72,35 @@ enum ActivityType {
   status_change
 }
 
+enum DataSourceType {
+  csv
+  xlsx
+  postgres
+  rest
+  google_sheets
+}
+
+enum DataSourceStatus {
+  active
+  inactive
+  error
+}
+
+enum SyncJobStatus {
+  pending
+  running
+  completed
+  failed
+  cancelled
+}
+
+enum ImportStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
 // ---------------------------------------------------------------------------
 // Better Auth tables (provider-owned). Domain User maps via externalAuthId.
 // ---------------------------------------------------------------------------
@@ -164,6 +193,13 @@ model Tenant {
   sales        Sale[]
   saleItems    SaleItem[]
   activities   Activity[]
+  credentials  Credential[]
+  dataSources  DataSource[]
+  syncJobs     SyncJob[]
+  rawRecords   RawRecord[]
+  mappings     Mapping[]
+  imports      Import[]
+  qualityReports DataQualityReport[]
 
   @@unique([slug])
   @@index([status])
@@ -414,4 +450,158 @@ model Activity {
   @@index([tenantId, leadId])
   @@index([tenantId, sellerId])
   @@map("activities")
+}
+
+// ---------------------------------------------------------------------------
+// Data Platform (Etapa 3)
+// ---------------------------------------------------------------------------
+
+model Credential {
+  id            String       @id @db.Uuid
+  tenantId      String       @map("tenant_id") @db.Uuid
+  provider      String
+  encryptedData String       @map("encrypted_data")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSources   DataSource[]
+
+  @@index([tenantId])
+  @@map("credentials")
+}
+
+model DataSource {
+  id           String           @id @db.Uuid
+  tenantId     String           @map("tenant_id") @db.Uuid
+  type         DataSourceType
+  name         String
+  status       DataSourceStatus @default(active)
+  configuration Json?
+  credentialId  String?          @map("credential_id") @db.Uuid
+  lastSyncAt   DateTime?        @map("last_sync_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  credential   Credential?      @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  syncJobs     SyncJob[]
+  rawRecords   RawRecord[]
+  mappings     Mapping[]
+  imports      Import[]
+  qualityReports DataQualityReport[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("data_sources")
+}
+
+model SyncJob {
+  id              String        @id @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  dataSourceId    String        @map("data_source_id") @db.Uuid
+  status          SyncJobStatus @default(pending)
+  startedAt       DateTime?     @map("started_at")
+  finishedAt      DateTime?     @map("finished_at")
+  recordsRead     Int           @default(0) @map("records_read")
+  recordsCreated  Int           @default(0) @map("records_created")
+  recordsUpdated  Int           @default(0) @map("records_updated")
+  recordsFailed   Int           @default(0) @map("records_failed")
+  error           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource      DataSource    @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  rawRecords      RawRecord[]
+  imports         Import[]
+  qualityReports  DataQualityReport[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, dataSourceId])
+  @@index([tenantId, createdAt])
+  @@map("sync_jobs")
+}
+
+model RawRecord {
+  id           String     @id @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  dataSourceId String     @map("data_source_id") @db.Uuid
+  syncJobId    String?    @map("sync_job_id") @db.Uuid
+  externalId   String?    @map("external_id")
+  entityType   String     @map("entity_type")
+  payload      Json
+  checksum     String
+  processedAt  DateTime?  @map("processed_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource   DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  syncJob      SyncJob?   @relation(fields: [syncJobId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, dataSourceId, externalId, entityType])
+  @@index([tenantId, dataSourceId])
+  @@index([tenantId, entityType])
+  @@index([tenantId, externalId])
+  @@map("raw_records")
+}
+
+model Mapping {
+  id            String     @id @db.Uuid
+  tenantId      String     @map("tenant_id") @db.Uuid
+  dataSourceId  String     @map("data_source_id") @db.Uuid
+  sourceEntity  String     @map("source_entity")
+  targetEntity  String     @map("target_entity")
+  configuration Json
+  version       Int        @default(1)
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource    DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dataSourceId])
+  @@index([tenantId, targetEntity])
+  @@map("mappings")
+}
+
+model Import {
+  id               String       @id @db.Uuid
+  tenantId         String       @map("tenant_id") @db.Uuid
+  dataSourceId     String       @map("data_source_id") @db.Uuid
+  syncJobId        String?      @map("sync_job_id") @db.Uuid
+  entityType       String       @map("entity_type")
+  status           ImportStatus @default(pending)
+  totalRecords     Int          @default(0) @map("total_records")
+  processedRecords Int          @default(0) @map("processed_records")
+  failedRecords    Int          @default(0) @map("failed_records")
+  idempotencyKey   String?      @unique @map("idempotency_key")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource       DataSource   @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  syncJob          SyncJob?     @relation(fields: [syncJobId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, dataSourceId])
+  @@index([tenantId, createdAt])
+  @@map("imports")
+}
+
+model DataQualityReport {
+  id           String     @id @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  dataSourceId String     @map("data_source_id") @db.Uuid
+  syncJobId    String?    @map("sync_job_id") @db.Uuid
+  entityType   String     @map("entity_type")
+  totalRecords Int        @map("total_records")
+  validRecords Int        @map("valid_records")
+  invalidRecords Int      @map("invalid_records")
+  warnings     Json
+  errors       Json
+  createdAt    DateTime   @default(now()) @map("created_at")
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource   DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  syncJob      SyncJob?   @relation(fields: [syncJobId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, dataSourceId])
+  @@index([tenantId, createdAt])
+  @@map("data_quality_reports")
 }

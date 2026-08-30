@@ -97,6 +97,32 @@ export class SellerRepository {
     });
   }
 
+  async upsertByExternalId(input: CreateSellerInput & { dataSourceId: string; externalId: string }) {
+    const existing = await this.db.seller.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        dataSourceId: input.dataSourceId,
+        externalId: input.externalId,
+        deletedAt: null,
+      },
+    });
+
+    if (existing) {
+      const updated = await this.db.seller.update({
+        where: { id: existing.id },
+        data: {
+          name: input.name,
+          email: input.email ?? null,
+          status: input.status ?? existing.status,
+        },
+      });
+      return { entity: updated, created: false };
+    }
+
+    const created = await this.create(input);
+    return { entity: created, created: true };
+  }
+
   async softDelete({ tenantId, id }: { tenantId: string; id: string }) {
     const existing = await this.findById({ tenantId, id });
     if (!existing) return null;

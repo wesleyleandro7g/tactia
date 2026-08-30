@@ -1,0 +1,4 @@
+external_id,name,email,phone
+CUST001,João Silva,joao@example.com,11999990001
+CUST002,Maria Costa,maria@example.com,11999990002
+CUST003,Carlos Souza,carlos@example.com,11999990003

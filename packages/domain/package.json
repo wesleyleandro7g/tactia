@@ -16,6 +16,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@tactia/connectors": "workspace:*",
     "@tactia/database": "workspace:*",
     "@tactia/shared": "workspace:*",
     "zod": "^3.25.76"

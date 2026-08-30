@@ -1,25 +1,36 @@
 import {
   ActivityRepository,
   AuditLogRepository,
+  CredentialRepository,
   CustomerRepository,
+  DataQualityReportRepository,
+  DataSourceRepository,
+  ImportRepository,
   LeadRepository,
+  MappingRepository,
   MembershipRepository,
   prisma,
   ProductRepository,
+  RawRecordRepository,
   SaleRepository,
   SellerRepository,
+  SyncJobRepository,
   TenantRepository,
   UserRepository,
 } from '@tactia/database';
 import {
   ActivityService,
   AuditLogService,
+  CredentialService,
   CustomerService,
+  DataSourceService,
+  ImportService,
   LeadService,
   MembershipService,
   ProductService,
   SaleService,
   SellerService,
+  SyncService,
   TenantService,
   UserService,
 } from '@tactia/domain';
@@ -35,6 +46,13 @@ const productRepository = new ProductRepository(prisma);
 const sellerRepository = new SellerRepository(prisma);
 const saleRepository = new SaleRepository(prisma);
 const activityRepository = new ActivityRepository(prisma);
+const credentialRepository = new CredentialRepository(prisma);
+const dataSourceRepository = new DataSourceRepository(prisma);
+const syncJobRepository = new SyncJobRepository(prisma);
+const rawRecordRepository = new RawRecordRepository(prisma);
+const mappingRepository = new MappingRepository(prisma);
+const importRepository = new ImportRepository(prisma);
+const dataQualityReportRepository = new DataQualityReportRepository(prisma);
 
 export const auditLogService = new AuditLogService(auditLogRepository);
 export const tenantService = new TenantService(tenantRepository, membershipRepository, auditLogService);
@@ -63,3 +81,22 @@ export const activityService = new ActivityService(
   sellerRepository,
   auditLogService,
 );
+export const credentialService = new CredentialService(credentialRepository);
+export const dataSourceService = new DataSourceService(
+  dataSourceRepository,
+  mappingRepository,
+  credentialRepository,
+  auditLogService,
+);
+export const syncService = new SyncService(
+  dataSourceRepository,
+  syncJobRepository,
+  rawRecordRepository,
+  importRepository,
+  dataQualityReportRepository,
+  mappingRepository,
+  credentialRepository,
+  auditLogService,
+);
+export const importService = new ImportService(importRepository);
+
