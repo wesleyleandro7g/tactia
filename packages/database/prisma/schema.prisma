@@ -101,6 +101,40 @@ enum ImportStatus {
   failed
 }
 
+enum InsightType {
+  anomaly
+  performance
+  opportunity
+  warning
+}
+
+enum InsightSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum InsightStatus {
+  open
+  acknowledged
+  resolved
+  dismissed
+}
+
+enum RecommendationPriority {
+  low
+  medium
+  high
+}
+
+enum RecommendationStatus {
+  pending
+  accepted
+  rejected
+  dismissed
+}
+
 // ---------------------------------------------------------------------------
 // Better Auth tables (provider-owned). Domain User maps via externalAuthId.
 // ---------------------------------------------------------------------------
@@ -201,6 +235,8 @@ model Tenant {
   imports      Import[]
   qualityReports DataQualityReport[]
   metrics        Metric[]
+  insights       Insight[]
+  recommendations Recommendation[]
 
   @@unique([slug])
   @@index([status])
@@ -625,4 +661,55 @@ model Metric {
   @@unique([tenantId, key])
   @@index([tenantId])
   @@map("metrics")
+}
+
+// ---------------------------------------------------------------------------
+// Intelligence — Rules, Insights, Recommendations (Etapa 5)
+// ---------------------------------------------------------------------------
+
+model Insight {
+  id              String          @id @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  type            InsightType
+  severity        InsightSeverity
+  status          InsightStatus   @default(open)
+  title           String
+  description     String
+  ruleKey         String          @map("rule_key")
+  evidence        Json
+  periodFrom      DateTime        @map("period_from")
+  periodTo        DateTime        @map("period_to")
+  resolvedAt      DateTime?       @map("resolved_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recommendations Recommendation[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, ruleKey, status])
+  @@map("insights")
+}
+
+model Recommendation {
+  id          String                 @id @db.Uuid
+  tenantId    String                 @map("tenant_id") @db.Uuid
+  insightId   String                 @map("insight_id") @db.Uuid
+  priority    RecommendationPriority
+  status      RecommendationStatus   @default(pending)
+  title       String
+  description String
+  actionType  String?                @map("action_type")
+  metadata    Json?
+  acceptedAt  DateTime?              @map("accepted_at")
+  rejectedAt  DateTime?              @map("rejected_at")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  insight     Insight                @relation(fields: [insightId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([insightId])
+  @@map("recommendations")
 }

@@ -14,6 +14,9 @@ export { DataSourceService } from './services/data-source-service';
 export { SyncService } from './services/sync-service';
 export { ImportService } from './services/import-service';
 export { MetricService } from './services/metric-service';
+export { InsightService } from './services/insight-service';
+export { RecommendationService } from './services/recommendation-service';
+export { IntelligencePipelineService } from './services/intelligence-pipeline-service';
 export type { AuthProvider } from './ports/auth-provider';
 export {
   createTenantSchema,

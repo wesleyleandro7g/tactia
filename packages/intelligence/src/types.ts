@@ -81,3 +81,40 @@ export const METRIC_DEFINITIONS: Record<MetricKey, { name: string; description: 
     description: 'Variação percentual na receita em relação ao período anterior de mesma duração.',
   },
 };
+
+// ---------------------------------------------------------------------------
+// Intelligence types (Etapa 5)
+// ---------------------------------------------------------------------------
+
+export type InsightTypeLiteral = 'anomaly' | 'performance' | 'opportunity' | 'warning';
+export type InsightSeverityLiteral = 'low' | 'medium' | 'high' | 'critical';
+
+export type DetectedEvent = {
+  ruleKey: string;
+  type: InsightTypeLiteral;
+  severity: InsightSeverityLiteral;
+  title: string;
+  description: string;
+  evidence: MetricResult[];
+  periodFrom: Date;
+  periodTo: Date;
+};
+
+export type TenantThresholds = {
+  revenueDrop: number; // default -0.15
+  revenueGrowth: number; // default 0.15
+  productChange: number; // default 0.20 (both growth and decline)
+  inactiveLeadDays: number; // default 7
+  inactiveCustomerDays: number; // default 30
+  sellerDeviationFactor: number; // default 0.4 (40% below average)
+};
+
+export const DEFAULT_THRESHOLDS: TenantThresholds = {
+  revenueDrop: -0.15,
+  revenueGrowth: 0.15,
+  productChange: 0.2,
+  inactiveLeadDays: 7,
+  inactiveCustomerDays: 30,
+  sellerDeviationFactor: 0.4,
+};
+

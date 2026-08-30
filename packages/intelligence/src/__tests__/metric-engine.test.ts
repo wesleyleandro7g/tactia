@@ -47,20 +47,22 @@ const periodJan: { from: Date; to: Date } = {
 // Used to validate comparison; the engine calculates it automatically.
 
 async function cleanUp() {
-  await prisma.saleItem.deleteMany();
-  await prisma.sale.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.seller.deleteMany();
-  await prisma.customer.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.membership.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.authAccount.deleteMany();
-  await prisma.authSession.deleteMany();
-  await prisma.authVerification.deleteMany();
-  await prisma.authUser.deleteMany();
-  await prisma.metric.deleteMany();
-  await prisma.tenant.deleteMany();
+  // Scoped cleanup by slug to avoid cross-package conflicts on the shared test DB.
+  const tenantRows = await prisma.tenant.findMany({ where: { slug: 'metric-test' } });
+  const ids = tenantRows.map((t) => t.id);
+  if (ids.length === 0) return;
+
+  await prisma.recommendation.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.insight.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.saleItem.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.sale.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.product.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.seller.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.customer.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.membership.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.metric.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
 beforeAll(async () => {

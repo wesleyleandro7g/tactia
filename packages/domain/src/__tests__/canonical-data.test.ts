@@ -43,21 +43,33 @@ const saleService = new SaleService(sales, customers, products, sellers, auditLo
 const activityService = new ActivityService(activities, customers, leads, sellers, auditLogs);
 
 async function reset() {
-  await prisma.saleItem.deleteMany();
-  await prisma.sale.deleteMany();
-  await prisma.activity.deleteMany();
-  await prisma.lead.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.seller.deleteMany();
-  await prisma.customer.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.membership.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.authAccount.deleteMany();
-  await prisma.authSession.deleteMany();
-  await prisma.authVerification.deleteMany();
-  await prisma.authUser.deleteMany();
-  await prisma.tenant.deleteMany();
+  // Scoped by known slugs to avoid conflicts with other test packages running in parallel
+  const testSlugs = ['crud-co', 'tenant-a', 'tenant-b', 'viewer-co'];
+  const tenantRows = await prisma.tenant.findMany({ where: { slug: { in: testSlugs } } });
+  const ids = tenantRows.map((t) => t.id);
+  if (ids.length === 0) return;
+
+  await prisma.recommendation.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.insight.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.saleItem.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.sale.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.activity.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.lead.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.product.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.seller.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.customer.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.membership.deleteMany({ where: { tenantId: { in: ids } } });
+  // Users without memberships — find via authUser email pattern
+  const authUsers = await prisma.authUser.findMany({ where: { email: { endsWith: '.test' } } });
+  const authIds = authUsers.map((a) => a.id);
+  if (authIds.length > 0) {
+    await prisma.user.deleteMany({ where: { externalAuthId: { in: authIds } } });
+    await prisma.authAccount.deleteMany({ where: { userId: { in: authIds } } });
+    await prisma.authSession.deleteMany({ where: { userId: { in: authIds } } });
+    await prisma.authUser.deleteMany({ where: { id: { in: authIds } } });
+  }
+  await prisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
 function context(

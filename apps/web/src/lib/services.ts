@@ -6,6 +6,7 @@ import {
   DataQualityReportRepository,
   DataSourceRepository,
   ImportRepository,
+  InsightRepository,
   LeadRepository,
   MappingRepository,
   MembershipRepository,
@@ -13,6 +14,7 @@ import {
   prisma,
   ProductRepository,
   RawRecordRepository,
+  RecommendationRepository,
   SaleRepository,
   SellerRepository,
   SyncJobRepository,
@@ -26,10 +28,13 @@ import {
   CustomerService,
   DataSourceService,
   ImportService,
+  IntelligencePipelineService,
+  InsightService,
   LeadService,
   MembershipService,
   MetricService,
   ProductService,
+  RecommendationService,
   SaleService,
   SellerService,
   SyncService,
@@ -61,6 +66,8 @@ const mappingRepository = new MappingRepository(prisma);
 const importRepository = new ImportRepository(prisma);
 const dataQualityReportRepository = new DataQualityReportRepository(prisma);
 const metricRepository = new MetricRepository(prisma);
+const insightRepository = new InsightRepository(prisma);
+const recommendationRepository = new RecommendationRepository(prisma);
 
 // ---------------------------------------------------------------------------
 // Services
@@ -127,3 +134,17 @@ export const importService = new ImportService(importRepository);
 
 const metricEngine = new MetricEngine(prisma);
 export const metricService = new MetricService(metricEngine, metricRepository);
+
+export const insightService = new InsightService(insightRepository);
+
+export const recommendationService = new RecommendationService(
+  recommendationRepository,
+  auditLogService,
+);
+
+export const intelligencePipelineService = new IntelligencePipelineService(
+  prisma,
+  insightRepository,
+  recommendationRepository,
+  auditLogService,
+);

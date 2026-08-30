@@ -10,6 +10,11 @@ export type {
   DataSourceStatus,
   SyncJobStatus,
   ImportStatus,
+  InsightType,
+  InsightSeverity,
+  InsightStatus,
+  RecommendationPriority,
+  RecommendationStatus,
   Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
@@ -30,6 +35,8 @@ export { MappingRepository } from './repositories/mapping-repository';
 export { ImportRepository } from './repositories/import-repository';
 export { DataQualityReportRepository } from './repositories/data-quality-report-repository';
 export { MetricRepository } from './repositories/metric-repository';
+export { InsightRepository } from './repositories/insight-repository';
+export { RecommendationRepository } from './repositories/recommendation-repository';
 export type { CreateTenantInput } from './repositories/tenant-repository';
 export type { CreateUserInput } from './repositories/user-repository';
 export type { CreateMembershipInput } from './repositories/membership-repository';
@@ -48,4 +55,6 @@ export type { CreateMappingInput } from './repositories/mapping-repository';
 export type { CreateImportInput } from './repositories/import-repository';
 export type { CreateDataQualityReportInput } from './repositories/data-quality-report-repository';
 export type { CreateMetricInput } from './repositories/metric-repository';
+export type { CreateInsightInput, UpdateInsightInput } from './repositories/insight-repository';
+export type { CreateRecommendationInput } from './repositories/recommendation-repository';
 
