@@ -47,21 +47,29 @@ async function reset() {
   const testSlugs = ['crud-co', 'tenant-a', 'tenant-b', 'viewer-co'];
   const tenantRows = await prisma.tenant.findMany({ where: { slug: { in: testSlugs } } });
   const ids = tenantRows.map((t) => t.id);
-  if (ids.length === 0) return;
 
-  await prisma.recommendation.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.insight.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.saleItem.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.sale.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.activity.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.lead.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.product.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.seller.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.customer.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
-  await prisma.membership.deleteMany({ where: { tenantId: { in: ids } } });
-  // Users without memberships — find via authUser email pattern
-  const authUsers = await prisma.authUser.findMany({ where: { email: { endsWith: '.test' } } });
+  if (ids.length > 0) {
+    await prisma.recommendation.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.insight.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.saleItem.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.sale.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.activity.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.lead.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.product.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.seller.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.customer.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.membership.deleteMany({ where: { tenantId: { in: ids } } });
+  }
+  // Fixture accounts of this file only — deleting every '*.test' account would
+  // wipe other test files running against the shared test database.
+  const authUsers = await prisma.authUser.findMany({
+    where: {
+      email: {
+        in: ['owner@crud.test', 'a@iso.test', 'b@iso.test', 'owner@viewer.test', 'viewer@viewer.test'],
+      },
+    },
+  });
   const authIds = authUsers.map((a) => a.id);
   if (authIds.length > 0) {
     await prisma.user.deleteMany({ where: { externalAuthId: { in: authIds } } });
@@ -69,7 +77,9 @@ async function reset() {
     await prisma.authSession.deleteMany({ where: { userId: { in: authIds } } });
     await prisma.authUser.deleteMany({ where: { id: { in: authIds } } });
   }
-  await prisma.tenant.deleteMany({ where: { id: { in: ids } } });
+  if (ids.length > 0) {
+    await prisma.tenant.deleteMany({ where: { id: { in: ids } } });
+  }
 }
 
 function context(

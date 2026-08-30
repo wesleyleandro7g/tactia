@@ -44,6 +44,8 @@ const syncService = new SyncService(
 let tenantId: string;
 let dataSourceId: string;
 let ctx: RequestContext;
+let authUserId: string;
+let userId: string;
 
 beforeAll(async () => {
   // Create test tenant
@@ -52,17 +54,20 @@ beforeAll(async () => {
     data: { id: tenantId, name: 'Sync Test Tenant', slug: `sync-test-${tenantId.slice(0, 8)}` },
   });
 
-  // Create auth user + domain user
-  const authUserId = createId();
+  // Create auth user + domain user.
+  // The e-mail carries the full id: UUID v7 prefixes only change every ~65s, so
+  // a truncated id would collide when the suite runs twice in a row.
+  authUserId = createId();
+  const email = `sync-test-${authUserId}@sync.local`;
   await prisma.authUser.create({
-    data: { id: authUserId, name: 'Test', email: `sync-test-${tenantId.slice(0, 8)}@test.com`, emailVerified: true },
+    data: { id: authUserId, name: 'Test', email, emailVerified: true },
   });
   await prisma.authAccount.create({
     data: { id: createId(), accountId: authUserId, providerId: 'credential', userId: authUserId, password: 'x' },
   });
-  const userId = createId();
+  userId = createId();
   await prisma.user.create({
-    data: { id: userId, externalAuthId: authUserId, name: 'Test', email: `sync-test-${tenantId.slice(0, 8)}@test.com` },
+    data: { id: userId, externalAuthId: authUserId, name: 'Test', email },
   });
   await prisma.membership.create({
     data: { id: createId(), tenantId, userId, role: 'owner', status: 'active' },
@@ -97,8 +102,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Cascade delete via tenant
+  // Cascade delete via tenant, then the identity rows (not owned by the tenant)
   await prisma.tenant.delete({ where: { id: tenantId } }).catch(() => undefined);
+  await prisma.user.deleteMany({ where: { id: userId } });
+  await prisma.authSession.deleteMany({ where: { userId: authUserId } });
+  await prisma.authAccount.deleteMany({ where: { userId: authUserId } });
+  await prisma.authUser.deleteMany({ where: { id: authUserId } });
   await prisma.$disconnect();
 });
 
