@@ -9,7 +9,18 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 - PostgreSQL 16 + Prisma
 - Better Auth (email/senha), desacoplado do domínio via `external_auth_id`
 - Vercel AI SDK atrás de um `LLMAdapter` próprio (provider e modelo via env)
+- UI em Next.js App Router com Tailwind v4 (Server Components para leitura, `/api/v1/*` para escrita)
 - MinIO (S3-compatible) para etapas futuras
+
+## Telas
+
+| Rota | O que faz |
+|---|---|
+| `/dashboard` | Receita, vendas, clientes e ticket médio; séries no tempo; insights por severidade; recomendações pendentes |
+| `/onboarding` | Wizard empresa → fonte → conexão → descoberta → mapeamento → prévia → importação |
+| `/chat` | Conversa com a Tactia com streaming, fonte de cada número e proposta de ação |
+| `/approvals` | Fila de aprovações e execuções recentes |
+| `/admin` | Painel interno do operador (allowlist `TACTIA_OPERATOR_EMAILS`) |
 
 ## Setup
 
@@ -17,6 +28,7 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 cp .env.example .env
 # preencha BETTER_AUTH_SECRET (mín. 32 chars) e ENCRYPTION_KEY (64 hex)
 # para o chat: LLM_API_KEY (ou LLM_PROVIDER=mock)
+# para o painel /admin: TACTIA_OPERATOR_EMAILS=seu@email
 
 PostgreSQL local usa a porta **5433** (5432 costuma estar ocupada). MinIO: 9000.
 pnpm install

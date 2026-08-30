@@ -1,16 +1,76 @@
 @import "tailwindcss";
 
 :root {
+  /* Base (Etapa 1) */
   --bg: #0f1419;
   --fg: #e8eef4;
   --muted: #8b9aab;
   --accent: #3d8bfd;
   --card: #1a222c;
   --border: #2a3542;
+
+  /* Superfícies e semântica (Etapa 8) */
+  --card-hover: #202a36;
+  --fg-subtle: #6b7a8c;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(61, 139, 253, 0.14);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.14);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --info: #60a5fa;
+  --info-soft: rgba(96, 165, 250, 0.14);
+  --ring: #3d8bfd;
+}
+
+/* Expõe os tokens como utilitários do Tailwind v4: bg-card, text-muted, border-border... */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-ring: var(--ring);
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Foco sempre visível — nunca remover sem substituto (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Números em tabelas e cards alinham por dígito */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
