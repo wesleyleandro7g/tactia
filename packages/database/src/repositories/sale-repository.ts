@@ -143,6 +143,11 @@ export class SaleRepository {
     });
   }
 
+  /**
+   * Upsert by `(tenantId, dataSourceId, externalId)` — the idempotency key of a
+   * sync (spec §38). On update the items are replaced, not appended: re-running
+   * the same sync must not inflate revenue nor duplicate line items.
+   */
   async upsertByExternalId(input: CreateSaleInput & { dataSourceId: string; externalId: string }) {
     const existing = await this.db.sale.findFirst({
       where: {
@@ -154,19 +159,33 @@ export class SaleRepository {
     });
 
     if (existing) {
-      const updated = await this.db.sale.update({
-        where: { id: existing.id },
-        data: {
-          customerId: input.customerId,
-          sellerId: input.sellerId ?? null,
-          totalAmount: input.totalAmount,
-          discountAmount: input.discountAmount ?? 0,
-          currency: input.currency ?? 'BRL',
-          status: input.status ?? existing.status,
-          soldAt: input.soldAt,
-          metadata: asJson(input.metadata),
-        },
-        include: saleInclude,
+      const updated = await this.db.$transaction(async (tx) => {
+        await tx.saleItem.deleteMany({ where: { saleId: existing.id } });
+        return tx.sale.update({
+          where: { id: existing.id },
+          data: {
+            customerId: input.customerId,
+            sellerId: input.sellerId ?? null,
+            totalAmount: input.totalAmount,
+            discountAmount: input.discountAmount ?? 0,
+            currency: input.currency ?? 'BRL',
+            status: input.status ?? existing.status,
+            soldAt: input.soldAt,
+            metadata: asJson(input.metadata),
+            items: {
+              create: input.items.map((item) => ({
+                id: createId(),
+                tenantId: input.tenantId,
+                productId: item.productId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                discountAmount: item.discountAmount ?? 0,
+                totalAmount: item.totalAmount,
+              })),
+            },
+          },
+          include: saleInclude,
+        });
       });
       return { entity: updated, created: false };
     }

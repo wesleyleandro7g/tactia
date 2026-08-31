@@ -84,7 +84,6 @@ export class CsvConnector implements Connector {
       for (const row of rows) {
         counters.read++;
         try {
-          const normalized = this.normalize(row, mapping.configuration.fields);
           const externalId = String(row['external_id'] ?? row['id'] ?? counters.read);
           const checksum = computeChecksum(row as Record<string, unknown>);
 
@@ -98,8 +97,6 @@ export class CsvConnector implements Connector {
             checksum,
           });
 
-          // Mark the normalized data on the raw record (via externalId)
-          void normalized; // will be used by normalizer
           if (created) counters.created++;
           else counters.updated++;
         } catch {

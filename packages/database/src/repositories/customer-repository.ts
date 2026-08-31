@@ -107,6 +107,31 @@ export class CustomerRepository {
     });
   }
 
+  /**
+   * Lookup used by the normalizer to resolve references coming from a source.
+   * Without `dataSourceId` the search is tenant-wide — used as a fallback when
+   * a sales file lives in a different DataSource than its customers file.
+   */
+  async findByExternalId({
+    tenantId,
+    dataSourceId,
+    externalId,
+  }: {
+    tenantId: string;
+    dataSourceId?: string;
+    externalId: string;
+  }) {
+    return this.db.customer.findFirst({
+      where: {
+        tenantId,
+        externalId,
+        deletedAt: null,
+        ...(dataSourceId ? { dataSourceId } : {}),
+      },
+      select: { id: true },
+    });
+  }
+
   async upsertByExternalId(input: CreateCustomerInput & { dataSourceId: string; externalId: string }) {
     const existing = await this.db.customer.findFirst({
       where: {

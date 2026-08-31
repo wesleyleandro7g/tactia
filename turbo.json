@@ -17,7 +17,7 @@
     },
     "test": {
       "dependsOn": ["^generate"],
-      "env": ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL"]
+      "env": ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "ENCRYPTION_KEY"]
     },
     "dev": {
       "cache": false,

@@ -111,6 +111,27 @@ export class ProductRepository {
     });
   }
 
+  /** See `CustomerRepository.findByExternalId` — `dataSourceId` is optional. */
+  async findByExternalId({
+    tenantId,
+    dataSourceId,
+    externalId,
+  }: {
+    tenantId: string;
+    dataSourceId?: string;
+    externalId: string;
+  }) {
+    return this.db.product.findFirst({
+      where: {
+        tenantId,
+        externalId,
+        deletedAt: null,
+        ...(dataSourceId ? { dataSourceId } : {}),
+      },
+      select: { id: true, price: true },
+    });
+  }
+
   async upsertByExternalId(input: CreateProductInput & { dataSourceId: string; externalId: string }) {
     const existing = await this.db.product.findFirst({
       where: {

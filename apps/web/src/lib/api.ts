@@ -14,6 +14,7 @@ import {
 } from '@tactia/shared';
 import { cookies } from 'next/headers';
 import { auth } from './auth';
+import { enforceRateLimit, type RateLimitPolicy } from './rate-limit';
 import { tenantService, userService } from './services';
 
 export function getClientIp(request: Request): string | null {
@@ -71,7 +72,7 @@ function toAppError(error: unknown): AppError {
 }
 
 export function createApiHandler(
-  options: { auth: AuthMode; roles?: MembershipRole[] },
+  options: { auth: AuthMode; roles?: MembershipRole[]; rateLimit?: RateLimitPolicy },
   handler: Handler,
 ) {
   return async (request: Request, segment?: { params: Promise<Record<string, string>> }) => {
@@ -82,6 +83,7 @@ export function createApiHandler(
       tenantId: null,
       userId: null,
       role: null,
+      ip: getClientIp(request),
     };
 
     try {
@@ -100,6 +102,9 @@ export function createApiHandler(
           throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'Insufficient permissions');
         }
       }
+
+      // Applied after auth so the bucket can be keyed by tenant (spec §49).
+      if (options.rateLimit) enforceRateLimit(options.rateLimit, ctx);
 
       const result = await handler(request, ctx, params);
       if (result instanceof Response) return withRequestId(result, ctx.requestId);
@@ -121,7 +126,7 @@ export function createApiHandler(
       });
     } catch (error) {
       const appError = toAppError(error);
-      logger.info({
+      const entry = {
         request_id: ctx.requestId,
         tenant_id: ctx.tenantId,
         user_id: ctx.userId,
@@ -129,7 +134,11 @@ export function createApiHandler(
         duration_ms: Date.now() - started,
         status: appError.statusCode,
         error: appError.code,
-      });
+      };
+      // 5xx is an incident, 429 is a signal, 4xx is routine input.
+      if (appError.statusCode >= 500) logger.error(entry);
+      else if (appError.statusCode === 429) logger.warn(entry);
+      else logger.info(entry);
       return Response.json(fail(appError.code, appError.message, ctx.requestId, appError.details), {
         status: appError.statusCode,
         headers: { [REQUEST_ID_HEADER]: ctx.requestId },

@@ -1,4 +1,5 @@
 import { createApiHandler, readJson, searchParamsRecord } from '@/lib/api';
+import { RATE_LIMITS } from '@/lib/rate-limit';
 import { insightService } from '@/lib/services';
 
 /**
@@ -14,7 +15,7 @@ export const GET = createApiHandler({ auth: 'tenant' }, async (request, ctx) => 
  * Trigger the intelligence pipeline on-demand.
  */
 export const POST = createApiHandler(
-  { auth: 'tenant', roles: ['owner', 'admin', 'member'] },
+  { auth: 'tenant', roles: ['owner', 'admin', 'member'], rateLimit: RATE_LIMITS.pipeline },
   async (request, ctx) => {
     const { intelligencePipelineService } = await import('@/lib/services');
     const body = (await readJson(request)) as Record<string, unknown> | null;

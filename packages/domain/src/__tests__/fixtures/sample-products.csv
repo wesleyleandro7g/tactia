@@ -1,0 +1,3 @@
+external_id,name,sku,category,price
+PROD001,Plano Essencial,SKU-001,Assinatura,150.00
+PROD002,Plano Básico,SKU-002,Assinatura,80.50

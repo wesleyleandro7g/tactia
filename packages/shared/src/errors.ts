@@ -9,6 +9,12 @@ export const ErrorCode = {
   AI_ERROR: 'AI_ERROR',
   ACTION_ERROR: 'ACTION_ERROR',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+  /**
+   * Extension to spec §48: §49 requires rate limiting, and a 429 reported as
+   * `AUTHENTICATION_ERROR` would make the UI send the user back to the login
+   * screen. Kept last so the §48 list stays intact.
+   */
+  RATE_LIMITED: 'RATE_LIMITED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -24,6 +30,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   AI_ERROR: 502,
   ACTION_ERROR: 502,
   INTERNAL_ERROR: 500,
+  RATE_LIMITED: 429,
 };
 
 export class AppError extends Error {

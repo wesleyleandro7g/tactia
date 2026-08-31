@@ -97,6 +97,27 @@ export class SellerRepository {
     });
   }
 
+  /** See `CustomerRepository.findByExternalId` — `dataSourceId` is optional. */
+  async findByExternalId({
+    tenantId,
+    dataSourceId,
+    externalId,
+  }: {
+    tenantId: string;
+    dataSourceId?: string;
+    externalId: string;
+  }) {
+    return this.db.seller.findFirst({
+      where: {
+        tenantId,
+        externalId,
+        deletedAt: null,
+        ...(dataSourceId ? { dataSourceId } : {}),
+      },
+      select: { id: true },
+    });
+  }
+
   async upsertByExternalId(input: CreateSellerInput & { dataSourceId: string; externalId: string }) {
     const existing = await this.db.seller.findFirst({
       where: {

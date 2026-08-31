@@ -1,0 +1,253 @@
+# Runbook
+
+Diagnóstico e operação da Tactia em produção. Para colocar um cliente novo, veja
+[onboarding-cliente.md](./onboarding-cliente.md).
+
+---
+
+## 1. Primeiros comandos
+
+```bash
+# Está vivo? (sem autenticação, sem dado de tenant)
+curl -s https://SEU-HOST/api/v1/health
+# {"data":{"status":"ok","database":"up"},"meta":{"requestId":"..."}}
+
+# Logs estruturados
+docker compose -f docker/docker-compose.prod.yml logs -f web
+
+# Um request específico (todo response traz o header x-request-id)
+docker compose -f docker/docker-compose.prod.yml logs web | grep '"request_id":"<ID>"'
+```
+
+`health` responde 503 quando o banco não responde — é o sinal do healthcheck do
+container e do load balancer.
+
+## 2. Como ler os logs
+
+Toda operação relevante emite uma linha JSON com os campos da spec §47:
+
+```json
+{"level":30,"request_id":"...","tenant_id":"...","user_id":"...","operation":"sync",
+ "data_source_id":"...","sync_job_id":"...","records":1842,"records_created":1800,
+ "records_updated":42,"records_failed":0,"duration_ms":3821,"status":"completed"}
+```
+
+| `operation` | Quando |
+|---|---|
+| `GET/POST /api/v1/...` | Toda requisição de API (status + duração) |
+| `sync` | Importação concluída ou falha, com contadores |
+| `chat` | Turno de chat completo (`mode: sync\|stream`, provider, model, tool_calls) |
+| `tool:<nome>` | Cada tool executada pela IA |
+| `action:<tipo>` | Execução de ação |
+| `intelligence_pipeline_start/complete` | Pipeline de regras |
+| `health` | Só quando falha |
+
+Níveis: `info` (30) para o normal, `warn` (40) para 429/rate limit e falha de
+tool, `error` (50) para 5xx e falha de sync/execução.
+
+Filtros úteis:
+
+```bash
+L='docker compose -f docker/docker-compose.prod.yml logs web'
+$L | grep '"status":5'                          # tudo que falhou no servidor
+$L | grep '"operation":"sync"' | grep failed    # importações quebradas
+$L | grep RATE_LIMITED                          # quem está batendo no limite
+$L | grep '"tenant_id":"<TENANT>"'              # tudo de um cliente
+$L | grep '"duration_ms":[0-9]\{4,\}'           # requisições acima de 1s
+```
+
+Nunca há stack trace na resposta HTTP: o cliente recebe `{ error: { code, message } }`
+com um dos códigos da spec §48 (mais `RATE_LIMITED`). O detalhe técnico fica só no log.
+
+## 3. Sync falhou
+
+**Onde olhar:** `/admin/tenants/:id` → tabela **Sync jobs** (status, contadores,
+erro) ou:
+
+```bash
+curl -s -b cookies.txt "https://SEU-HOST/api/v1/sync-jobs?pageSize=10" | jq \
+  '.data.items[] | {id, status, recordsRead, recordsCreated, recordsFailed, error}'
+```
+
+O campo `error` vem no formato `CÓDIGO: mensagem`:
+
+| Erro | Causa provável | O que fazer |
+|---|---|---|
+| `VALIDATION_ERROR: A fonte de dados não tem nenhum mapeamento ativo` | Fonte criada sem mapping | Criar o mapping em `/onboarding` ou via `POST /api/v1/data-sources/:id/mappings` |
+| `SYNC_ERROR: ENOENT ... .csv` | Caminho do CSV não existe **dentro do container** | `docker compose cp` o arquivo e refazer o sync |
+| `SYNC_ERROR: EACCES` | Arquivo sem permissão de leitura para o usuário do container (uid 1001) | `chmod 644` no arquivo |
+| `CONNECTOR_ERROR` / `P1001` | Postgres do cliente inacessível (firewall, host, porta) | Testar com `POST /api/v1/data-sources/:id/test-connection` |
+| `SYNC_ERROR: password authentication failed` | Credencial trocada no lado do cliente | Recriar a credential e apontar a fonte para o novo `credentialId` |
+| `SYNC_ERROR: relation "x" does not exist` | Mapping aponta para tabela/coluna que não existe mais | Rodar **Descobrir** de novo e corrigir o mapping |
+| `INTERNAL_ERROR: ENCRYPTION_KEY ...` | Chave ausente ou com tamanho errado | Ver §7 |
+
+**Reexecutar** (seguro, idempotente):
+
+```bash
+# como operador, atravessando tenant (grava audit log com actorType=operator)
+curl -X POST https://SEU-HOST/api/v1/admin/sync -b cookies.txt \
+  -H 'Content-Type: application/json' \
+  -d '{"tenantId":"<TENANT>","dataSourceId":"<FONTE>"}'
+```
+
+Ou `/admin/tenants/:id` → **Disparar sync**.
+
+## 4. Importou, mas os dados não apareceram
+
+Sintoma clássico: o sync termina `completed`, mas o dashboard fica vazio.
+Olhe os contadores **e** o relatório de qualidade.
+
+```bash
+curl -s -b cookies.txt "https://SEU-HOST/api/v1/imports?pageSize=20" | jq \
+  '.data.items[] | {entityType, totalRecords, processedRecords, failedRecords, status}'
+```
+
+`processedRecords: 0` com `totalRecords > 0` significa que **nada foi normalizado**.
+Os motivos ficam no `DataQualityReport` (campo `errors`):
+
+| Motivo | Significado | Correção |
+|---|---|---|
+| `missing_external_id` | Linha sem `external_id` mapeado | Mapear a coluna de identificador da origem |
+| `customer_without_name` / `product_without_name` | Campo obrigatório vazio | Corrigir a origem ou o mapping |
+| `sale_without_customer` | Venda sem `customer_external_id` | Mapear a coluna do cliente |
+| `sale_customer_not_found` | Cliente referenciado não existe | Importar os clientes **antes** das vendas |
+| `sale_invalid_date` | `sold_at` não é uma data reconhecível | Usar ISO (`2026-08-25`) |
+| `sale_without_amount` | Sem `total_amount` e sem preço/quantidade | Mapear o valor |
+| `duplicated_external_id` | O mesmo `external_id` duas vezes no arquivo | Deduplicar na origem |
+| `sale_negative_amount` | Valor negativo (devolução?) | Tratar como `refunded` na origem |
+
+Corrija a origem ou o mapping e rode o sync de novo — o upsert é idempotente por
+`(tenant, fonte, external_id)`, então nada duplica.
+
+**Receita zerada com vendas na base:** confira `status` (só `confirmed` conta) e
+o período do dashboard (`?from=&to=`).
+
+## 5. Reprocessar um import
+
+```bash
+curl -X POST https://SEU-HOST/api/v1/admin/reprocess-import -b cookies.txt \
+  -H 'Content-Type: application/json' \
+  -d '{"tenantId":"<TENANT>","importId":"<IMPORT>"}'
+```
+
+Reexecuta o sync da fonte que originou o import. Os `RawRecord` originais são
+preservados; só o resultado canônico é reescrito.
+
+## 6. Chat indisponível ou estranho
+
+| Sintoma | Causa | Ação |
+|---|---|---|
+| Banner "Chat indisponível" | Sem `LLM_API_KEY` | Configurar a chave e reiniciar o web |
+| `AI_ERROR` (502) | Provider fora, chave inválida, cota estourada | `grep '"operation":"chat"' \| grep AI_ERROR` mostra a mensagem do provider |
+| Resposta genérica "não consigo confirmar esses números" | Guardrail `unsourced_numbers`: o modelo citou número sem evidência | Esperado. Se recorrente, revisar se as tools estão devolvendo dados (`grep '"operation":"tool:'`) |
+| `RATE_LIMITED` (429) | Mais de 20 mensagens/min no tenant | Esperado; ajustar em `apps/web/src/lib/rate-limit.ts` se necessário |
+| Chat responde, mas sem números | Tenant sem dados no período | Importar dados / conferir o período |
+
+O chat nunca executa nada: uma proposta de ação sempre cai em `/approvals`.
+
+## 7. Segredos e chaves
+
+| Variável | Efeito se faltar/estiver errada |
+|---|---|
+| `ENCRYPTION_KEY` (64 hex) | Credenciais não podem ser criadas nem lidas → sync Postgres falha |
+| `BETTER_AUTH_SECRET` (≥32 chars) | Sessões inválidas; ninguém entra |
+| `DATABASE_URL` | `health` 503, aplicação inutilizável |
+| `LLM_API_KEY` | Apenas o chat fica indisponível |
+| `TACTIA_OPERATOR_EMAILS` | Vazio = `/admin` responde 404 para todos |
+
+**Trocar `ENCRYPTION_KEY` invalida todas as credenciais existentes** (AES-GCM
+falha na autenticação da tag). Se for inevitável: recrie as credentials
+(`POST /api/v1/credentials`) e atualize o `credentialId` de cada fonte.
+
+Segredos vêm exclusivamente do ambiente. Nenhum arquivo `.env` entra na imagem
+(`.dockerignore`); confira com:
+
+```bash
+docker run --rm --entrypoint sh tactia-web -c 'find / -maxdepth 4 -name ".env" 2>/dev/null'
+```
+
+## 8. Deploy e migrations
+
+```bash
+cp .env.example .env.production   # preencha os valores reais
+docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+O serviço `migrate` roda `prisma migrate deploy` e o `web` só sobe depois que ele
+termina com sucesso. Ordem: `postgres` (healthy) → `migrate` (exit 0) → `web`.
+
+> **Atenção:** variáveis já exportadas no shell têm precedência sobre `--env-file`
+> no docker compose. Se o container subir apontando para `localhost:5433`, o seu
+> shell tem um `DATABASE_URL` de desenvolvimento exportado. Rode
+> `env -u DATABASE_URL -u ENCRYPTION_KEY ... docker compose ...` ou abra um shell limpo.
+
+Rollback: `docker compose ... up -d --no-deps web` com a imagem anterior. Migrations
+são forward-only; um rollback de schema tem que ser feito com uma migration nova.
+
+Aplicar migrations sem subir o app:
+
+```bash
+docker compose -f docker/docker-compose.prod.yml --env-file .env.production run --rm migrate
+```
+
+## 9. Backup e restauração
+
+```bash
+# backup
+docker compose -f docker/docker-compose.prod.yml exec -T postgres \
+  pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > tactia-$(date +%F).dump
+
+# restore (destrutivo — confirme o alvo antes)
+docker compose -f docker/docker-compose.prod.yml exec -T postgres \
+  pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists < tactia-AAAA-MM-DD.dump
+```
+
+O backup do banco **não** cobre `ENCRYPTION_KEY`: guarde a chave separadamente ou
+as credenciais restauradas ficam ilegíveis.
+
+## 10. Ações e aprovações
+
+| Sintoma | Onde olhar |
+|---|---|
+| Ação não executou | `GET /api/v1/action-executions?status=awaiting_approval` — falta aprovação de owner/admin |
+| Execução `failed` | O campo `error` (`CÓDIGO: mensagem`) + `grep '"operation":"action:'` |
+| Execução duplicada | Não deveria acontecer: `Idempotency-Key` e o guard de status impedem; se ocorrer, colete os dois ids e o `request_id` |
+| E-mail não chegou | O driver padrão é `console`: o "envio" é uma linha de log. Provider real é pendência |
+
+Uma execução `failed` não é reexecutada automaticamente (sem retry na V0.1):
+proponha de novo, com uma `Idempotency-Key` nova.
+
+## 11. Isolamento entre tenants
+
+Um usuário só alcança o tenant do próprio cookie `tactia-tenant-id`, validado
+contra o membership a cada requisição. Recurso de outro tenant responde
+`NOT_FOUND` (não 403, para não revelar existência).
+
+O único caminho cross-tenant são as rotas `/api/v1/admin/*`, restritas à allowlist
+e sempre auditadas com `actorType: 'operator'`:
+
+```bash
+curl -s -b cookies.txt "https://SEU-HOST/api/v1/audit-logs?pageSize=50" | jq \
+  '.data.items[] | select(.actorType=="operator")'
+```
+
+## 12. Escalada
+
+Antes de pedir ajuda, colete:
+
+1. `request_id` do response (header `x-request-id`).
+2. A linha de log correspondente.
+3. `tenant_id`, e `sync_job_id`/`execution_id` quando aplicável.
+4. `GET /api/v1/audit-logs` do período.
+5. `docker compose ps` e `docker inspect <container> --format '{{.State.Health}}'`.
+
+## 13. Limitações conhecidas da V0.1
+
+| Limitação | Impacto |
+|---|---|
+| Sync e execução rodam **inline** no request | Import muito grande pode estourar o timeout do proxy; quebre o arquivo |
+| Rate limit **in-memory** | Vale por processo; com mais de uma instância o limite efetivo é multiplicado |
+| CSV por caminho no servidor | Sem upload pela interface; use `docker compose cp` |
+| Sem retry de execução falha | Reproponha manualmente |
+| E-mail só no driver `console` | Nenhum e-mail sai de verdade |
+| Sem agendamento de sync | Dispare manualmente ou por cron externo chamando a API |

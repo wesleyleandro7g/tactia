@@ -1,5 +1,6 @@
 import { proposeActionSchema } from '@tactia/execution';
 import { createApiHandler, readJson, searchParamsRecord } from '@/lib/api';
+import { RATE_LIMITS } from '@/lib/rate-limit';
 import { actionService, executionEngine } from '@/lib/services';
 import { idempotencyKey } from '@/lib/idempotency';
 
@@ -19,7 +20,7 @@ export const GET = createApiHandler({ auth: 'tenant' }, async (request, ctx) => 
  * Proposing by `actionType` provisions the tenant definition on first use.
  */
 export const POST = createApiHandler(
-  { auth: 'tenant', roles: ['owner', 'admin', 'member'] },
+  { auth: 'tenant', roles: ['owner', 'admin', 'member'], rateLimit: RATE_LIMITS.execution },
   async (request, ctx) => {
     const parsed = proposeActionSchema.parse(await readJson(request));
     return executionEngine.propose(ctx, {

@@ -137,17 +137,6 @@ export const dataSourceService = new DataSourceService(
   auditLogService,
 );
 
-export const syncService = new SyncService(
-  dataSourceRepository,
-  syncJobRepository,
-  rawRecordRepository,
-  importRepository,
-  dataQualityReportRepository,
-  mappingRepository,
-  credentialRepository,
-  auditLogService,
-);
-
 export const importService = new ImportService(importRepository);
 
 const metricEngine = new MetricEngine(prisma);
@@ -166,6 +155,26 @@ export const intelligencePipelineService = new IntelligencePipelineService(
   recommendationRepository,
   auditLogService,
 );
+
+export const syncService = new SyncService({
+  dataSources: dataSourceRepository,
+  syncJobs: syncJobRepository,
+  rawRecords: rawRecordRepository,
+  imports: importRepository,
+  qualityReports: dataQualityReportRepository,
+  mappings: mappingRepository,
+  credentials: credentialRepository,
+  auditLogs: auditLogService,
+  customers: customerRepository,
+  products: productRepository,
+  sellers: sellerRepository,
+  sales: saleRepository,
+  // An import is only useful once it produced insights (spec §2): the pipeline
+  // runs right after a successful sync, and a failure here never fails the sync.
+  onSyncCompleted: async ({ tenantId, userId }) => {
+    await intelligencePipelineService.run({ tenantId, actorCtx: { tenantId, userId } });
+  },
+});
 
 export const conversationService = new ConversationService(
   conversationRepository,

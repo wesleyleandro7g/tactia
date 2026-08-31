@@ -1,76 +1,116 @@
 import type {
-  DataSourceRepository,
-  SyncJobRepository,
-  RawRecordRepository,
-  ImportRepository,
-  DataQualityReportRepository,
-  MappingRepository,
   CredentialRepository,
+  CustomerRepository,
+  DataQualityReportRepository,
+  DataSourceRepository,
+  ImportRepository,
+  MappingRepository,
+  ProductRepository,
+  RawRecordRepository,
+  SaleRepository,
+  SellerRepository,
+  SyncJobRepository,
 } from '@tactia/database';
-import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
+import { AppError, ErrorCode, isAppError, logger, type RequestContext } from '@tactia/shared';
 import {
+  canonicalEntityRank,
   CsvConnector,
+  normalizeRow,
+  normalizeToCanonical,
   PostgresConnector,
   runDataQualityChecks,
+  type FieldMapping,
   type MappingConfig,
+  type QualityIssue,
 } from '@tactia/connectors';
 import { assertTenantContext } from '../authz';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import { decrypt } from './credential-service';
 
+export type SyncServiceDeps = {
+  dataSources: DataSourceRepository;
+  syncJobs: SyncJobRepository;
+  rawRecords: RawRecordRepository;
+  imports: ImportRepository;
+  qualityReports: DataQualityReportRepository;
+  mappings: MappingRepository;
+  credentials: CredentialRepository;
+  auditLogs: AuditLogService;
+  /** Canonical repositories used by the normalize → upsert step (spec §37). */
+  customers: CustomerRepository;
+  products: ProductRepository;
+  sellers: SellerRepository;
+  sales: SaleRepository;
+  /**
+   * Called after a sync completes successfully. Wired in `apps/web` to the
+   * intelligence pipeline so an import produces insights without a manual step
+   * (spec §2). Failures here never fail the sync.
+   */
+  onSyncCompleted?: (event: {
+    tenantId: string;
+    dataSourceId: string;
+    syncJobId: string;
+    userId: string | null;
+  }) => Promise<void>;
+};
+
+/** Raw records are normalized in pages to keep memory flat on large imports. */
+const NORMALIZE_PAGE_SIZE = 500;
+
+type EntityOutcome = {
+  entityType: string;
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  issues: QualityIssue[];
+  normalized: Record<string, unknown>[];
+};
+
 export class SyncService {
-  constructor(
-    private readonly dataSources: DataSourceRepository,
-    private readonly syncJobs: SyncJobRepository,
-    private readonly rawRecords: RawRecordRepository,
-    private readonly imports: ImportRepository,
-    private readonly qualityReports: DataQualityReportRepository,
-    private readonly mappings: MappingRepository,
-    private readonly credentials: CredentialRepository,
-    private readonly auditLogs: AuditLogService,
-  ) {}
+  constructor(private readonly deps: SyncServiceDeps) {}
 
   async startSync(ctx: RequestContext, dataSourceId: string) {
     assertTenantContext(ctx);
-    const ds = await this.dataSources.findById({ tenantId: ctx.tenantId!, id: dataSourceId });
+    const tenantId = ctx.tenantId!;
+    const ds = await this.deps.dataSources.findById({ tenantId, id: dataSourceId });
     if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');
 
-    const job = await this.syncJobs.create({
-      tenantId: ctx.tenantId!,
+    const job = await this.deps.syncJobs.create({
+      tenantId,
       dataSourceId,
       status: 'pending',
     });
 
-    await this.auditLogs.record(ctx, {
+    await this.deps.auditLogs.record(ctx, {
       action: AuditAction.SYNC_STARTED,
       entityType: 'sync_job',
       entityId: job.id,
       metadata: { dataSourceId },
     });
 
-    // Execute inline if SYNC_INLINE=true or in test environment, or always by default for V0.1
-    // pg-boss integration is configured at app level; domain service always runs inline
-    await this.executeSync(ctx.tenantId!, job.id);
+    // V0.1 runs inline: the JobQueue driver (pg-boss) plugs in at the app layer.
+    await this.executeSync(tenantId, job.id, {
+      requestId: ctx.requestId,
+      userId: ctx.userId ?? null,
+    });
 
-    return job;
+    return this.deps.syncJobs.findById({ tenantId, id: job.id });
   }
 
   async getSyncJob(ctx: RequestContext, id: string) {
     assertTenantContext(ctx);
-    const job = await this.syncJobs.findById({ tenantId: ctx.tenantId!, id });
+    const job = await this.deps.syncJobs.findById({ tenantId: ctx.tenantId!, id });
     if (!job) throw new AppError(ErrorCode.NOT_FOUND, 'SyncJob not found');
     return job;
   }
 
-  async listSyncJobs(
-    ctx: RequestContext,
-    query: Record<string, string | undefined>,
-  ) {
+  async listSyncJobs(ctx: RequestContext, query: Record<string, string | undefined>) {
     assertTenantContext(ctx);
     const page = parseInt(query['page'] ?? '1', 10);
     const pageSize = parseInt(query['pageSize'] ?? '20', 10);
     const skip = (page - 1) * pageSize;
-    const result = await this.syncJobs.list({
+    const result = await this.deps.syncJobs.list({
       tenantId: ctx.tenantId!,
       dataSourceId: query['dataSourceId'],
       skip,
@@ -81,33 +121,55 @@ export class SyncService {
 
   async cancelSyncJob(ctx: RequestContext, id: string) {
     assertTenantContext(ctx);
-    const job = await this.syncJobs.findById({ tenantId: ctx.tenantId!, id });
+    const job = await this.deps.syncJobs.findById({ tenantId: ctx.tenantId!, id });
     if (!job) throw new AppError(ErrorCode.NOT_FOUND, 'SyncJob not found');
     if (job.status !== 'pending') {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'Only pending sync jobs can be cancelled');
     }
-    return this.syncJobs.updateStatus({ id, status: 'cancelled' });
+    return this.deps.syncJobs.updateStatus({ id, status: 'cancelled' });
   }
 
-  async executeSync(tenantId: string, syncJobId: string): Promise<void> {
-    await this.syncJobs.updateStatus({
+  /**
+   * Full lifecycle (spec §37): fetch → raw → normalize → upsert canônico →
+   * data quality → import. Counters on the `SyncJob` report canonical results:
+   * `recordsRead` are the rows read from the source, `recordsCreated/Updated`
+   * are the canonical entities written, `recordsFailed` are the rows that could
+   * not be normalized (each with a reason in the DataQualityReport).
+   */
+  async executeSync(
+    tenantId: string,
+    syncJobId: string,
+    meta: { requestId?: string; userId?: string | null } = {},
+  ): Promise<void> {
+    const started = Date.now();
+    const requestId = meta.requestId;
+    let dataSourceId: string | null = null;
+
+    await this.deps.syncJobs.updateStatus({
       id: syncJobId,
       status: 'running',
       startedAt: new Date(),
     });
 
     try {
-      const job = await this.syncJobs.findById({ tenantId, id: syncJobId });
-      if (!job) throw new Error('SyncJob not found');
+      const job = await this.deps.syncJobs.findById({ tenantId, id: syncJobId });
+      if (!job) throw new AppError(ErrorCode.NOT_FOUND, 'SyncJob not found');
+      dataSourceId = job.dataSourceId;
 
-      const ds = await this.dataSources.findById({ tenantId, id: job.dataSourceId });
-      if (!ds) throw new Error('DataSource not found');
+      const ds = await this.deps.dataSources.findById({ tenantId, id: job.dataSourceId });
+      if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');
 
-      const activeMappings = await this.mappings.findByDataSource({
+      const activeMappings = await this.deps.mappings.findByDataSource({
         tenantId,
         dataSourceId: ds.id,
         activeOnly: true,
       });
+      if (activeMappings.length === 0) {
+        throw new AppError(
+          ErrorCode.VALIDATION_ERROR,
+          'A fonte de dados não tem nenhum mapeamento ativo',
+        );
+      }
 
       const syncContextMappings = activeMappings.map((m) => ({
         sourceEntity: m.sourceEntity,
@@ -115,112 +177,305 @@ export class SyncService {
         configuration: m.configuration as unknown as MappingConfig,
       }));
 
-      // Build connector
-      const connector = await this._buildConnector(tenantId, ds);
+      const connector = await this.buildConnector(tenantId, ds);
 
-      // Execute sync — connector writes RawRecords
-      const result = await connector.sync({
+      // 1. Source → RawRecord (originals preserved, spec §3.3)
+      const raw = await connector.sync({
         tenantId,
         dataSourceId: ds.id,
         syncJobId,
         mappings: syncContextMappings,
         onProgress: async (counters) => {
-          await this.syncJobs.updateCounters({
+          await this.deps.syncJobs.updateCounters({
             id: syncJobId,
             recordsRead: counters.read,
-            recordsCreated: counters.created,
-            recordsUpdated: counters.updated,
+            recordsCreated: 0,
+            recordsUpdated: 0,
             recordsFailed: counters.failed,
           });
         },
       });
 
-      // Data quality checks and Import records per entity type
-      const entityTypes = [...new Set(activeMappings.map((m) => m.targetEntity))];
+      // 2. RawRecord → normalize → canonical upsert, in dependency order
+      const fieldsByEntity = mergeFieldsByTargetEntity(syncContextMappings);
+      const entityTypes = [...fieldsByEntity.keys()].sort(
+        (a, b) => canonicalEntityRank(a) - canonicalEntityRank(b),
+      );
+
+      const outcomes: EntityOutcome[] = [];
       for (const entityType of entityTypes) {
-        // Fetch raw records for this entity to run quality checks
-        const rawResult = await this.rawRecords.list({
-          tenantId,
-          dataSourceId: ds.id,
-          entityType,
-          skip: 0,
-          take: 10_000,
-        });
-        const records = rawResult.items.map((r) => r.payload as Record<string, unknown>);
-        const qr = runDataQualityChecks(entityType, records);
+        outcomes.push(
+          await this.normalizeEntity({
+            tenantId,
+            dataSourceId: ds.id,
+            entityType,
+            fields: fieldsByEntity.get(entityType)!,
+          }),
+        );
+      }
 
-        await this.qualityReports.create({
+      // 3. Data quality over the *normalized* records (spec §56) + Import row
+      for (const outcome of outcomes) {
+        const quality = runDataQualityChecks(outcome.entityType, outcome.normalized);
+        const errors = [...quality.errors, ...outcome.issues];
+        const invalidRecords = Math.max(quality.invalidRecords, outcome.skipped);
+
+        await this.deps.qualityReports.create({
           tenantId,
           dataSourceId: ds.id,
           syncJobId,
-          entityType,
-          totalRecords: qr.totalRecords,
-          validRecords: qr.validRecords,
-          invalidRecords: qr.invalidRecords,
-          warnings: qr.warnings,
-          errors: qr.errors,
+          entityType: outcome.entityType,
+          totalRecords: outcome.total,
+          validRecords: outcome.total - invalidRecords,
+          invalidRecords,
+          warnings: quality.warnings,
+          errors,
         });
 
-        await this.imports.create({
+        const importRow = await this.deps.imports.create({
           tenantId,
           dataSourceId: ds.id,
           syncJobId,
-          entityType,
-          totalRecords: qr.totalRecords,
+          entityType: outcome.entityType,
+          totalRecords: outcome.total,
+        });
+        const processed = outcome.created + outcome.updated;
+        await this.deps.imports.updateCounters({
+          id: importRow.id,
+          processedRecords: processed,
+          failedRecords: outcome.skipped,
+          // No `partial` in ImportStatus: an import that wrote nothing while
+          // having rows is a failure; anything else is completed with counters.
+          status: outcome.total > 0 && processed === 0 ? 'failed' : 'completed',
         });
       }
 
-      await this.syncJobs.updateStatus({
+      const totals = outcomes.reduce(
+        (acc, outcome) => ({
+          created: acc.created + outcome.created,
+          updated: acc.updated + outcome.updated,
+          skipped: acc.skipped + outcome.skipped,
+        }),
+        { created: 0, updated: 0, skipped: 0 },
+      );
+
+      await this.deps.syncJobs.updateCounters({
+        id: syncJobId,
+        recordsRead: raw.recordsRead,
+        recordsCreated: totals.created,
+        recordsUpdated: totals.updated,
+        recordsFailed: raw.recordsFailed + totals.skipped,
+      });
+      await this.deps.syncJobs.updateStatus({
         id: syncJobId,
         status: 'completed',
         finishedAt: new Date(),
       });
-      await this.syncJobs.updateCounters({
-        id: syncJobId,
-        recordsRead: result.recordsRead,
-        recordsCreated: result.recordsCreated,
-        recordsUpdated: result.recordsUpdated,
-        recordsFailed: result.recordsFailed,
-      });
+      await this.deps.dataSources.updateLastSyncAt({ id: ds.id, lastSyncAt: new Date() });
 
-      // Update lastSyncAt on dataSource
-      await this.dataSources.updateLastSyncAt({ id: ds.id, lastSyncAt: new Date() });
+      const summary = {
+        recordsRead: raw.recordsRead,
+        recordsCreated: totals.created,
+        recordsUpdated: totals.updated,
+        recordsFailed: raw.recordsFailed + totals.skipped,
+        entities: outcomes.map((outcome) => ({
+          entityType: outcome.entityType,
+          created: outcome.created,
+          updated: outcome.updated,
+          skipped: outcome.skipped,
+        })),
+      };
 
-      // Audit
-      await this.auditLogs.record(
-        { tenantId, userId: null },
+      await this.deps.auditLogs.record(
+        { tenantId, userId: meta.userId ?? null },
         {
           action: AuditAction.SYNC_COMPLETED,
           entityType: 'sync_job',
           entityId: syncJobId,
-          metadata: result,
+          actorType: 'system',
+          metadata: summary,
         },
       );
+
+      // Observability (spec §47)
+      logger.info({
+        ...(requestId ? { request_id: requestId } : {}),
+        tenant_id: tenantId,
+        user_id: meta.userId ?? null,
+        operation: 'sync',
+        data_source_id: ds.id,
+        sync_job_id: syncJobId,
+        records: raw.recordsRead,
+        records_created: totals.created,
+        records_updated: totals.updated,
+        records_failed: raw.recordsFailed + totals.skipped,
+        duration_ms: Date.now() - started,
+        status: 'completed',
+      });
+
+      if (this.deps.onSyncCompleted) {
+        try {
+          await this.deps.onSyncCompleted({
+            tenantId,
+            dataSourceId: ds.id,
+            syncJobId,
+            userId: meta.userId ?? null,
+          });
+        } catch (error) {
+          logger.error({
+            ...(requestId ? { request_id: requestId } : {}),
+            tenant_id: tenantId,
+            operation: 'sync_post_hook',
+            sync_job_id: syncJobId,
+            status: 'failed',
+            error: isAppError(error) ? error.code : ErrorCode.INTERNAL_ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await this.syncJobs.updateStatus({
+      const code = isAppError(err) ? err.code : ErrorCode.SYNC_ERROR;
+      const detail = err instanceof Error ? err.message : String(err);
+      // Stored classified and without stack trace (spec §48).
+      const message = `${code}: ${detail}`;
+
+      await this.deps.syncJobs.updateStatus({
         id: syncJobId,
         status: 'failed',
         finishedAt: new Date(),
         error: message,
       });
+
+      await this.deps.auditLogs.record(
+        { tenantId, userId: meta.userId ?? null },
+        {
+          action: AuditAction.SYNC_FAILED,
+          entityType: 'sync_job',
+          entityId: syncJobId,
+          actorType: 'system',
+          metadata: { error: message, ...(dataSourceId ? { dataSourceId } : {}) },
+        },
+      );
+
+      logger.error({
+        ...(requestId ? { request_id: requestId } : {}),
+        tenant_id: tenantId,
+        user_id: meta.userId ?? null,
+        operation: 'sync',
+        ...(dataSourceId ? { data_source_id: dataSourceId } : {}),
+        sync_job_id: syncJobId,
+        duration_ms: Date.now() - started,
+        status: 'failed',
+        error: code,
+        message: detail,
+      });
     }
   }
 
-  private async _buildConnector(
+  // -------------------------------------------------------------------------
+
+  /** Reads raw records of one entity type and upserts them into the canonical model. */
+  private async normalizeEntity(input: {
+    tenantId: string;
+    dataSourceId: string;
+    entityType: string;
+    fields: FieldMapping[];
+  }): Promise<EntityOutcome> {
+    const { tenantId, dataSourceId, entityType, fields } = input;
+    const repositories = {
+      customers: this.deps.customers,
+      products: this.deps.products,
+      sellers: this.deps.sellers,
+      sales: this.deps.sales,
+    };
+
+    const outcome: EntityOutcome = {
+      entityType,
+      total: 0,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      issues: [],
+      normalized: [],
+    };
+    const reasons = new Map<string, { count: number; sample?: unknown }>();
+
+    let skip = 0;
+    for (;;) {
+      const page = await this.deps.rawRecords.list({
+        tenantId,
+        dataSourceId,
+        entityType,
+        skip,
+        take: NORMALIZE_PAGE_SIZE,
+      });
+      if (page.items.length === 0) break;
+
+      for (const record of page.items) {
+        outcome.total += 1;
+        const normalized = normalizeRow(record.payload as Record<string, unknown>, fields);
+        // The source external_id is authoritative when the mapping omits it.
+        if (normalized['external_id'] == null && record.externalId) {
+          normalized['external_id'] = record.externalId;
+        }
+        outcome.normalized.push(normalized);
+
+        try {
+          const result = await normalizeToCanonical(
+            tenantId,
+            dataSourceId,
+            entityType,
+            normalized,
+            repositories,
+          );
+          if (result.status === 'skipped') {
+            outcome.skipped += 1;
+            addReason(reasons, result.reason, result.sample);
+            continue;
+          }
+          if (result.status === 'created') outcome.created += 1;
+          else outcome.updated += 1;
+          await this.deps.rawRecords.markProcessed({ id: record.id });
+        } catch (error) {
+          outcome.skipped += 1;
+          addReason(
+            reasons,
+            isAppError(error) ? error.code : 'upsert_failed',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+
+      skip += page.items.length;
+      if (skip >= page.total) break;
+    }
+
+    outcome.issues = [...reasons.entries()].map(([rule, { count, sample }]) => ({
+      rule,
+      count,
+      ...(sample === undefined ? {} : { sample }),
+    }));
+
+    return outcome;
+  }
+
+  private async buildConnector(
     tenantId: string,
     ds: { type: string; configuration: unknown; credentialId: string | null },
   ) {
     const config = (ds.configuration ?? {}) as Record<string, unknown>;
 
     if (ds.type === 'csv') {
-      return new CsvConnector({ filePath: String(config['filePath'] ?? '') }, this.rawRecords);
+      return new CsvConnector(
+        { filePath: String(config['filePath'] ?? '') },
+        this.deps.rawRecords,
+      );
     }
 
     if (ds.type === 'postgres') {
       let credData: Record<string, unknown> = {};
       if (ds.credentialId) {
-        const cred = await this.credentials.findById({ tenantId, id: ds.credentialId });
+        const cred = await this.deps.credentials.findById({ tenantId, id: ds.credentialId });
         if (cred) {
           credData = JSON.parse(decrypt(cred.encryptedData)) as Record<string, unknown>;
         }
@@ -235,10 +490,42 @@ export class SyncService {
           username: String(credData['username'] ?? ''),
           password: String(credData['password'] ?? ''),
         },
-        this.rawRecords,
+        this.deps.rawRecords,
       );
     }
 
     throw new AppError(ErrorCode.CONNECTOR_ERROR, `Connector type '${ds.type}' not supported yet`);
   }
+}
+
+function addReason(
+  map: Map<string, { count: number; sample?: unknown }>,
+  rule: string,
+  sample?: unknown,
+) {
+  const existing = map.get(rule);
+  if (existing) existing.count += 1;
+  else map.set(rule, { count: 1, ...(sample === undefined ? {} : { sample }) });
+}
+
+/**
+ * Two mappings may target the same canonical entity. Their field lists are
+ * merged (first mapping wins per target field) so the normalizer sees a single
+ * configuration per entity type.
+ */
+function mergeFieldsByTargetEntity(
+  mappings: Array<{ targetEntity: string; configuration: MappingConfig }>,
+): Map<string, FieldMapping[]> {
+  const byEntity = new Map<string, FieldMapping[]>();
+  for (const mapping of mappings) {
+    const current = byEntity.get(mapping.targetEntity) ?? [];
+    const seen = new Set(current.map((field) => field.target));
+    for (const field of mapping.configuration?.fields ?? []) {
+      if (seen.has(field.target)) continue;
+      seen.add(field.target);
+      current.push(field);
+    }
+    byEntity.set(mapping.targetEntity, current);
+  }
+  return byEntity;
 }

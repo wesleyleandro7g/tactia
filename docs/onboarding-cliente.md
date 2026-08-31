@@ -1,0 +1,195 @@
+# Onboarding de um cliente real
+
+Guia do operador para colocar uma empresa dentro da Tactia, do zero até o primeiro
+insight. Espelha o roteiro da spec §55 e é o caminho que o wizard `/onboarding`
+implementa. Tempo esperado: **20 a 40 minutos**, sendo a maior parte a preparação
+dos dados do cliente.
+
+> Se algo falhar no meio do caminho, vá para o [runbook](./runbook.md).
+
+---
+
+## 0. Antes de começar
+
+Tenha em mãos:
+
+| Item | Por quê |
+|---|---|
+| Nome da empresa | Vira o `Tenant` |
+| E-mail do owner | Primeiro usuário, com papel `owner` |
+| A fonte de dados | CSV exportado ou credenciais de um PostgreSQL de leitura |
+| `LLM_API_KEY` configurada no ambiente | Sem ela o `/chat` fica indisponível (o resto funciona) |
+| Seu e-mail em `TACTIA_OPERATOR_EMAILS` | Dá acesso ao painel `/admin` para diagnóstico |
+
+Checagem rápida do ambiente:
+
+```bash
+curl -s https://SEU-HOST/api/v1/health
+# {"data":{"status":"ok","database":"up"}, ...}
+```
+
+### Se a fonte for CSV
+
+A V0.1 lê o CSV de um **caminho no servidor** (upload pela interface é pendência).
+Copie os arquivos para dentro do host/container antes de começar:
+
+```bash
+docker compose -f docker/docker-compose.prod.yml cp ./cliente-clientes.csv web:/tmp/csv/clientes.csv
+```
+
+Um arquivo por entidade. Cabeçalhos aceitos pelo mapeamento (o nome da coluna de
+origem pode ser qualquer um — você escolhe o destino no passo 5):
+
+| Entidade | Campos de destino |
+|---|---|
+| `customer` | `external_id`*, `name`*, `email`, `phone`, `document` |
+| `product` | `external_id`*, `name`*, `sku`, `category`, `price`, `cost` |
+| `seller` | `external_id`*, `name`*, `email` |
+| `sale` | `external_id`*, `customer_external_id`*, `sold_at`*, `total_amount`, `seller_external_id`, `product_external_id`, `quantity`, `unit_price`, `discount_amount`, `currency`, `status` |
+
+\* obrigatórios. Sem `external_id` a linha é descartada (não há como fazer upsert
+idempotente). Uma venda sem cliente resolvível também é descartada — e o motivo
+aparece no relatório de qualidade.
+
+`total_amount` pode ser omitido se houver `unit_price` (ou preço do produto) e
+`quantity`. `status` aceita `pending`, `confirmed`, `cancelled`, `refunded`;
+qualquer outro valor entra como `confirmed`. **Receita só considera `confirmed`.**
+
+### Se a fonte for PostgreSQL
+
+Peça ao cliente um usuário **somente leitura**:
+
+```sql
+CREATE USER tactia_ro WITH PASSWORD '...';
+GRANT CONNECT ON DATABASE erp TO tactia_ro;
+GRANT USAGE ON SCHEMA public TO tactia_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO tactia_ro;
+```
+
+A senha é cifrada com AES-256-GCM antes de ser gravada e só é descriptografada no
+momento de conectar. Nenhuma rota devolve a senha.
+
+---
+
+## 1. Criar a conta do owner
+
+Abra `https://SEU-HOST/signup` e crie a conta com o e-mail do cliente
+(ou crie você e transfira depois). O signup já pede o nome da empresa e cria o
+`Tenant` com você como `owner`.
+
+Grava `TENANT_CREATED`, `USER_CREATED` e `MEMBERSHIP_CREATED` no audit log.
+
+## 2. Convidar o resto do time
+
+`/api/v1/users` (owner/admin):
+
+```bash
+curl -X POST https://SEU-HOST/api/v1/users -b cookies.txt \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Analista","email":"analista@cliente.com","password":"provisoria123","role":"member"}'
+```
+
+Papéis: `owner` > `admin` > `member` > `viewer`. Só `owner`/`admin` aprovam ações.
+Não há e-mail de convite na V0.1 — combine a senha provisória por outro canal.
+
+## 3. Configurar a fonte de dados
+
+Você cai em `/onboarding` automaticamente. Escolha **CSV** (informe o caminho no
+servidor) ou **PostgreSQL** (host, porta, banco, usuário, senha).
+
+Importante para CSV: **crie uma fonte por arquivo** (clientes, produtos,
+vendedores, vendas). Referências entre entidades são resolvidas primeiro dentro
+da mesma fonte e, se não encontradas, no tenant inteiro — então as vendas
+encontram os clientes mesmo estando em outra fonte.
+
+## 4. Testar a conexão
+
+Botão **Testar conexão**. Para CSV verifica se o arquivo é legível; para Postgres
+abre a conexão e roda `SELECT 1`. Erro aqui é sempre de infraestrutura ou
+credencial — a mensagem do connector aparece na tela.
+
+## 5. Descobrir e mapear
+
+**Descobrir** lista colunas (CSV) ou tabelas e colunas (Postgres). Depois mapeie
+coluna de origem → campo canônico usando a tabela do passo 0.
+
+Ordem de importação obrigatória quando as vendas referenciam outras entidades:
+
+```text
+clientes → produtos → vendedores → vendas
+```
+
+## 6. Prévia
+
+Mostra as primeiras linhas como a Tactia vai lê-las. Confira acentuação, separador
+decimal e formato de data antes de importar. Datas devem ser reconhecíveis por
+`new Date()` — `2026-08-25` e `2026-08-25T13:00:00Z` funcionam; `25/08/2026` não.
+
+## 7. Importar
+
+**Importar dados** executa o ciclo completo (spec §37):
+
+```text
+fonte → RawRecord (original preservado) → normalização → upsert canônico
+      → relatório de qualidade → Import → pipeline de insights
+```
+
+Rodar de novo é seguro: o upsert usa `(tenant, fonte, external_id)`, então nada
+duplica (spec §38).
+
+## 8. Validar os dados
+
+A tela de resultado mostra o que entrou:
+
+```text
+✓ 1.842 clientes na base
+✓ 8.421 vendas na base
+✓ 42 vendedores encontrados
+✓ R$ 1.284.000 em vendas analisadas
+```
+
+Confira `Registros lidos / criados / atualizados / falhas`. **Qualquer coisa
+diferente de 0 em falhas** merece uma olhada no relatório de qualidade:
+
+```bash
+curl -s -b cookies.txt "https://SEU-HOST/api/v1/imports" | jq
+```
+
+Motivos mais comuns: `missing_external_id`, `sale_customer_not_found`,
+`sale_invalid_date`, `sale_without_amount`, `duplicated_external_id`.
+
+## 9. Métricas
+
+`/dashboard` já mostra receita, vendas, clientes e ticket médio do mês corrente,
+com variação contra o período anterior. Se os números vierem zerados com dados
+importados, cheque o período (`?from=&to=`) e o `status` das vendas — canceladas e
+estornadas nunca entram na receita.
+
+## 10. Primeiros insights
+
+O pipeline determinístico roda **automaticamente depois de cada importação**.
+Para rodar de novo sob demanda, use **Rodar análise** no dashboard.
+
+Espere ver, quando os dados justificarem: queda ou crescimento de receita,
+produto em alta/baixa, leads e clientes inativos, vendedor fora da média. Cada
+insight traz a evidência (métrica + período) e uma recomendação.
+
+---
+
+## Fechamento com o cliente
+
+Um roteiro de 15 minutos que costuma funcionar:
+
+1. `/dashboard` — os quatro números e a variação.
+2. Um insight com a evidência aberta: "isso não é opinião, é a métrica X no período Y".
+3. `/chat` — "Quanto vendemos este mês?" e "Quem mais vendeu?", mostrando a fonte citada.
+4. Peça uma ação no chat ("crie uma tarefa para ligar para o cliente X") e mostre
+   que ela **fica pendente de aprovação** — a Tactia nunca age sozinha.
+5. `/approvals` — aprovar e ver a execução registrada.
+
+## Depois do onboarding
+
+- Reimporte periodicamente (`/admin` → **Disparar sync**) ou agende a chamada de
+  `POST /api/v1/data-sources/:id/sync`.
+- Acompanhe `/admin/tenants/:id`: sync jobs, contadores, erros e insights.
+- Limites por padrão: 6 syncs/min, 20 mensagens de chat/min por tenant.

@@ -1,4 +1,11 @@
-import { AppError, ErrorCode, fail, REQUEST_ID_HEADER, createId } from '@tactia/shared';
+import {
+  AppError,
+  ErrorCode,
+  fail,
+  logger,
+  REQUEST_ID_HEADER,
+  createId,
+} from '@tactia/shared';
 import { toNextJsHandler } from 'better-auth/next-js';
 import { auth } from '@/lib/auth';
 import { getClientIp } from '@/lib/api';
@@ -6,14 +13,29 @@ import { consumeRateLimit } from '@/lib/rate-limit';
 
 const handler = toNextJsHandler(auth);
 
+/** Brute-force guard on the credential endpoints (spec §49): 30 req/min por IP. */
 function rateLimited(request: Request): Response | null {
   const ip = getClientIp(request) ?? 'unknown';
   const allowed = consumeRateLimit(`auth:${ip}`, 30, 60_000);
   if (allowed) return null;
+
   const requestId = request.headers.get(REQUEST_ID_HEADER) ?? createId();
-  const error = new AppError(ErrorCode.AUTHENTICATION_ERROR, 'Too many requests', undefined, 429);
+  const error = new AppError(
+    ErrorCode.RATE_LIMITED,
+    'Muitas tentativas. Aguarde um instante e tente novamente.',
+  );
+  logger.warn({
+    request_id: requestId,
+    tenant_id: null,
+    user_id: null,
+    operation: `${request.method} ${new URL(request.url).pathname}`,
+    duration_ms: 0,
+    status: error.statusCode,
+    error: error.code,
+    ip,
+  });
   return Response.json(fail(error.code, error.message, requestId), {
-    status: 429,
+    status: error.statusCode,
     headers: { [REQUEST_ID_HEADER]: requestId },
   });
 }

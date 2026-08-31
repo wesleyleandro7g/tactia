@@ -59,6 +59,31 @@ DATABASE_URL=postgresql://tactia:tactia@localhost:5433/tactia_test pnpm db:migra
 pnpm test
 ```
 
+O E2E do fluxo completo (empresa → fonte → import → métricas → insight → ação →
+execução) está em `apps/web/src/__tests__/pilot-flow.test.ts`.
+
+## Deploy
+
+```bash
+cp .env.example .env.production   # preencha os valores reais
+docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -d --build
+curl -s http://localhost:3000/api/v1/health   # {"data":{"status":"ok","database":"up"}}
+```
+
+Sobe `postgres` → `migrate` (`prisma migrate deploy`) → `web` (Next standalone,
+usuário não-root). Só o web publica porta; coloque um proxy com TLS na frente.
+
+## Operação
+
+| Documento | Para quê |
+|---|---|
+| [docs/onboarding-cliente.md](docs/onboarding-cliente.md) | Passo a passo para colocar um cliente real |
+| [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
+
+Logs são JSON estruturado com `request_id`, `tenant_id`, `user_id`, `operation`,
+`duration_ms` e `status`. Toda resposta traz o header `x-request-id`, que é a chave
+para achar a linha correspondente no log.
+
 ## Estrutura
 
 ```text
@@ -70,4 +95,6 @@ packages/connectors     CSV/Postgres connectors, normalização, data quality
 packages/intelligence   Metric engine, rules, insights, recommendations
 packages/execution      Action registry, execution engine, approvals
 packages/ai             Tool registry, context builder, LLM adapter, orchestrator
+docker/                 docker-compose de dev, Dockerfile e compose de produção
+docs/                   Documento por etapa + onboarding e runbook
 ```

@@ -148,6 +148,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   AI_ERROR: 'A IA está indisponível agora.',
   ACTION_ERROR: 'A ação não pôde ser executada.',
   INTERNAL_ERROR: 'Erro interno. Tente novamente.',
+  RATE_LIMITED: 'Muitas solicitações em pouco tempo. Aguarde um instante.',
 };
 
 export function errorMessage(code: string | undefined, fallback = 'Algo deu errado.'): string {

@@ -1,0 +1,73 @@
+# Tactia — imagem de produção do apps/web (Next.js standalone).
+# Build a partir da raiz do repositório:
+#   docker build -f docker/Dockerfile -t tactia-web .
+#
+# Stages:
+#   runner   (default) → serve o Next.js
+#   migrator          → aplica as migrations e sai
+
+FROM node:22-alpine AS base
+RUN corepack enable && apk add --no-cache openssl
+WORKDIR /repo
+
+# ---------------------------------------------------------------------------
+# deps — instala com o lockfile
+# ---------------------------------------------------------------------------
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json apps/web/
+COPY packages/ai/package.json packages/ai/
+COPY packages/connectors/package.json packages/connectors/
+COPY packages/database/package.json packages/database/
+COPY packages/domain/package.json packages/domain/
+COPY packages/execution/package.json packages/execution/
+COPY packages/intelligence/package.json packages/intelligence/
+COPY packages/shared/package.json packages/shared/
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && pnpm install --frozen-lockfile
+
+# ---------------------------------------------------------------------------
+# builder — Prisma client + next build (standalone)
+# ---------------------------------------------------------------------------
+FROM base AS builder
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /repo/ ./
+COPY . .
+RUN pnpm --filter @tactia/database generate
+# Placeholders passados apenas para este comando (não ficam no ambiente da
+# imagem): o build não conecta no banco, mas os módulos exigem as variáveis.
+RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
+    BETTER_AUTH_SECRET=placeholder-de-build-com-32-caracteres \
+    pnpm --filter @tactia/web build
+
+# ---------------------------------------------------------------------------
+# migrator — `prisma migrate deploy` (usado pelo serviço `migrate` do compose)
+# ---------------------------------------------------------------------------
+FROM builder AS migrator
+WORKDIR /repo/packages/database
+CMD ["pnpm", "migrate:deploy"]
+
+# ---------------------------------------------------------------------------
+# runner — só o necessário para servir
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS runner
+RUN apk add --no-cache openssl
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+# O bundle do Next perde o caminho relativo do query engine do Prisma; apontar
+# explicitamente é o escape hatch documentado (não é segredo, é um caminho).
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/packages/database/src/generated/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
+
+RUN addgroup -g 1001 -S nodejs && adduser -S tactia -u 1001
+
+COPY --from=builder --chown=tactia:nodejs /repo/apps/web/.next/standalone ./
+COPY --from=builder --chown=tactia:nodejs /repo/apps/web/.next/static ./apps/web/.next/static
+
+USER tactia
+EXPOSE 3000
+
+# `next start` não é usado no modo standalone.
+CMD ["node", "apps/web/server.js"]

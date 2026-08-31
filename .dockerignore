@@ -1,0 +1,26 @@
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+coverage
+**/coverage
+packages/database/src/generated
+.git
+.github
+docs
+*.log
+**/*.log
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Nenhum arquivo de ambiente entra na imagem — as variáveis vêm do runtime.
+# Os padrões precisam de `**/` para alcançar os pacotes (packages/database/.env).
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example

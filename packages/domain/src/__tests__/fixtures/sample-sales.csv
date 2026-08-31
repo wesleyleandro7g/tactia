@@ -1,0 +1,5 @@
+external_id,customer_external_id,seller_external_id,product_external_id,quantity,unit_price,total_amount,sold_at,status
+SALE001,CUST001,SELL001,PROD001,2,150.00,300.00,2026-08-03,confirmed
+SALE002,CUST002,SELL001,PROD002,1,80.50,80.50,2026-08-10,confirmed
+SALE003,CUST003,SELL002,PROD001,3,150.00,450.00,2026-08-17,confirmed
+SALE004,CUST999,SELL001,PROD001,1,150.00,150.00,2026-08-20,confirmed

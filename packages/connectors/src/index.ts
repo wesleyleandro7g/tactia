@@ -7,5 +7,10 @@ export { PostgresConnector } from './postgres-connector';
 export type { PostgresConnectorConfig } from './postgres-connector';
 export { runDataQualityChecks } from './data-quality';
 export type { DataQualityCheckResult, QualityIssue } from './data-quality';
-export { normalizeRow, normalizeToCanonical } from './normalizer';
-export type { NormalizerRepositories } from './normalizer';
+export {
+  CANONICAL_ENTITY_ORDER,
+  canonicalEntityRank,
+  normalizeRow,
+  normalizeToCanonical,
+} from './normalizer';
+export type { NormalizeOutcome, NormalizerRepositories } from './normalizer';
