@@ -126,6 +126,29 @@ describe('RuleEngine', () => {
     expect(drop!.evidence.length).toBeGreaterThan(0);
   });
 
+  it('reports the real drop percentage (1000 → 100 = 90%)', async () => {
+    const events = await ruleEngine.evaluate({
+      tenantId,
+      period: { from: periodFrom, to: periodTo },
+      db: prisma,
+      thresholds: DEFAULT_THRESHOLDS,
+    });
+
+    const drop = events.find((e) => e.ruleKey === 'revenue_drop')!;
+    // Regression: reading `comparison.change` of a growth metric compared
+    // growth to growth and reported 190% instead of 90%.
+    expect(drop.title).toBe('Queda de receita de 90%');
+    expect(drop.description).toContain('90%');
+
+    const growth = drop.evidence.find((item) => item.key === 'revenue_growth')!;
+    expect(growth.value).toBeCloseTo(-0.9, 5);
+
+    // Revenue with comparison is part of the evidence: R$ 100 vs R$ 1.000.
+    const revenue = drop.evidence.find((item) => item.key === 'revenue')!;
+    expect(revenue.value).toBe(100);
+    expect(revenue.comparison?.value).toBe(1000);
+  });
+
   it('detects inactive_leads rule', async () => {
     const events = await ruleEngine.evaluate({
       tenantId,

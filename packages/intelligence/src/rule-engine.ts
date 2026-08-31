@@ -26,11 +26,18 @@ async function ruleRevenueDrop(ctx: RuleContext, engine: MetricEngine): Promise<
   const result = await engine.calculate('revenue_growth', {
     tenantId: ctx.tenantId,
     period: ctx.period,
-    withComparison: true,
   });
 
-  const change = result.comparison?.change ?? 0;
+  // `revenue_growth` já É a variação vs. o período anterior. Pedir `comparison`
+  // para essa métrica compararia crescimento com crescimento (derivada segunda)
+  // e produzia percentuais irreais (-95% virava "195%").
+  const change = result.value;
   if (change <= ctx.thresholds.revenueDrop) {
+    const revenue = await engine.calculate('revenue', {
+      tenantId: ctx.tenantId,
+      period: ctx.period,
+      withComparison: true,
+    });
     const pct = Math.round(Math.abs(change) * 100);
     return [
       {
@@ -39,7 +46,9 @@ async function ruleRevenueDrop(ctx: RuleContext, engine: MetricEngine): Promise<
         severity: change <= -0.3 ? 'critical' : 'high',
         title: `Queda de receita de ${pct}%`,
         description: `A receita caiu ${pct}% em relação ao período anterior.`,
-        evidence: [result],
+        // A receita com comparação entra como evidência: é o número que o
+        // usuário reconhece ("R$ 200 contra R$ 4.000").
+        evidence: [result, revenue],
         periodFrom: ctx.period.from,
         periodTo: ctx.period.to,
       },
@@ -52,11 +61,15 @@ async function ruleRevenueGrowth(ctx: RuleContext, engine: MetricEngine): Promis
   const result = await engine.calculate('revenue_growth', {
     tenantId: ctx.tenantId,
     period: ctx.period,
-    withComparison: true,
   });
 
-  const change = result.comparison?.change ?? 0;
+  const change = result.value;
   if (change >= ctx.thresholds.revenueGrowth) {
+    const revenue = await engine.calculate('revenue', {
+      tenantId: ctx.tenantId,
+      period: ctx.period,
+      withComparison: true,
+    });
     const pct = Math.round(change * 100);
     return [
       {
@@ -65,7 +78,7 @@ async function ruleRevenueGrowth(ctx: RuleContext, engine: MetricEngine): Promis
         severity: 'medium',
         title: `Crescimento de receita de ${pct}%`,
         description: `A receita cresceu ${pct}% em relação ao período anterior.`,
-        evidence: [result],
+        evidence: [result, revenue],
         periodFrom: ctx.period.from,
         periodTo: ctx.period.to,
       },
