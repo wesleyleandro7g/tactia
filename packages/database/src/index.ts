@@ -19,6 +19,9 @@ export type {
   ActionType,
   ActionExecutionStatus,
   ApprovalStatus,
+  InteractionChannel,
+  InteractionDirection,
+  InteractionIntent,
   Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
@@ -31,6 +34,7 @@ export { ProductRepository } from './repositories/product-repository';
 export { SellerRepository } from './repositories/seller-repository';
 export { SaleRepository } from './repositories/sale-repository';
 export { ActivityRepository } from './repositories/activity-repository';
+export { InteractionRepository, EMBEDDING_DIMENSIONS } from './repositories/interaction-repository';
 export { CredentialRepository } from './repositories/credential-repository';
 export { DataSourceRepository } from './repositories/data-source-repository';
 export { SyncJobRepository } from './repositories/sync-job-repository';
@@ -56,6 +60,11 @@ export type { CreateProductInput } from './repositories/product-repository';
 export type { CreateSellerInput } from './repositories/seller-repository';
 export type { CreateSaleInput, CreateSaleItemInput } from './repositories/sale-repository';
 export type { CreateActivityInput } from './repositories/activity-repository';
+export type {
+  CreateInteractionInput,
+  InteractionRecord,
+  InteractionSearchHit,
+} from './repositories/interaction-repository';
 export type { CreateDataSourceInput } from './repositories/data-source-repository';
 export type { CreateCredentialInput } from './repositories/credential-repository';
 export type { CreateSyncJobInput } from './repositories/sync-job-repository';

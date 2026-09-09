@@ -4,6 +4,7 @@ import type {
   DataQualityReportRepository,
   DataSourceRepository,
   ImportRepository,
+  InteractionRepository,
   MappingRepository,
   ProductRepository,
   RawRecordRepository,
@@ -41,6 +42,16 @@ export type SyncServiceDeps = {
   products: ProductRepository;
   sellers: SellerRepository;
   sales: SaleRepository;
+  interactions: InteractionRepository;
+  /**
+   * Classifies and embeds interactions written in this sync. Failures here
+   * never fail the sync — the intelligence hook still runs afterwards.
+   */
+  enrichInteractions?: (event: {
+    tenantId: string;
+    dataSourceId: string;
+    syncJobId: string;
+  }) => Promise<void>;
   /**
    * Called after a sync completes successfully. Wired in `apps/web` to the
    * intelligence pipeline so an import produces insights without a manual step
@@ -273,6 +284,26 @@ export class SyncService {
       });
       await this.deps.dataSources.updateLastSyncAt({ id: ds.id, lastSyncAt: new Date() });
 
+      if (this.deps.enrichInteractions && outcomes.some((outcome) => outcome.entityType === 'interaction')) {
+        try {
+          await this.deps.enrichInteractions({
+            tenantId,
+            dataSourceId: ds.id,
+            syncJobId,
+          });
+        } catch (error) {
+          logger.warn({
+            ...(requestId ? { request_id: requestId } : {}),
+            tenant_id: tenantId,
+            operation: 'sync_enrich_interactions',
+            sync_job_id: syncJobId,
+            status: 'failed',
+            error: isAppError(error) ? error.code : ErrorCode.INTERNAL_ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       const summary = {
         recordsRead: raw.recordsRead,
         recordsCreated: totals.created,
@@ -387,6 +418,7 @@ export class SyncService {
       products: this.deps.products,
       sellers: this.deps.sellers,
       sales: this.deps.sales,
+      interactions: this.deps.interactions,
     };
 
     const outcome: EntityOutcome = {

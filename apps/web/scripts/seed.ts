@@ -263,6 +263,63 @@ async function seedBusiness(tenantId: string) {
   );
 }
 
+async function seedInteractions(tenantId: string, customerIds: string[]) {
+  const existing = await prisma.interaction.count({ where: { tenantId } });
+  if (existing > 0) {
+    console.log(`Interactions seed: ${existing} already present, skipping`);
+    return;
+  }
+
+  const samples = [
+    {
+      channel: 'whatsapp' as const,
+      intent: 'complaint' as const,
+      topics: ['atraso'],
+      body: 'Meu pedido atrasou de novo. Péssimo atendimento, quero cancelar.',
+      daysAgo: 3,
+    },
+    {
+      channel: 'email' as const,
+      intent: 'complaint' as const,
+      topics: ['qualidade'],
+      body: 'O produto chegou quebrado e ninguém responde o chamado.',
+      daysAgo: 8,
+    },
+    {
+      channel: 'whatsapp' as const,
+      intent: 'praise' as const,
+      topics: ['atendimento'],
+      body: 'Excelente, obrigado pelo suporte rápido. Parabéns à equipe.',
+      daysAgo: 5,
+    },
+    {
+      channel: 'note' as const,
+      intent: 'question' as const,
+      topics: ['boleto'],
+      body: 'Quando vence o boleto da fatura deste mês?',
+      daysAgo: 2,
+    },
+  ];
+
+  for (const [index, sample] of samples.entries()) {
+    await prisma.interaction.create({
+      data: {
+        id: createId(),
+        tenantId,
+        customerId: customerIds[index % customerIds.length] ?? null,
+        channel: sample.channel,
+        direction: 'inbound',
+        body: sample.body,
+        occurredAt: daysAgo(sample.daysAgo),
+        intent: sample.intent,
+        topics: sample.topics,
+        metadata: { seed: true },
+      },
+    });
+  }
+  console.log(`Interactions seed: ${samples.length} messages`);
+}
+
 async function seedActions(tenantId: string) {
   // Built-in action definitions (Etapa 7). Idempotent: skips existing types.
   const defaults = [
@@ -306,6 +363,15 @@ async function main() {
   console.log(`Identity ready: ${DEMO_EMAIL} / password123 (${tenant.name})`);
   await seedBusiness(tenant.id);
   await seedActions(tenant.id);
+  const customerRows = await prisma.customer.findMany({
+    where: { tenantId: tenant.id },
+    select: { id: true },
+    take: 8,
+  });
+  await seedInteractions(
+    tenant.id,
+    customerRows.map((row) => row.id),
+  );
 }
 
 main()

@@ -13,6 +13,7 @@ import {
   DataQualityReportRepository,
   DataSourceRepository,
   ImportRepository,
+  InteractionRepository,
   MappingRepository,
   prisma,
   ProductRepository,
@@ -42,6 +43,7 @@ const customerRepo = new CustomerRepository(prisma);
 const productRepo = new ProductRepository(prisma);
 const sellerRepo = new SellerRepository(prisma);
 const saleRepo = new SaleRepository(prisma);
+const interactionRepo = new InteractionRepository(prisma);
 
 const credentialService = new CredentialService(credentialRepo);
 const dataSourceService = new DataSourceService(
@@ -63,6 +65,7 @@ const syncService = new SyncService({
   products: productRepo,
   sellers: sellerRepo,
   sales: saleRepo,
+  interactions: interactionRepo,
 });
 
 let tenantId: string;

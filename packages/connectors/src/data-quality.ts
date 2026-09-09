@@ -89,6 +89,30 @@ export function runDataQualityChecks(
           addIssue(warnings, 'product_without_price', undefined);
         }
         break;
+
+      case 'interaction': {
+        const body = record['body'] ?? record['text'] ?? record['message'];
+        if (!body || String(body).trim() === '') {
+          addIssue(errors, 'interaction_without_body', record);
+          isValid = false;
+        }
+        const occurredAt = record['occurred_at'] ?? record['date'] ?? record['sent_at'];
+        if (!occurredAt) {
+          addIssue(errors, 'interaction_invalid_date', record);
+          isValid = false;
+        } else {
+          const parsed = new Date(String(occurredAt));
+          if (Number.isNaN(parsed.getTime())) {
+            addIssue(errors, 'interaction_invalid_date', occurredAt);
+            isValid = false;
+          }
+        }
+        if (!record['external_id']) {
+          addIssue(errors, 'missing_external_id', record);
+          isValid = false;
+        }
+        break;
+      }
     }
 
     if (!isValid) invalidCount++;

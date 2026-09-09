@@ -46,6 +46,7 @@ origem pode ser qualquer um — você escolhe o destino no passo 5):
 | `product` | `external_id`*, `name`*, `sku`, `category`, `price`, `cost` |
 | `seller` | `external_id`*, `name`*, `email` |
 | `sale` | `external_id`*, `customer_external_id`*, `sold_at`*, `total_amount`, `seller_external_id`, `product_external_id`, `quantity`, `unit_price`, `discount_amount`, `currency`, `status` |
+| `interaction` | `external_id`*, `body`*, `occurred_at`*, `channel`, `direction`, `subject`, `customer_external_id`, `customer_email`, `customer_phone` |
 
 \* obrigatórios. Sem `external_id` a linha é descartada (não há como fazer upsert
 idempotente). Uma venda sem cliente resolvível também é descartada — e o motivo

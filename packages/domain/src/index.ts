@@ -9,6 +9,15 @@ export { ProductService } from './services/product-service';
 export { SellerService } from './services/seller-service';
 export { SaleService } from './services/sale-service';
 export { ActivityService } from './services/activity-service';
+export { InteractionService } from './services/interaction-service';
+export { InteractionEnrichmentService } from './services/interaction-enrichment-service';
+export type {
+  InteractionClassifier,
+  InteractionEmbedder,
+  InteractionIntentLabel,
+  ClassifiedInteraction,
+} from './ports/interaction-enrichment';
+export { INTERACTION_INTENTS } from './ports/interaction-enrichment';
 export { CredentialService, encrypt, decrypt } from './services/credential-service';
 export { DataSourceService } from './services/data-source-service';
 export { SyncService } from './services/sync-service';
@@ -40,6 +49,8 @@ export {
   updateSaleSchema,
   createActivitySchema,
   updateActivitySchema,
+  createInteractionSchema,
+  listInteractionQuerySchema,
   listQuerySchema,
 } from './schemas/business';
 export {

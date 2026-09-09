@@ -23,6 +23,7 @@ import {
   DataSourceRepository,
   ImportRepository,
   InsightRepository,
+  InteractionRepository,
   LeadRepository,
   MappingRepository,
   MembershipRepository,
@@ -46,6 +47,7 @@ import {
   DataSourceService,
   IntelligencePipelineService,
   InsightService,
+  InteractionService,
   LeadService,
   MetricService,
   ProductService,
@@ -90,6 +92,7 @@ const productRepository = new ProductRepository(prisma);
 const sellerRepository = new SellerRepository(prisma);
 const saleRepository = new SaleRepository(prisma);
 const activityRepository = new ActivityRepository(prisma);
+const interactionRepository = new InteractionRepository(prisma);
 const dataSourceRepository = new DataSourceRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
 const syncJobRepository = new SyncJobRepository(prisma);
@@ -150,6 +153,11 @@ const activityService = new ActivityService(
   sellerRepository,
   auditLogService,
 );
+const interactionService = new InteractionService(
+  interactionRepository,
+  customerRepository,
+  auditLogService,
+);
 const leadService = new LeadService(leadRepository, customerRepository, auditLogService);
 void leadService;
 void activityService;
@@ -184,6 +192,7 @@ const syncService = new SyncService({
   products: productRepository,
   sellers: sellerRepository,
   sales: saleRepository,
+  interactions: interactionRepository,
   onSyncCompleted: async ({ tenantId, syncJobId, userId }) => {
     pipelineRuns.push(syncJobId);
     await intelligencePipelineService.run({ tenantId, actorCtx: { tenantId, userId } });
@@ -232,6 +241,7 @@ const toolRegistry = new ToolRegistry(
       sales: saleService,
       insights: insightService,
       recommendations: recommendationService,
+      interactions: interactionService,
     },
     { actionProposer },
   ),
@@ -511,7 +521,7 @@ describe('Fluxo do piloto (spec §2)', () => {
       from: iso(30),
       to: new Date().toISOString(),
     });
-    expect(bulk.metrics).toHaveLength(6);
+    expect(bulk.metrics).toHaveLength(7);
   });
 
   it('8. gera insights automaticamente depois do sync', async () => {

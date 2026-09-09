@@ -11,6 +11,7 @@ import {
   DataSourceRepository,
   ImportRepository,
   InsightRepository,
+  InteractionRepository,
   LeadRepository,
   MappingRepository,
   MembershipRepository,
@@ -36,6 +37,8 @@ import {
   ImportService,
   IntelligencePipelineService,
   InsightService,
+  InteractionEnrichmentService,
+  InteractionService,
   LeadService,
   MembershipService,
   MetricService,
@@ -55,6 +58,12 @@ import {
   ExecutionEngine,
   createDefaultActionRegistry,
 } from '@tactia/execution';
+import {
+  KeywordInteractionClassifier,
+  LlmInteractionClassifier,
+  createEmbeddingAdapterFromEnv,
+  createLLMAdapterFromEnv,
+} from '@tactia/ai';
 import { betterAuthProvider } from './auth-provider';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +80,7 @@ const productRepository = new ProductRepository(prisma);
 const sellerRepository = new SellerRepository(prisma);
 const saleRepository = new SaleRepository(prisma);
 const activityRepository = new ActivityRepository(prisma);
+const interactionRepository = new InteractionRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
 const dataSourceRepository = new DataSourceRepository(prisma);
 const syncJobRepository = new SyncJobRepository(prisma);
@@ -128,6 +138,39 @@ export const activityService = new ActivityService(
   auditLogService,
 );
 
+const llmAdapter = createLLMAdapterFromEnv({
+  LLM_PROVIDER: process.env.LLM_PROVIDER,
+  LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_MODEL: process.env.LLM_MODEL,
+  LLM_BASE_URL: process.env.LLM_BASE_URL,
+});
+const embeddingAdapter = createEmbeddingAdapterFromEnv({
+  LLM_PROVIDER: process.env.LLM_PROVIDER,
+  LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_MODEL: process.env.LLM_MODEL,
+  LLM_BASE_URL: process.env.LLM_BASE_URL,
+  EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
+});
+const interactionClassifier =
+  process.env.LLM_PROVIDER === 'mock'
+    ? new KeywordInteractionClassifier()
+    : llmAdapter
+      ? new LlmInteractionClassifier(llmAdapter)
+      : null;
+
+export const interactionEnrichmentService = new InteractionEnrichmentService({
+  interactions: interactionRepository,
+  classifier: interactionClassifier,
+  embedder: embeddingAdapter,
+});
+
+export const interactionService = new InteractionService(
+  interactionRepository,
+  customerRepository,
+  auditLogService,
+  interactionEnrichmentService,
+);
+
 export const credentialService = new CredentialService(credentialRepository);
 
 export const dataSourceService = new DataSourceService(
@@ -169,6 +212,10 @@ export const syncService = new SyncService({
   products: productRepository,
   sellers: sellerRepository,
   sales: saleRepository,
+  interactions: interactionRepository,
+  enrichInteractions: async ({ tenantId, dataSourceId }) => {
+    await interactionEnrichmentService.enrichPending({ tenantId, dataSourceId });
+  },
   // An import is only useful once it produced insights (spec §2): the pipeline
   // runs right after a successful sync, and a failure here never fails the sync.
   onSyncCompleted: async ({ tenantId, userId }) => {

@@ -21,14 +21,28 @@ export {
   type LLMEnv,
 } from './config';
 export {
+  createEmbeddingAdapterFromEnv,
+  DEFAULT_EMBEDDING_MODEL,
+  type EmbeddingEnv,
+} from './embeddings/config';
+export type { EmbeddingAdapter } from './embeddings/types';
+export { MockEmbeddingAdapter } from './embeddings/mock-embedding-adapter';
+export { OpenAIEmbeddingAdapter } from './embeddings/openai-embedding-adapter';
+export {
+  LlmInteractionClassifier,
+  KeywordInteractionClassifier,
+} from './classifiers/interaction-classifier';
+export {
   createDefaultTools,
   createDefaultToolRegistry,
+  createGetComplaintsTool,
   createGetCustomersTool,
   createGetInsightsTool,
   createGetProductsTool,
   createGetRevenueTool,
   createGetSalesTool,
   createGetSellersTool,
+  createSearchInteractionsTool,
   createProposeActionTool,
   currentMonthPeriod,
   periodInputSchema,

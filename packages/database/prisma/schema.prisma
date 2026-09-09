@@ -165,6 +165,26 @@ enum RecommendationStatus {
   dismissed
 }
 
+enum InteractionChannel {
+  whatsapp
+  email
+  note
+  other
+}
+
+enum InteractionDirection {
+  inbound
+  outbound
+  internal
+}
+
+enum InteractionIntent {
+  complaint
+  praise
+  question
+  other
+}
+
 // ---------------------------------------------------------------------------
 // Better Auth tables (provider-owned). Domain User maps via externalAuthId.
 // ---------------------------------------------------------------------------
@@ -257,6 +277,7 @@ model Tenant {
   sales        Sale[]
   saleItems    SaleItem[]
   activities   Activity[]
+  interactions Interaction[]
   credentials  Credential[]
   dataSources  DataSource[]
   syncJobs     SyncJob[]
@@ -363,6 +384,7 @@ model Customer {
   leads        Lead[]
   sales        Sale[]
   activities   Activity[]
+  interactions Interaction[]
 
   @@unique([tenantId, dataSourceId, externalId])
   @@index([tenantId, status])
@@ -522,6 +544,36 @@ model Activity {
   @@index([tenantId, leadId])
   @@index([tenantId, sellerId])
   @@map("activities")
+}
+
+model Interaction {
+  id           String               @id @db.Uuid
+  tenantId     String               @map("tenant_id") @db.Uuid
+  dataSourceId String?              @map("data_source_id") @db.Uuid
+  externalId   String?              @map("external_id")
+  customerId   String?              @map("customer_id") @db.Uuid
+  channel      InteractionChannel
+  direction    InteractionDirection @default(inbound)
+  subject      String?
+  body         String
+  occurredAt   DateTime             @map("occurred_at")
+  intent       InteractionIntent?
+  topics       String[]             @default([])
+  /// Written via raw SQL (pgvector). Never selected through Prisma.
+  embedding    Unsupported("vector")?
+  metadata     Json?
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, customerId])
+  @@index([tenantId, intent, occurredAt])
+  @@index([tenantId, channel])
+  @@index([tenantId, dataSourceId])
+  @@map("interactions")
 }
 
 // ---------------------------------------------------------------------------

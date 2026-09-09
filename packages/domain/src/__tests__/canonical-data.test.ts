@@ -54,6 +54,7 @@ async function reset() {
     await prisma.saleItem.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.sale.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.activity.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.interaction.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.lead.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.product.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.seller.deleteMany({ where: { tenantId: { in: ids } } });

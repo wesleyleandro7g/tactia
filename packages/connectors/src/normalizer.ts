@@ -1,5 +1,6 @@
 import type {
   CustomerRepository,
+  InteractionRepository,
   ProductRepository,
   SaleRepository,
   SellerRepository,
@@ -12,13 +13,14 @@ export type NormalizerRepositories = {
   products: ProductRepository;
   sellers: SellerRepository;
   sales: SaleRepository;
+  interactions: InteractionRepository;
 };
 
 /**
  * Canonical entities are upserted in dependency order: a sale can only be
  * written after its customer, product and seller exist (spec §38).
  */
-export const CANONICAL_ENTITY_ORDER = ['customer', 'product', 'seller', 'sale'] as const;
+export const CANONICAL_ENTITY_ORDER = ['customer', 'product', 'seller', 'interaction', 'sale'] as const;
 
 export function canonicalEntityRank(entityType: string): number {
   const index = (CANONICAL_ENTITY_ORDER as readonly string[]).indexOf(entityType);
@@ -58,6 +60,8 @@ function date(value: unknown): Date | null {
 }
 
 const SALE_STATUSES = new Set(['pending', 'confirmed', 'cancelled', 'refunded']);
+const INTERACTION_CHANNELS = new Set(['whatsapp', 'email', 'note', 'other']);
+const INTERACTION_DIRECTIONS = new Set(['inbound', 'outbound', 'internal']);
 
 /**
  * Resolves a reference by `external_id`, preferring the same DataSource and
@@ -232,6 +236,68 @@ export async function normalizeToCanonical(
         status: status as 'pending' | 'confirmed' | 'cancelled' | 'refunded',
         soldAt,
         items,
+      });
+      return { status: created ? 'created' : 'updated' };
+    }
+
+    case 'interaction': {
+      if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
+      const body = str(normalized['body'] ?? normalized['text'] ?? normalized['message']);
+      if (!body) return { status: 'skipped', reason: 'interaction_without_body', sample: externalId };
+
+      const occurredAt = date(normalized['occurred_at'] ?? normalized['date'] ?? normalized['sent_at']);
+      if (!occurredAt) {
+        return { status: 'skipped', reason: 'interaction_invalid_date', sample: externalId };
+      }
+
+      const customerExternalId = str(
+        normalized['customer_external_id'] ?? normalized['customer_id'],
+      );
+      const customerEmail = str(normalized['customer_email'] ?? normalized['email']);
+      const customerPhone = str(normalized['customer_phone'] ?? normalized['phone']);
+
+      let customerId: string | null = null;
+      if (customerExternalId) {
+        const customer = await resolveRef(
+          (params) => repositories.customers.findByExternalId(params),
+          tenantId,
+          dataSourceId,
+          customerExternalId,
+        );
+        customerId = customer?.id ?? null;
+      }
+      if (!customerId && customerEmail) {
+        const customer = await repositories.customers.findByEmail({
+          tenantId,
+          email: customerEmail,
+        });
+        customerId = customer?.id ?? null;
+      }
+      if (!customerId && customerPhone) {
+        const customer = await repositories.customers.findByPhone({
+          tenantId,
+          phone: customerPhone,
+        });
+        customerId = customer?.id ?? null;
+      }
+
+      const rawChannel = str(normalized['channel'])?.toLowerCase();
+      const channel =
+        rawChannel && INTERACTION_CHANNELS.has(rawChannel) ? rawChannel : 'other';
+      const rawDirection = str(normalized['direction'])?.toLowerCase();
+      const direction =
+        rawDirection && INTERACTION_DIRECTIONS.has(rawDirection) ? rawDirection : 'inbound';
+
+      const { created } = await repositories.interactions.upsertByExternalId({
+        tenantId,
+        dataSourceId,
+        externalId,
+        customerId,
+        channel: channel as 'whatsapp' | 'email' | 'note' | 'other',
+        direction: direction as 'inbound' | 'outbound' | 'internal',
+        subject: str(normalized['subject']),
+        body,
+        occurredAt,
       });
       return { status: created ? 'created' : 'updated' };
     }

@@ -3,12 +3,14 @@ import type { MetricResult } from '@tactia/intelligence';
 import type {
   CustomerService,
   InsightService,
+  InteractionService,
   MetricService,
   ProductService,
   RecommendationService,
   SaleService,
   SellerService,
 } from '@tactia/domain';
+import type { EmbeddingAdapter } from '../embeddings/types';
 import type { MessageSource } from '../types';
 
 /**
@@ -24,6 +26,8 @@ export type ToolDeps = {
   sales: SaleService;
   insights: InsightService;
   recommendations: RecommendationService;
+  interactions: InteractionService;
+  embedder?: EmbeddingAdapter | null;
 };
 
 /** Optional ISO period accepted by every data tool. */

@@ -51,6 +51,7 @@ export const METRIC_KEYS = [
   'customer_count',
   'sales_growth',
   'revenue_growth',
+  'complaint_count',
 ] as const;
 
 export type MetricKey = (typeof METRIC_KEYS)[number];
@@ -80,6 +81,10 @@ export const METRIC_DEFINITIONS: Record<MetricKey, { name: string; description: 
     name: 'Crescimento de Receita',
     description: 'Variação percentual na receita em relação ao período anterior de mesma duração.',
   },
+  complaint_count: {
+    name: 'Reclamações',
+    description: 'Contagem de interações classificadas como reclamação no período.',
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -107,6 +112,7 @@ export type TenantThresholds = {
   inactiveLeadDays: number; // default 7
   inactiveCustomerDays: number; // default 30
   sellerDeviationFactor: number; // default 0.4 (40% below average)
+  complaintGrowth: number; // default 0.3 (30% more complaints than previous period)
 };
 
 export const DEFAULT_THRESHOLDS: TenantThresholds = {
@@ -116,5 +122,6 @@ export const DEFAULT_THRESHOLDS: TenantThresholds = {
   inactiveLeadDays: 7,
   inactiveCustomerDays: 30,
   sellerDeviationFactor: 0.4,
+  complaintGrowth: 0.3,
 };
 

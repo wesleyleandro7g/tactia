@@ -21,6 +21,7 @@ import {
   TenantRepository,
 } from '@tactia/database';
 import { MetricEngine, RuleEngine, InsightEngine, RecommendationEngine, DEFAULT_THRESHOLDS } from '../index';
+import { createId } from '@tactia/shared';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,6 +62,7 @@ async function cleanUp() {
   await prisma.saleItem.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.sale.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.activity.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.interaction.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.lead.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.customer.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
@@ -100,6 +102,21 @@ beforeAll(async () => {
 
   // Lead without any activity (inactive_leads rule)
   await leads.create({ tenantId, name: 'Stale Lead', status: 'contacted' });
+
+  for (let index = 0; index < 4; index += 1) {
+    await prisma.interaction.create({
+      data: {
+        id: createId(),
+        tenantId,
+        channel: 'whatsapp',
+        direction: 'inbound',
+        body: `Reclamação ${index}: o pedido atrasou.`,
+        occurredAt: new Date(`2025-01-1${index}T12:00:00Z`),
+        intent: 'complaint',
+        topics: ['atraso'],
+      },
+    });
+  }
 });
 
 afterAll(async () => {
@@ -124,6 +141,18 @@ describe('RuleEngine', () => {
     expect(drop!.type).toBe('anomaly');
     expect(drop!.severity).toBe('critical'); // -90% > 30%
     expect(drop!.evidence.length).toBeGreaterThan(0);
+  });
+
+  it('detects complaint_volume when there are several complaints and none in the previous period', async () => {
+    const events = await ruleEngine.evaluate({
+      tenantId,
+      period: { from: periodFrom, to: periodTo },
+      db: prisma,
+      thresholds: DEFAULT_THRESHOLDS,
+    });
+    const complaints = events.find((event) => event.ruleKey === 'complaint_volume');
+    expect(complaints).toBeDefined();
+    expect(complaints!.evidence[0]?.value).toBe(4);
   });
 
   it('reports the real drop percentage (1000 → 100 = 90%)', async () => {

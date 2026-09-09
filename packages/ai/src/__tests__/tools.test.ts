@@ -14,6 +14,7 @@ import {
   AuditLogRepository,
   CustomerRepository,
   InsightRepository,
+  InteractionRepository,
   LeadRepository,
   MembershipRepository,
   MetricRepository,
@@ -29,6 +30,7 @@ import {
   AuditLogService,
   CustomerService,
   InsightService,
+  InteractionService,
   MetricService,
   ProductService,
   RecommendationService,
@@ -39,6 +41,7 @@ import {
 import { MetricEngine } from '@tactia/intelligence';
 import { ErrorCode, createId, type RequestContext } from '@tactia/shared';
 import { ContextBuilder } from '../context-builder';
+import { MockEmbeddingAdapter } from '../embeddings/mock-embedding-adapter';
 import { createDefaultToolRegistry } from '../tools/index';
 import type { ToolContext } from '../types';
 
@@ -64,6 +67,12 @@ const saleService = new SaleService(
   new SellerRepository(prisma),
   auditLogs,
 );
+const interactionRepository = new InteractionRepository(prisma);
+const interactionService = new InteractionService(
+  interactionRepository,
+  new CustomerRepository(prisma),
+  auditLogs,
+);
 const insightService = new InsightService(insightRepository);
 const recommendationService = new RecommendationService(
   new RecommendationRepository(prisma),
@@ -78,6 +87,8 @@ const registry = createDefaultToolRegistry({
   sales: saleService,
   insights: insightService,
   recommendations: recommendationService,
+  interactions: interactionService,
+  embedder: new MockEmbeddingAdapter(),
 });
 
 const contextBuilder = new ContextBuilder({
@@ -114,6 +125,7 @@ async function cleanUp() {
   const ids = rows.map((row) => row.id);
   if (ids.length === 0) return;
 
+  await prisma.interaction.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.message.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.conversation.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.recommendation.deleteMany({ where: { tenantId: { in: ids } } });
@@ -258,6 +270,49 @@ beforeAll(async () => {
     soldAt: new Date('2025-01-15T00:00:00Z'),
     items: [],
   });
+
+  const complaint = await interactionRepository.create({
+    tenantId,
+    customerId: customer.id,
+    channel: 'whatsapp',
+    direction: 'inbound',
+    body: 'Péssimo atendimento, o pedido atrasou e vou cancelar.',
+    occurredAt: new Date('2025-01-12T14:00:00Z'),
+    intent: 'complaint',
+    topics: ['atraso'],
+  });
+  await interactionRepository.updateEnrichment({
+    tenantId,
+    id: complaint.id,
+    intent: 'complaint',
+    topics: ['atraso'],
+    embedding: (await new MockEmbeddingAdapter().embed([complaint.body]))[0]!,
+  });
+  const praise = await interactionRepository.create({
+    tenantId,
+    customerId: otherCustomer.id,
+    channel: 'email',
+    direction: 'inbound',
+    body: 'Excelente, obrigado pelo suporte rápido.',
+    occurredAt: new Date('2025-01-18T10:00:00Z'),
+    intent: 'praise',
+    topics: ['elogio'],
+  });
+  await interactionRepository.updateEnrichment({
+    tenantId,
+    id: praise.id,
+    intent: 'praise',
+    topics: ['elogio'],
+    embedding: (await new MockEmbeddingAdapter().embed([praise.body]))[0]!,
+  });
+  await interactionRepository.create({
+    tenantId: b.tenant.id,
+    channel: 'whatsapp',
+    body: 'Péssimo, vou cancelar tudo neste tenant vizinho.',
+    occurredAt: new Date('2025-01-12T14:00:00Z'),
+    intent: 'complaint',
+    topics: ['vizinho'],
+  });
 });
 
 afterAll(async () => {
@@ -266,14 +321,16 @@ afterAll(async () => {
 });
 
 describe('V0.1 tools', () => {
-  it('registers exactly the 6 tools of the plan', () => {
+  it('registers the V0.1 tools plus interaction tools', () => {
     expect(registry.names().sort()).toEqual([
+      'get_complaints',
       'get_customers',
       'get_insights',
       'get_products',
       'get_revenue',
       'get_sales',
       'get_sellers',
+      'search_interactions',
     ]);
   });
 
@@ -408,6 +465,41 @@ describe('V0.1 tools', () => {
     // Evidence of the insight becomes evidence of the answer
     expect(result.sources.some((source) => source.metric === 'revenue_growth')).toBe(true);
     expect(result.sources.some((source) => source.metric === 'insights')).toBe(true);
+  });
+
+  it('get_complaints returns only complaint interactions with excerpts', async () => {
+    const result = await registry.execute('get_complaints', ctxA, {
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const data = result.data as {
+      total: number;
+      complaints: Array<{ excerpt: string; channel: string }>;
+    };
+    expect(data.total).toBe(1);
+    expect(data.complaints).toHaveLength(1);
+    expect(data.complaints[0]?.excerpt).toMatch(/atrasou/i);
+    expect(result.sources.some((source) => source.excerpt)).toBe(true);
+  });
+
+  it('search_interactions finds complaints by meaning and stays in-tenant', async () => {
+    const result = await registry.execute('search_interactions', ctxA, {
+      query: 'cliente reclamou de atraso na entrega',
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const data = result.data as { matches: Array<{ excerpt: string }>; mode: string };
+    expect(data.mode).toBe('semantic');
+    expect(data.matches.length).toBeGreaterThan(0);
+    expect(data.matches.some((match) => /atrasou|cancelar/i.test(match.excerpt))).toBe(true);
+
+    const other = await registry.execute('get_complaints', ctxB, {
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const otherData = other.data as { total: number; complaints: Array<{ excerpt: string }> };
+    expect(otherData.total).toBe(1);
+    expect(otherData.complaints[0]?.excerpt).toMatch(/tenant vizinho/i);
   });
 
   it('isolates tenants: the other tenant sees none of this data', async () => {

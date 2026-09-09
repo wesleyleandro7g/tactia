@@ -132,6 +132,20 @@ export class CustomerRepository {
     });
   }
 
+  async findByEmail({ tenantId, email }: { tenantId: string; email: string }) {
+    return this.db.customer.findFirst({
+      where: { tenantId, email: { equals: email, mode: 'insensitive' }, deletedAt: null },
+      select: { id: true },
+    });
+  }
+
+  async findByPhone({ tenantId, phone }: { tenantId: string; phone: string }) {
+    return this.db.customer.findFirst({
+      where: { tenantId, phone, deletedAt: null },
+      select: { id: true },
+    });
+  }
+
   async upsertByExternalId(input: CreateCustomerInput & { dataSourceId: string; externalId: string }) {
     const existing = await this.db.customer.findFirst({
       where: {

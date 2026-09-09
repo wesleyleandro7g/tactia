@@ -266,10 +266,11 @@ describe('MetricEngine — breakdown by product', () => {
 });
 
 describe('MetricEngine — calculateAll', () => {
-  it('returns all 6 metrics', async () => {
+  it('returns all 7 metrics', async () => {
     const results = await engine.calculateAll({ tenantId, period: periodJan });
-    expect(results).toHaveLength(6);
+    expect(results).toHaveLength(7);
     const keys = results.map((r) => r.key);
+    expect(keys).toContain('complaint_count');
     expect(keys).toContain('revenue');
     expect(keys).toContain('sales_count');
     expect(keys).toContain('average_ticket');

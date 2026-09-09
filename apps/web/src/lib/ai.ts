@@ -13,6 +13,7 @@ import {
   customerService,
   executionEngine,
   insightService,
+  interactionService,
   metricService,
   productService,
   recommendationService,
@@ -20,6 +21,7 @@ import {
   sellerService,
   tenantService,
 } from './services';
+import { createEmbeddingAdapterFromEnv } from '@tactia/ai';
 
 /**
  * Bridge between the AI layer and the Execution Engine: the assistant can only
@@ -43,6 +45,14 @@ export const toolRegistry = new ToolRegistry(
       sales: saleService,
       insights: insightService,
       recommendations: recommendationService,
+      interactions: interactionService,
+      embedder: createEmbeddingAdapterFromEnv({
+        LLM_PROVIDER: process.env.LLM_PROVIDER,
+        LLM_API_KEY: process.env.LLM_API_KEY,
+        LLM_MODEL: process.env.LLM_MODEL,
+        LLM_BASE_URL: process.env.LLM_BASE_URL,
+        EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
+      }),
     },
     { actionProposer },
   ),

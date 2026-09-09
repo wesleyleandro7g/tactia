@@ -66,6 +66,14 @@ const TARGET_FIELDS = [
   { value: 'phone', label: 'Telefone' },
   { value: 'document', label: 'Documento' },
   { value: 'status', label: 'Status' },
+  { value: 'body', label: 'Corpo da mensagem' },
+  { value: 'subject', label: 'Assunto' },
+  { value: 'channel', label: 'Canal' },
+  { value: 'direction', label: 'Direção' },
+  { value: 'occurred_at', label: 'Data da interação' },
+  { value: 'customer_external_id', label: 'ID externo do cliente' },
+  { value: 'customer_email', label: 'E-mail do cliente' },
+  { value: 'customer_phone', label: 'Telefone do cliente' },
 ];
 
 const TARGET_ENTITIES = [
@@ -74,6 +82,7 @@ const TARGET_ENTITIES = [
   { value: 'seller', label: 'Vendedores' },
   { value: 'lead', label: 'Leads' },
   { value: 'sale', label: 'Vendas' },
+  { value: 'interaction', label: 'Interações' },
 ];
 
 async function post<T>(url: string, body?: unknown): Promise<{ data?: T; error?: string }> {

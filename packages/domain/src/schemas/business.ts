@@ -106,3 +106,27 @@ export const createActivitySchema = z.object({
 });
 
 export const updateActivitySchema = createActivitySchema.partial();
+
+export const interactionChannelSchema = z.enum(['whatsapp', 'email', 'note', 'other']);
+export const interactionDirectionSchema = z.enum(['inbound', 'outbound', 'internal']);
+export const interactionIntentSchema = z.enum(['complaint', 'praise', 'question', 'other']);
+
+export const listInteractionQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).max(120).optional(),
+  customerId: z.string().uuid().optional(),
+  channel: interactionChannelSchema.optional(),
+  intent: interactionIntentSchema.optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
+export const createInteractionSchema = z.object({
+  channel: interactionChannelSchema.optional().default('note'),
+  direction: interactionDirectionSchema.optional().default('internal'),
+  subject: z.string().trim().max(240).nullable().optional(),
+  body: z.string().trim().min(1).max(20_000),
+  occurredAt: z.coerce.date().optional(),
+  customerId: optionalId,
+  externalId: z.string().trim().min(1).max(120).nullable().optional(),
+  metadata: metadataSchema,
+});

@@ -1,20 +1,24 @@
 import { ToolRegistry } from '../tool-registry';
 import type { Tool } from '../types';
+import { createGetComplaintsTool } from './get-complaints';
 import { createGetCustomersTool } from './get-customers';
 import { createGetInsightsTool } from './get-insights';
 import { createGetProductsTool } from './get-products';
 import { createGetRevenueTool } from './get-revenue';
 import { createGetSalesTool } from './get-sales';
 import { createGetSellersTool } from './get-sellers';
+import { createSearchInteractionsTool } from './search-interactions';
 import { createProposeActionTool, type ActionProposalPort } from './propose-action';
 import type { ToolDeps } from './shared';
 
+export { createGetComplaintsTool } from './get-complaints';
 export { createGetCustomersTool } from './get-customers';
 export { createGetInsightsTool } from './get-insights';
 export { createGetProductsTool } from './get-products';
 export { createGetRevenueTool } from './get-revenue';
 export { createGetSalesTool } from './get-sales';
 export { createGetSellersTool } from './get-sellers';
+export { createSearchInteractionsTool } from './search-interactions';
 export {
   createProposeActionTool,
   PROPOSABLE_ACTION_TYPES,
@@ -47,6 +51,8 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
     createGetProductsTool(deps),
     createGetSellersTool(deps),
     createGetInsightsTool(deps),
+    createGetComplaintsTool(deps),
+    createSearchInteractionsTool(deps),
   ];
 
   if (options.actionProposer) {

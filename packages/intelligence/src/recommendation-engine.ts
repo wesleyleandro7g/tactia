@@ -63,6 +63,13 @@ const TEMPLATES: Record<string, RecommendationTemplate> = {
     priority: 'medium',
     actionType: 'create_task',
   },
+  complaint_volume: {
+    title: 'Investigar aumento de reclamações',
+    description: (i) =>
+      `${i.title}. Leia os trechos no chat e priorize os clientes mais afetados.`,
+    priority: 'high',
+    actionType: 'create_task',
+  },
 };
 
 export class RecommendationEngine {

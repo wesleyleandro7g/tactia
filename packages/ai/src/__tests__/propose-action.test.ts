@@ -82,7 +82,7 @@ describe('propose_action tool', () => {
       createDefaultTools(emptyDeps, { actionProposer: port }),
     );
     expect(withActions.has('propose_action')).toBe(true);
-    expect(withActions.names()).toHaveLength(7);
+    expect(withActions.names()).toHaveLength(9);
   });
 
   it('forwards the structured payload to the execution engine', async () => {

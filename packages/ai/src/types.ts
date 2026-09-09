@@ -30,6 +30,9 @@ export type MessageSource = {
   tool?: string;
   /** Human readable pt-BR label for the UI ("vendas entre 01/08 e 25/08") */
   label?: string;
+  /** Canonical record cited as qualitative evidence */
+  refId?: string;
+  excerpt?: string;
 };
 
 export type ToolResult<TData = unknown> = {

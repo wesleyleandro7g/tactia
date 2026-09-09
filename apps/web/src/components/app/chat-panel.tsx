@@ -64,6 +64,8 @@ const TOOL_LABELS: Record<string, string> = {
   get_products: 'consultando os produtos',
   get_sellers: 'consultando os vendedores',
   get_insights: 'consultando os insights',
+  get_complaints: 'consultando as reclamações',
+  search_interactions: 'buscando nas conversas',
   propose_action: 'preparando uma proposta de ação',
 };
 

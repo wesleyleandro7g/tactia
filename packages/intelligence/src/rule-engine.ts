@@ -268,6 +268,45 @@ async function ruleSellerPerformanceDeviation(
   return events;
 }
 
+async function ruleComplaintVolume(
+  ctx: RuleContext,
+  engine: MetricEngine,
+): Promise<DetectedEvent[]> {
+  const result = await engine.calculate('complaint_count', {
+    tenantId: ctx.tenantId,
+    period: ctx.period,
+    withComparison: true,
+  });
+
+  const current = result.value;
+  const previous = result.comparison?.value ?? 0;
+  const change = result.comparison?.change ?? 0;
+
+  if (current === 0) return [];
+  if (previous === 0 && current < 3) return [];
+  if (previous > 0 && change < ctx.thresholds.complaintGrowth) return [];
+
+  const evidence: MetricResult = result;
+  return [
+    {
+      ruleKey: 'complaint_volume',
+      type: 'warning',
+      severity: current >= 10 || change >= 1 ? 'high' : 'medium',
+      title:
+        previous === 0
+          ? `${current} reclamação${current > 1 ? 'ões' : ''} no período`
+          : `Reclamações ${Math.round(change * 100)}% acima do período anterior`,
+      description:
+        previous === 0
+          ? `Foram classificadas ${current} interação${current > 1 ? 'ões' : ''} como reclamação no período.`
+          : `As reclamações passaram de ${previous} para ${current} em relação ao período anterior.`,
+      evidence: [evidence],
+      periodFrom: ctx.period.from,
+      periodTo: ctx.period.to,
+    },
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // RuleEngine
 // ---------------------------------------------------------------------------
@@ -283,6 +322,7 @@ export class RuleEngine {
       ruleInactiveLeads(ctx),
       ruleInactiveCustomers(ctx),
       ruleSellerPerformanceDeviation(ctx, this.engine),
+      ruleComplaintVolume(ctx, this.engine),
     ]);
 
     const events: DetectedEvent[] = [];

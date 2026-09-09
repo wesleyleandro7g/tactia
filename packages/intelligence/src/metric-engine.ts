@@ -72,6 +72,20 @@ async function querySalesCount(db: PrismaClient, tenantId: string, period: Metri
   });
 }
 
+async function queryComplaintCount(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<number> {
+  return db.interaction.count({
+    where: {
+      tenantId,
+      intent: 'complaint',
+      occurredAt: { gte: period.from, lt: period.to },
+    },
+  });
+}
+
 async function queryCustomerCount(db: PrismaClient, tenantId: string, period: MetricPeriod): Promise<number> {
   const result = await db.sale.groupBy({
     by: ['customerId'],
@@ -274,6 +288,9 @@ export class MetricEngine {
         const prev = await queryRevenue(this.db, tenantId, previousPeriod(period));
         return percentChange(current, prev);
       }
+
+      case 'complaint_count':
+        return queryComplaintCount(this.db, tenantId, period);
     }
   }
 
