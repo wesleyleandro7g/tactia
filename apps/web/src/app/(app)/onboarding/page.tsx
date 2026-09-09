@@ -3,7 +3,7 @@ import { OnboardingWizard, type OnboardingState } from '@/components/app/onboard
 import { getServerContext, listUserTenants } from '@/lib/server-context';
 import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Configurar dados · Tactia' };
+export const metadata = { title: 'Trazer dados · Tactia' };
 
 /**
  * Onboarding (spec §55). O estado inicial é lido do banco para que recarregar a

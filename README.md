@@ -17,7 +17,7 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 | Rota | O que faz |
 |---|---|
 | `/dashboard` | Receita, vendas, clientes e ticket médio; séries no tempo; insights por severidade; recomendações pendentes |
-| `/onboarding` | Wizard empresa → fonte → conexão → descoberta → mapeamento → prévia → importação |
+| `/onboarding` | Wizard empresa → arquivo (upload/CSV ou Postgres) → colunas → conferir → importação |
 | `/chat` | Conversa com a Tactia com streaming, fonte de cada número e proposta de ação |
 | `/approvals` | Fila de aprovações e execuções recentes |
 | `/admin` | Painel interno do operador (allowlist `TACTIA_OPERATOR_EMAILS`) |
@@ -72,11 +72,13 @@ curl -s http://localhost:3000/api/v1/health   # {"data":{"status":"ok","database
 
 Sobe `postgres` → `migrate` (`prisma migrate deploy`) → `web` (Next standalone,
 usuário não-root). Só o web publica porta; coloque um proxy com TLS na frente.
+Guia completo: [docs/deploy-producao.md](docs/deploy-producao.md).
 
 ## Operação
 
 | Documento | Para quê |
 |---|---|
+| [docs/deploy-producao.md](docs/deploy-producao.md) | Deploy em produção com Docker Compose e TLS |
 | [docs/onboarding-cliente.md](docs/onboarding-cliente.md) | Passo a passo para colocar um cliente real |
 | [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
 

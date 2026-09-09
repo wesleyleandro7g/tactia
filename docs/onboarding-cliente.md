@@ -5,6 +5,7 @@ insight. Espelha o roteiro da spec §55 e é o caminho que o wizard `/onboarding
 implementa. Tempo esperado: **20 a 40 minutos**, sendo a maior parte a preparação
 dos dados do cliente.
 
+> Se o ambiente ainda não estiver no ar, comece por [deploy-producao.md](./deploy-producao.md).
 > Se algo falhar no meio do caminho, vá para o [runbook](./runbook.md).
 
 ---
@@ -30,15 +31,14 @@ curl -s https://SEU-HOST/api/v1/health
 
 ### Se a fonte for CSV
 
-A V0.1 lê o CSV de um **caminho no servidor** (upload pela interface é pendência).
-Copie os arquivos para dentro do host/container antes de começar:
+No wizard `/onboarding`, arraste o arquivo ou clique para escolher. O upload
+grava o CSV em `UPLOAD_DIR` (default `/tmp/tactia-uploads` no host, `/data/uploads`
+no compose de produção) e o conector lê o caminho gerado.
 
-```bash
-docker compose -f docker/docker-compose.prod.yml cp ./cliente-clientes.csv web:/tmp/csv/clientes.csv
-```
+Operadores ainda podem colar um caminho no servidor em **Opção avançada**.
 
 Um arquivo por entidade. Cabeçalhos aceitos pelo mapeamento (o nome da coluna de
-origem pode ser qualquer um — você escolhe o destino no passo 5):
+origem pode ser qualquer um — você escolhe o destino no passo de colunas):
 
 | Entidade | Campos de destino |
 |---|---|
@@ -93,26 +93,26 @@ curl -X POST https://SEU-HOST/api/v1/users -b cookies.txt \
 Papéis: `owner` > `admin` > `member` > `viewer`. Só `owner`/`admin` aprovam ações.
 Não há e-mail de convite na V0.1 — combine a senha provisória por outro canal.
 
-## 3. Configurar a fonte de dados
+## 3. Trazer o arquivo
 
-Você cai em `/onboarding` automaticamente. Escolha **CSV** (informe o caminho no
-servidor) ou **PostgreSQL** (host, porta, banco, usuário, senha).
+Você cai em `/onboarding` automaticamente. Escolha **Arquivo CSV** (arraste ou
+clique para enviar) ou **PostgreSQL** (host, porta, banco, usuário, senha).
+Diga de que entidade o arquivo é (clientes, produtos, vendedores, vendas…).
 
-Importante para CSV: **crie uma fonte por arquivo** (clientes, produtos,
+Importante para CSV: **um arquivo por entidade** (clientes, produtos,
 vendedores, vendas). Referências entre entidades são resolvidas primeiro dentro
 da mesma fonte e, se não encontradas, no tenant inteiro — então as vendas
 encontram os clientes mesmo estando em outra fonte.
 
-## 4. Testar a conexão
+## 4. Conferir a leitura
 
-Botão **Testar conexão**. Para CSV verifica se o arquivo é legível; para Postgres
-abre a conexão e roda `SELECT 1`. Erro aqui é sempre de infraestrutura ou
-credencial — a mensagem do connector aparece na tela.
+O wizard envia o CSV, testa se o arquivo é legível e lista as colunas. Para
+Postgres, o Continuar abre a conexão (`SELECT 1`) e descobre as tabelas. Erro
+aqui é de arquivo, infraestrutura ou credencial — a mensagem aparece na tela.
 
-## 5. Descobrir e mapear
+## 5. Mapear colunas
 
-**Descobrir** lista colunas (CSV) ou tabelas e colunas (Postgres). Depois mapeie
-coluna de origem → campo canônico usando a tabela do passo 0.
+Ligue cada coluna de origem ao campo canônico usando a tabela do passo 0.
 
 Ordem de importação obrigatória quando as vendas referenciam outras entidades:
 

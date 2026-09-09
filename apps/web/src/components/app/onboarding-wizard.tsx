@@ -8,12 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { Field, Input, Select } from '@/components/ui/field';
+import { Skeleton } from '@/components/ui/feedback';
+import { FileDropzone } from '@/components/app/file-dropzone';
 import { WizardStepper, type WizardStep } from '@/components/app/wizard-stepper';
 import { errorMessage, formatCurrency, formatInteger } from '@/lib/format';
-
-// ---------------------------------------------------------------------------
-// Tipos dos contratos da API já existentes
-// ---------------------------------------------------------------------------
+import {
+  TARGET_ENTITIES,
+  guessMapping,
+  sourceNameFromFile,
+  targetFieldsFor,
+} from '@/lib/import-mapping';
 
 type ApiError = { error?: { code?: string; message?: string } };
 
@@ -51,38 +55,9 @@ export type OnboardingState = {
 
 const STEPS: WizardStep[] = [
   { id: 'company', label: 'Empresa' },
-  { id: 'source', label: 'Fonte de dados' },
-  { id: 'discover', label: 'Descoberta' },
-  { id: 'mapping', label: 'Mapeamento' },
-  { id: 'preview', label: 'Prévia' },
-  { id: 'import', label: 'Importação' },
-];
-
-const TARGET_FIELDS = [
-  { value: '', label: 'Ignorar coluna' },
-  { value: 'external_id', label: 'ID externo' },
-  { value: 'name', label: 'Nome' },
-  { value: 'email', label: 'E-mail' },
-  { value: 'phone', label: 'Telefone' },
-  { value: 'document', label: 'Documento' },
-  { value: 'status', label: 'Status' },
-  { value: 'body', label: 'Corpo da mensagem' },
-  { value: 'subject', label: 'Assunto' },
-  { value: 'channel', label: 'Canal' },
-  { value: 'direction', label: 'Direção' },
-  { value: 'occurred_at', label: 'Data da interação' },
-  { value: 'customer_external_id', label: 'ID externo do cliente' },
-  { value: 'customer_email', label: 'E-mail do cliente' },
-  { value: 'customer_phone', label: 'Telefone do cliente' },
-];
-
-const TARGET_ENTITIES = [
-  { value: 'customer', label: 'Clientes' },
-  { value: 'product', label: 'Produtos' },
-  { value: 'seller', label: 'Vendedores' },
-  { value: 'lead', label: 'Leads' },
-  { value: 'sale', label: 'Vendas' },
-  { value: 'interaction', label: 'Interações' },
+  { id: 'source', label: 'Arquivo' },
+  { id: 'mapping', label: 'Colunas' },
+  { id: 'import', label: 'Importar' },
 ];
 
 async function post<T>(url: string, body?: unknown): Promise<{ data?: T; error?: string }> {
@@ -99,57 +74,83 @@ async function post<T>(url: string, body?: unknown): Promise<{ data?: T; error?:
   return { data: json?.data };
 }
 
+async function postForm<T>(url: string, file: File): Promise<{ data?: T; error?: string }> {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await fetch(url, { method: 'POST', body });
+  const json = (await response.json().catch(() => null)) as ({ data: T } & ApiError) | null;
+  if (!response.ok) {
+    return { error: json?.error?.message ?? errorMessage(json?.error?.code) };
+  }
+  return { data: json?.data };
+}
+
+function firstIncompleteStep(initial: OnboardingState): number {
+  if (!initial.hasTenant) return 0;
+  if (!initial.dataSource) return 1;
+  if (initial.mappingCount === 0) return 2;
+  return 3;
+}
+
 /**
- * Wizard de onboarding (spec §55): empresa → fonte → conexão → descoberta →
- * mapeamento → prévia → importação → resultado.
- *
- * O estado inicial vem do servidor, então recarregar a página retoma no passo
- * correspondente ao que já existe de verdade no banco.
+ * Wizard de importação: empresa → arquivo → colunas → conferir/resultado.
+ * Descoberta e teste de conexão rodam automaticamente após o arquivo.
  */
 export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
   const router = useRouter();
 
-  const firstIncomplete = !initial.hasTenant
-    ? 0
-    : !initial.dataSource
-      ? 1
-      : initial.mappingCount === 0
-        ? 2
-        : initial.lastSyncJob
-          ? 5
-          : 4;
-
-  const [step, setStep] = useState(firstIncomplete);
+  const [step, setStep] = useState(() => firstIncompleteStep(initial));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorAt, setErrorAt] = useState<number | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  // Passo 1
   const [companyName, setCompanyName] = useState('');
-  // Passo 2
   const [sourceType, setSourceType] = useState<'csv' | 'postgres'>('csv');
   const [sourceName, setSourceName] = useState('Importação inicial');
   const [filePath, setFilePath] = useState('');
-  const [pg, setPg] = useState({ host: 'localhost', port: '5432', database: '', username: '', password: '' });
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [sourceDirty, setSourceDirty] = useState(false);
+  const [pg, setPg] = useState({
+    host: 'localhost',
+    port: '5432',
+    database: '',
+    username: '',
+    password: '',
+  });
   const [dataSource, setDataSource] = useState<DataSource | null>(initial.dataSource);
-  const [connectionOk, setConnectionOk] = useState(false);
-  // Passo 3
+
   const [resources, setResources] = useState<DiscoveryResource[]>([]);
   const [resource, setResource] = useState<string>('data');
-  // Passo 4
   const [targetEntity, setTargetEntity] = useState('customer');
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [mappingSaved, setMappingSaved] = useState(initial.mappingCount > 0);
-  // Passo 5
   const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
-  // Passo 6
   const [syncJob, setSyncJob] = useState<SyncJob | null>(initial.lastSyncJob);
 
-  // Foco vai para o título ao trocar de passo (navegação anunciada).
+  const visibleSteps = initial.hasTenant ? STEPS.slice(1) : STEPS;
+  const stepperCurrent = initial.hasTenant ? step - 1 : step;
+  const stepperErrorAt =
+    errorAt == null ? null : initial.hasTenant ? errorAt - 1 : errorAt;
+
   useEffect(() => {
     headingRef.current?.focus();
   }, [step]);
+
+  useEffect(() => {
+    if (step === 2 && dataSource && resources.length === 0) {
+      void discover(dataSource.id);
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps -- só ao entrar no passo
+
+  useEffect(() => {
+    if (step === 3 && dataSource && !syncJob && previewRows.length === 0) {
+      void loadPreview();
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function fail(message: string, at = step) {
     setError(message);
@@ -159,6 +160,10 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
   function clearError() {
     setError(null);
     setErrorAt(null);
+  }
+
+  function applyGuessedMapping(columns: DiscoveryColumn[], entity = targetEntity) {
+    setMapping(guessMapping(columns, entity));
   }
 
   async function createCompany() {
@@ -171,7 +176,54 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
     setStep(1);
   }
 
-  async function createSourceAndTest() {
+  async function handleCsvFile(file: File) {
+    setUploading(true);
+    setUploadError(null);
+    clearError();
+    const result = await postForm<{ filePath: string; fileName: string; size: number }>(
+      '/api/v1/uploads',
+      file,
+    );
+    setUploading(false);
+    if (result.error || !result.data) {
+      setUploadError(result.error ?? 'Não foi possível enviar o arquivo.');
+      return;
+    }
+    setFilePath(result.data.filePath);
+    setUploadedFile({ name: result.data.fileName, size: result.data.size });
+    setSourceDirty(true);
+    if (sourceName === 'Importação inicial' || sourceName.trim().length === 0) {
+      setSourceName(sourceNameFromFile(result.data.fileName));
+    }
+  }
+
+  function clearCsvFile() {
+    setFilePath('');
+    setUploadedFile(null);
+    setUploadError(null);
+    setSourceDirty(true);
+  }
+
+  function startAnotherImport() {
+    setDataSource(null);
+    setFilePath('');
+    setUploadedFile(null);
+    setUploadError(null);
+    setSourceDirty(false);
+    setSourceName('Importação inicial');
+    setSourceType('csv');
+    setResources([]);
+    setResource('data');
+    setMapping({});
+    setMappingSaved(false);
+    setPreviewRows([]);
+    setSyncJob(null);
+    setTargetEntity('customer');
+    clearError();
+    setStep(1);
+  }
+
+  async function createSourceAndContinue() {
     setPending(true);
     clearError();
 
@@ -180,10 +232,13 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
         ? { filePath }
         : { host: pg.host, port: Number(pg.port), database: pg.database };
 
+    if (sourceType === 'csv' && filePath.trim().length === 0) {
+      setPending(false);
+      return fail('Escolha um arquivo CSV ou informe o caminho no servidor.', 1);
+    }
+
     let source = dataSource;
-    if (!source) {
-      // Postgres precisa de credencial: ela é criada antes e referenciada por id,
-      // para a senha nunca ficar no registro da fonte.
+    if (!source || sourceDirty) {
       let credentialId: string | undefined;
       if (sourceType === 'postgres') {
         const credential = await post<{ id: string }>('/api/v1/credentials', {
@@ -192,7 +247,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
         });
         if (credential.error || !credential.data) {
           setPending(false);
-          return fail(credential.error ?? 'Não foi possível guardar a credencial.');
+          return fail(credential.error ?? 'Não foi possível guardar a credencial.', 1);
         }
         credentialId = credential.data.id;
       }
@@ -205,23 +260,28 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
       });
       if (created.error || !created.data) {
         setPending(false);
-        return fail(created.error ?? 'Não foi possível criar a fonte de dados.');
+        return fail(created.error ?? 'Não foi possível criar a fonte de dados.', 1);
       }
       source = created.data;
       setDataSource(source);
+      setSourceDirty(false);
     }
 
     const test = await post<{ success: boolean; message: string }>(
       `/api/v1/data-sources/${source.id}/test-connection`,
     );
+    if (test.error) {
+      setPending(false);
+      return fail(test.error, 1);
+    }
+    if (!test.data?.success) {
+      setPending(false);
+      return fail(test.data?.message ?? 'Não foi possível ler a fonte.', 1);
+    }
+
+    await discover(source.id);
     setPending(false);
-
-    if (test.error) return fail(test.error);
-    if (!test.data?.success) return fail(test.data?.message ?? 'Conexão falhou.');
-
-    setConnectionOk(true);
     setStep(2);
-    void discover(source.id);
   }
 
   async function discover(sourceId?: string) {
@@ -239,14 +299,14 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
     setResources(found);
     if (found[0]) {
       setResource(found[0].name);
-      // Pré-mapeia colunas cujo nome já casa com um campo canônico.
-      const guessed: Record<string, string> = {};
-      for (const column of found[0].columns) {
-        const match = TARGET_FIELDS.find((field) => field.value === column.name.toLowerCase());
-        if (match) guessed[column.name] = match.value;
-      }
-      setMapping(guessed);
+      applyGuessedMapping(found[0].columns);
     }
+  }
+
+  function changeEntity(entity: string) {
+    setTargetEntity(entity);
+    const columns = resources.find((item) => item.name === resource)?.columns ?? [];
+    applyGuessedMapping(columns, entity);
   }
 
   async function saveMapping() {
@@ -256,7 +316,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
       .map(([source, target]) => ({ source, target }));
 
     if (fields.length === 0) {
-      return fail('Mapeie ao menos uma coluna para um campo canônico.', 3);
+      return fail('Diga o destino de pelo menos uma coluna.', 2);
     }
 
     setPending(true);
@@ -267,10 +327,10 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
       configuration: { fields },
     });
     setPending(false);
-    if (result.error) return fail(result.error, 3);
+    if (result.error) return fail(result.error, 2);
 
     setMappingSaved(true);
-    setStep(4);
+    setStep(3);
     void loadPreview();
   }
 
@@ -283,7 +343,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
       { resource, limit: 10 },
     );
     setPending(false);
-    if (result.error) return fail(result.error, 4);
+    if (result.error) return fail(result.error, 3);
     setPreviewRows(result.data ?? []);
   }
 
@@ -294,38 +354,54 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
     const result = await post<SyncJob>(`/api/v1/data-sources/${dataSource.id}/sync`);
     if (result.error) {
       setPending(false);
-      return fail(result.error, 5);
+      return fail(result.error, 3);
     }
 
-    // O sync roda inline (Etapa 3): ao responder, o job já tem contadores.
     const jobId = result.data?.id;
     if (jobId) {
       const detail = await fetch(`/api/v1/sync-jobs/${jobId}`);
       const json = (await detail.json().catch(() => null)) as { data?: SyncJob } | null;
       setSyncJob(json?.data ?? result.data ?? null);
+    } else {
+      setSyncJob(result.data ?? null);
     }
     setPending(false);
-    setStep(5);
+    setStep(3);
     router.refresh();
   }
 
   const columns = resources.find((item) => item.name === resource)?.columns ?? [];
+  const mappingFields = targetFieldsFor(targetEntity);
+  const mappedCount = Object.values(mapping).filter(Boolean).length;
+  const showResult = syncJob !== null && !pending;
+  const canContinueCsv = filePath.trim().length > 0;
+  const canContinuePg = pg.database.trim().length > 0 && pg.username.trim().length > 0;
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold">Configurar dados</h1>
-        <WizardStepper steps={STEPS} current={step} errorAt={errorAt} />
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Dados</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Trazer seus dados</h1>
+          <p className="max-w-xl text-sm text-muted">
+            Importe um arquivo por vez. Ordem recomendada: clientes, produtos, vendedores e, por
+            último, vendas.
+          </p>
+        </div>
+        <WizardStepper steps={visibleSteps} current={Math.max(stepperCurrent, 0)} errorAt={stepperErrorAt} />
       </header>
 
-      {error ? <Alert tone="danger" title="Não foi possível continuar">{error}</Alert> : null}
+      {error ? (
+        <Alert tone="danger" title="Não foi possível continuar">
+          {error}
+        </Alert>
+      ) : null}
 
-      <Card>
+      <Card className="overflow-hidden">
         <h2 ref={headingRef} tabIndex={-1} className="text-lg font-medium outline-none">
           {STEPS[step]?.label}
         </h2>
 
-        {/* 1. Empresa ---------------------------------------------------- */}
         {step === 0 ? (
           initial.hasTenant ? (
             <div className="mt-4 flex flex-col gap-3">
@@ -353,47 +429,84 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                 disabled={companyName.trim().length === 0}
                 onClick={() => void createCompany()}
               >
-                Criar empresa
+                Continuar
               </Button>
             </div>
           )
         ) : null}
 
-        {/* 2. Fonte de dados -------------------------------------------- */}
         {step === 1 ? (
-          <div className="mt-4 flex max-w-xl flex-col gap-4">
-            <Field htmlFor="source-type" label="Tipo de fonte">
-              <Select
-                id="source-type"
-                value={sourceType}
-                onChange={(event) => setSourceType(event.target.value as 'csv' | 'postgres')}
-              >
-                <option value="csv">Arquivo CSV</option>
-                <option value="postgres">PostgreSQL</option>
-              </Select>
-            </Field>
-
-            <Field htmlFor="source-name" label="Nome da fonte">
-              <Input
-                id="source-name"
-                value={sourceName}
-                onChange={(event) => setSourceName(event.target.value)}
-              />
-            </Field>
+          <div className="mt-4 flex max-w-2xl flex-col gap-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(
+                [
+                  { id: 'csv', title: 'Arquivo CSV', hint: 'Planilha exportada do seu sistema' },
+                  { id: 'postgres', title: 'PostgreSQL', hint: 'Banco de leitura da empresa' },
+                ] as const
+              ).map((option) => {
+                const selected = sourceType === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setSourceType(option.id)}
+                    className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                      selected
+                        ? 'border-accent/50 bg-accent-soft'
+                        : 'border-border bg-bg hover:border-muted hover:bg-card-hover'
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">{option.title}</span>
+                    <span className="mt-1 block text-xs text-muted">{option.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             {sourceType === 'csv' ? (
-              <Field
-                htmlFor="file-path"
-                label="Caminho do arquivo no servidor"
-                hint="Ex.: /dados/clientes.csv — upload direto entra em uma etapa futura."
-              >
-                <Input
-                  id="file-path"
-                  value={filePath}
-                  onChange={(event) => setFilePath(event.target.value)}
-                  placeholder="/caminho/para/arquivo.csv"
+              <>
+                <FileDropzone
+                  loading={uploading}
+                  fileName={uploadedFile?.name ?? (filePath ? filePath.split('/').pop() : null)}
+                  fileSize={uploadedFile?.size}
+                  error={uploadError}
+                  onFile={(file) => void handleCsvFile(file)}
+                  onClear={clearCsvFile}
                 />
-              </Field>
+
+                <details
+                  className="rounded-lg border border-border bg-bg px-3 py-2"
+                  open={advancedOpen}
+                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                >
+                  <summary className="cursor-pointer text-sm text-muted">
+                    Opção avançada: caminho no servidor
+                  </summary>
+                  <div className="mt-3">
+                    <Field
+                      htmlFor="file-path"
+                      label="Caminho do arquivo no servidor"
+                      hint="Para operadores que já copiaram o CSV para o host."
+                    >
+                      <Input
+                        id="file-path"
+                        value={filePath}
+                        onChange={(event) => {
+                          setFilePath(event.target.value);
+                          setUploadedFile(
+                            event.target.value
+                              ? { name: event.target.value.split('/').pop() ?? event.target.value, size: 0 }
+                              : null,
+                          );
+                          setSourceDirty(true);
+                        }}
+                        placeholder="/data/uploads/clientes.csv"
+                      />
+                    </Field>
+                  </div>
+                </details>
+              </>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field htmlFor="pg-host" label="Host">
@@ -415,7 +528,10 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                   <Input
                     id="pg-db"
                     value={pg.database}
-                    onChange={(event) => setPg({ ...pg, database: event.target.value })}
+                    onChange={(event) => {
+                      setPg({ ...pg, database: event.target.value });
+                      setSourceDirty(true);
+                    }}
                   />
                 </Field>
                 <Field htmlFor="pg-user" label="Usuário">
@@ -428,7 +544,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                 <Field
                   htmlFor="pg-pass"
                   label="Senha"
-                  hint="Guardada criptografada (AES-256-GCM) e usada apenas no momento do sync."
+                  hint="Guardada criptografada e usada só na leitura."
                   className="sm:col-span-2"
                 >
                   <Input
@@ -441,75 +557,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <Button loading={pending} onClick={() => void createSourceAndTest()}>
-                Testar conexão
-              </Button>
-              {connectionOk ? <Badge tone="success">Conexão ok</Badge> : null}
-            </div>
-          </div>
-        ) : null}
-
-        {/* 3. Descoberta ------------------------------------------------ */}
-        {step === 2 ? (
-          <div className="mt-4 flex flex-col gap-4">
-            {resources.length === 0 ? (
-              <>
-                <CardDescription>
-                  {pending ? 'Descobrindo recursos e colunas…' : 'Nenhum recurso encontrado na fonte.'}
-                </CardDescription>
-                <Button
-                  className="self-start"
-                  variant="secondary"
-                  loading={pending}
-                  onClick={() => void discover()}
-                >
-                  Descobrir novamente
-                </Button>
-              </>
-            ) : (
-              <>
-                <Field htmlFor="resource" label="Recurso">
-                  <Select
-                    id="resource"
-                    value={resource}
-                    onChange={(event) => setResource(event.target.value)}
-                  >
-                    {resources.map((item) => (
-                      <option key={item.name} value={item.name}>
-                        {item.name} ({item.columns.length} colunas)
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-
-                <DataTable
-                  caption={`Colunas detectadas em ${resource}`}
-                  columns={[
-                    { key: 'name', header: 'Coluna', render: (row: DiscoveryColumn) => row.name },
-                    { key: 'type', header: 'Tipo', render: (row: DiscoveryColumn) => row.type },
-                    {
-                      key: 'nullable',
-                      header: 'Aceita vazio',
-                      render: (row: DiscoveryColumn) => (row.nullable ? 'sim' : 'não'),
-                    },
-                  ]}
-                  rows={columns}
-                  rowKey={(row) => row.name}
-                />
-
-                <Button className="self-start" onClick={() => setStep(3)}>
-                  Configurar mapeamento
-                </Button>
-              </>
-            )}
-          </div>
-        ) : null}
-
-        {/* 4. Mapeamento ------------------------------------------------ */}
-        {step === 3 ? (
-          <div className="mt-4 flex flex-col gap-4">
-            <Field htmlFor="target-entity" label="Estes dados representam">
+            <Field htmlFor="target-entity" label="Este arquivo é de">
               <Select
                 id="target-entity"
                 value={targetEntity}
@@ -524,93 +572,162 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
               </Select>
             </Field>
 
-            <ul className="flex flex-col gap-3">
-              {columns.map((column) => (
-                <li key={column.name} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2">
-                  <span className="text-sm">
-                    {column.name} <span className="text-xs text-muted">({column.type})</span>
-                  </span>
-                  <Select
-                    aria-label={`Destino da coluna ${column.name}`}
-                    value={mapping[column.name] ?? ''}
-                    onChange={(event) =>
-                      setMapping({ ...mapping, [column.name]: event.target.value })
-                    }
-                  >
-                    {TARGET_FIELDS.map((field) => (
-                      <option key={field.value} value={field.value}>
-                        {field.label}
-                      </option>
-                    ))}
-                  </Select>
-                </li>
-              ))}
-            </ul>
-
-            {columns.length === 0 ? (
-              <CardDescription>
-                Nenhuma coluna detectada — volte ao passo de descoberta.
-              </CardDescription>
-            ) : null}
-
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setStep(2)}>
-                Voltar
-              </Button>
-              <Button loading={pending} onClick={() => void saveMapping()}>
-                Salvar mapeamento
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {/* 5. Prévia ---------------------------------------------------- */}
-        {step === 4 ? (
-          <div className="mt-4 flex flex-col gap-4">
-            {mappingSaved ? <Badge tone="success">Mapeamento salvo</Badge> : null}
-
-            {previewRows.length === 0 ? (
-              <CardDescription>
-                {pending ? 'Carregando prévia…' : 'Sem linhas para pré-visualizar.'}
-              </CardDescription>
-            ) : (
-              <DataTable
-                caption={`Primeiras ${previewRows.length} linhas de ${resource}`}
-                columns={Object.keys(previewRows[0] ?? {}).map((key) => ({
-                  key,
-                  header: key,
-                  render: (row: Record<string, unknown>) => String(row[key] ?? '—'),
-                }))}
-                rows={previewRows}
-                rowKey={(row) => JSON.stringify(row).slice(0, 64)}
+            <Field htmlFor="source-name" label="Nome desta importação">
+              <Input
+                id="source-name"
+                value={sourceName}
+                onChange={(event) => setSourceName(event.target.value)}
               />
-            )}
+            </Field>
 
-            <div className="flex gap-2">
-              <Button variant="secondary" loading={pending} onClick={() => void loadPreview()}>
-                Recarregar prévia
-              </Button>
-              <Button loading={pending} onClick={() => void runImport()}>
-                Importar dados
-              </Button>
-            </div>
+            <Button
+              className="self-start"
+              loading={pending || uploading}
+              disabled={sourceType === 'csv' ? !canContinueCsv : !canContinuePg}
+              onClick={() => void createSourceAndContinue()}
+            >
+              Continuar
+            </Button>
           </div>
         ) : null}
 
-        {/* 6. Resultado ------------------------------------------------- */}
-        {step === 5 ? (
+        {step === 2 ? (
           <div className="mt-4 flex flex-col gap-4">
-            {pending ? (
-              <p aria-live="polite" className="text-sm text-muted">
-                Importando… isso pode levar alguns instantes.
-              </p>
+            {pending && columns.length === 0 ? (
+              <div className="flex flex-col gap-2" aria-busy="true">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-2/3" />
+                <span className="sr-only">Lendo as colunas do arquivo…</span>
+              </div>
+            ) : columns.length === 0 ? (
+              <>
+                <CardDescription>
+                  Não encontramos colunas neste arquivo. Confira o CSV e tente de novo.
+                </CardDescription>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setStep(1)}>
+                    Voltar
+                  </Button>
+                  <Button variant="secondary" loading={pending} onClick={() => void discover()}>
+                    Tentar de novo
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-end gap-4">
+                  <Field htmlFor="map-entity" label="Este arquivo é de" className="min-w-48">
+                    <Select
+                      id="map-entity"
+                      value={targetEntity}
+                      onChange={(event) => changeEntity(event.target.value)}
+                    >
+                      {TARGET_ENTITIES.map((entity) => (
+                        <option key={entity.value} value={entity.value}>
+                          {entity.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  {resources.length > 1 ? (
+                    <Field htmlFor="resource" label="Tabela" className="min-w-48">
+                      <Select
+                        id="resource"
+                        value={resource}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          setResource(next);
+                          const nextColumns =
+                            resources.find((item) => item.name === next)?.columns ?? [];
+                          applyGuessedMapping(nextColumns);
+                        }}
+                      >
+                        {resources.map((item) => (
+                          <option key={item.name} value={item.name}>
+                            {item.name} ({item.columns.length} colunas)
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  ) : null}
+
+                  <p className="text-xs text-muted">{mappedCount} de {columns.length} colunas ligadas</p>
+                </div>
+
+                <ul className="flex flex-col gap-2">
+                  {columns.map((column) => (
+                    <li
+                      key={column.name}
+                      className="grid grid-cols-1 items-center gap-2 rounded-lg border border-border bg-bg px-3 py-2 sm:grid-cols-[1fr_1fr]"
+                    >
+                      <span className="text-sm">
+                        {column.name}{' '}
+                        <span className="text-xs text-muted">({column.type})</span>
+                      </span>
+                      <Select
+                        aria-label={`Destino da coluna ${column.name}`}
+                        value={mapping[column.name] ?? ''}
+                        onChange={(event) =>
+                          setMapping({ ...mapping, [column.name]: event.target.value })
+                        }
+                      >
+                        {mappingFields.map((field) => (
+                          <option key={field.value || 'ignore'} value={field.value}>
+                            {field.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setStep(1)}>
+                    Voltar
+                  </Button>
+                  <Button loading={pending} onClick={() => void saveMapping()}>
+                    Conferir dados
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        {step === 3 ? (
+          <div className="mt-4 flex flex-col gap-5">
+            {pending && !syncJob ? (
+              <div className="flex flex-col gap-3" aria-live="polite" aria-busy="true">
+                <p className="text-sm text-muted">
+                  {previewRows.length === 0 && !mappingSaved
+                    ? 'Carregando prévia…'
+                    : 'Importando… isso pode levar alguns instantes.'}
+                </p>
+                <div
+                  role="progressbar"
+                  aria-label="Progresso da importação"
+                  className="h-1.5 overflow-hidden rounded-full bg-border"
+                >
+                  <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
+                </div>
+              </div>
             ) : null}
 
-            {syncJob ? (
+            {showResult && syncJob ? (
               <>
                 <div className="flex items-center gap-2">
-                  <CardTitle className="text-base">Importação</CardTitle>
-                  <Badge tone={syncJob.status === 'completed' ? 'success' : syncJob.status === 'failed' ? 'danger' : 'info'}>
+                  <CardTitle className="text-base">Pronto</CardTitle>
+                  <Badge
+                    tone={
+                      syncJob.status === 'completed'
+                        ? 'success'
+                        : syncJob.status === 'failed'
+                          ? 'danger'
+                          : 'info'
+                    }
+                  >
                     {syncJob.status === 'completed'
                       ? 'Concluída'
                       : syncJob.status === 'failed'
@@ -621,34 +738,88 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
 
                 {syncJob.error ? <Alert tone="danger">{syncJob.error}</Alert> : null}
 
-                <ul aria-live="polite" className="flex flex-col gap-1 text-sm">
-                  <li>✓ {formatInteger(initial.summary.customers)} clientes na base</li>
-                  <li>✓ {formatInteger(initial.summary.sales)} vendas na base</li>
-                  <li>✓ {formatInteger(initial.summary.sellers)} vendedores encontrados</li>
-                  <li>✓ {formatInteger(initial.summary.products)} produtos cadastrados</li>
-                  <li>✓ {formatCurrency(initial.summary.revenue)} em vendas analisadas</li>
+                <ul
+                  aria-live="polite"
+                  className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                >
+                  <ResultStat label="Clientes" value={formatInteger(initial.summary.customers)} />
+                  <ResultStat label="Vendas" value={formatInteger(initial.summary.sales)} />
+                  <ResultStat label="Vendedores" value={formatInteger(initial.summary.sellers)} />
+                  <ResultStat label="Produtos" value={formatInteger(initial.summary.products)} />
                 </ul>
+                <p className="text-sm text-muted">
+                  {formatCurrency(initial.summary.revenue)} em vendas analisadas
+                </p>
 
                 <p className="text-xs text-muted tabular">
-                  Registros lidos {formatInteger(syncJob.recordsRead)} · criados{' '}
+                  Lidos {formatInteger(syncJob.recordsRead)} · criados{' '}
                   {formatInteger(syncJob.recordsCreated)} · atualizados{' '}
                   {formatInteger(syncJob.recordsUpdated)} · falhas{' '}
                   {formatInteger(syncJob.recordsFailed)}
                 </p>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button onClick={() => router.push('/dashboard')}>Ver dashboard</Button>
-                  <Button variant="secondary" loading={pending} onClick={() => void runImport()}>
-                    Importar novamente
+                  <Button variant="secondary" onClick={startAnotherImport}>
+                    Importar outro arquivo
+                  </Button>
+                  <Button variant="ghost" loading={pending} onClick={() => void runImport()}>
+                    Rodar de novo este arquivo
                   </Button>
                 </div>
               </>
             ) : (
-              <CardDescription>Nenhuma importação executada ainda.</CardDescription>
+              <>
+                {mappingSaved ? <Badge tone="success">Colunas salvas</Badge> : null}
+
+                {pending && previewRows.length === 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-3/4" />
+                  </div>
+                ) : previewRows.length === 0 ? (
+                  <CardDescription>
+                    Sem linhas para pré-visualizar. Você ainda pode importar.
+                  </CardDescription>
+                ) : (
+                  <DataTable
+                    caption={`Primeiras ${previewRows.length} linhas`}
+                    columns={Object.keys(previewRows[0] ?? {}).map((key) => ({
+                      key,
+                      header: key,
+                      render: (row: Record<string, unknown>) => String(row[key] ?? '—'),
+                    }))}
+                    rows={previewRows}
+                    rowKey={(row) => JSON.stringify(row).slice(0, 64)}
+                  />
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" onClick={() => setStep(2)}>
+                    Voltar
+                  </Button>
+                  <Button variant="secondary" loading={pending} onClick={() => void loadPreview()}>
+                    Recarregar prévia
+                  </Button>
+                  <Button loading={pending} onClick={() => void runImport()}>
+                    Importar {previewRows.length > 0 ? `${formatInteger(previewRows.length)}+ linhas` : 'dados'}
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         ) : null}
       </Card>
     </div>
+  );
+}
+
+function ResultStat({ label, value }: { label: string; value: string }) {
+  return (
+    <li className="rounded-xl border border-border bg-bg px-3 py-3">
+      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1 text-lg font-medium tabular">{value}</p>
+    </li>
   );
 }

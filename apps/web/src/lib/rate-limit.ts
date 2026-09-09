@@ -46,6 +46,8 @@ export const RATE_LIMITS = {
   pipeline: { name: 'pipeline', limit: 10, windowMs: 60_000 },
   /** Side-effecting actions. */
   execution: { name: 'execution', limit: 60, windowMs: 60_000 },
+  /** CSV uploads from the import wizard. */
+  upload: { name: 'upload', limit: 20, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 /**

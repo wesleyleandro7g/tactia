@@ -62,6 +62,7 @@ ENV HOSTNAME=0.0.0.0
 ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/packages/database/src/generated/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 
 RUN addgroup -g 1001 -S nodejs && adduser -S tactia -u 1001
+RUN mkdir -p /data/uploads && chown tactia:nodejs /data/uploads
 
 COPY --from=builder --chown=tactia:nodejs /repo/apps/web/.next/standalone ./
 COPY --from=builder --chown=tactia:nodejs /repo/apps/web/.next/static ./apps/web/.next/static

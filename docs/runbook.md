@@ -1,6 +1,7 @@
 # Runbook
 
-Diagnóstico e operação da Tactia em produção. Para colocar um cliente novo, veja
+Diagnóstico e operação da Tactia em produção. Para subir o ambiente, veja
+[deploy-producao.md](./deploy-producao.md). Para colocar um cliente novo, veja
 [onboarding-cliente.md](./onboarding-cliente.md).
 
 ---
@@ -74,7 +75,7 @@ O campo `error` vem no formato `CÓDIGO: mensagem`:
 | Erro | Causa provável | O que fazer |
 |---|---|---|
 | `VALIDATION_ERROR: A fonte de dados não tem nenhum mapeamento ativo` | Fonte criada sem mapping | Criar o mapping em `/onboarding` ou via `POST /api/v1/data-sources/:id/mappings` |
-| `SYNC_ERROR: ENOENT ... .csv` | Caminho do CSV não existe **dentro do container** | `docker compose cp` o arquivo e refazer o sync |
+| `SYNC_ERROR: ENOENT ... .csv` | Caminho do CSV não existe **dentro do container** | Reenvie o arquivo pelo wizard ou confira `UPLOAD_DIR` |
 | `SYNC_ERROR: EACCES` | Arquivo sem permissão de leitura para o usuário do container (uid 1001) | `chmod 644` no arquivo |
 | `CONNECTOR_ERROR` / `P1001` | Postgres do cliente inacessível (firewall, host, porta) | Testar com `POST /api/v1/data-sources/:id/test-connection` |
 | `SYNC_ERROR: password authentication failed` | Credencial trocada no lado do cliente | Recriar a credential e apontar a fonte para o novo `credentialId` |
@@ -247,7 +248,6 @@ Antes de pedir ajuda, colete:
 |---|---|
 | Sync e execução rodam **inline** no request | Import muito grande pode estourar o timeout do proxy; quebre o arquivo |
 | Rate limit **in-memory** | Vale por processo; com mais de uma instância o limite efetivo é multiplicado |
-| CSV por caminho no servidor | Sem upload pela interface; use `docker compose cp` |
 | Sem retry de execução falha | Reproponha manualmente |
 | E-mail só no driver `console` | Nenhum e-mail sai de verdade |
 | Sem agendamento de sync | Dispare manualmente ou por cron externo chamando a API |

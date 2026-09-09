@@ -47,7 +47,7 @@ describe('rate limiting (spec §49)', () => {
   });
 
   it('covers the expensive endpoints', () => {
-    expect(Object.keys(RATE_LIMITS).sort()).toEqual(['chat', 'execution', 'pipeline', 'sync']);
+    expect(Object.keys(RATE_LIMITS).sort()).toEqual(['chat', 'execution', 'pipeline', 'sync', 'upload']);
     for (const policy of Object.values(RATE_LIMITS)) {
       expect(policy.limit).toBeGreaterThan(0);
       expect(policy.windowMs).toBeGreaterThan(0);
