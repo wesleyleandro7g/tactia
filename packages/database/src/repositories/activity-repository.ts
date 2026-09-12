@@ -4,6 +4,8 @@ import { asJson, asNullableJson } from '../json';
 
 export type CreateActivityInput = {
   tenantId: string;
+  dataSourceId?: string | null;
+  externalId?: string | null;
   type: ActivityType;
   customerId?: string | null;
   leadId?: string | null;
@@ -20,6 +22,8 @@ export class ActivityRepository {
       data: {
         id: createId(),
         tenantId: input.tenantId,
+        dataSourceId: input.dataSourceId ?? null,
+        externalId: input.externalId ?? null,
         type: input.type,
         customerId: input.customerId ?? null,
         leadId: input.leadId ?? null,
@@ -94,6 +98,36 @@ export class ActivityRepository {
         metadata: asNullableJson(data.metadata),
       },
     });
+  }
+
+  async upsertByExternalId(
+    input: CreateActivityInput & { dataSourceId: string; externalId: string },
+  ) {
+    const existing = await this.db.activity.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        dataSourceId: input.dataSourceId,
+        externalId: input.externalId,
+      },
+    });
+
+    if (existing) {
+      const updated = await this.db.activity.update({
+        where: { id: existing.id },
+        data: {
+          type: input.type,
+          customerId: input.customerId ?? null,
+          leadId: input.leadId ?? null,
+          sellerId: input.sellerId ?? null,
+          occurredAt: input.occurredAt,
+          metadata: asJson(input.metadata),
+        },
+      });
+      return { entity: updated, created: false };
+    }
+
+    const created = await this.create(input);
+    return { entity: created, created: true };
   }
 
   async delete({ tenantId, id }: { tenantId: string; id: string }) {

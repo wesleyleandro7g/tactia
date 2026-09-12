@@ -20,6 +20,9 @@ export type CreateSaleInput = {
   discountAmount?: number;
   currency?: string;
   status?: SaleStatus;
+  paymentMethod?: string | null;
+  channel?: string | null;
+  region?: string | null;
   soldAt: Date;
   metadata?: unknown;
   items: CreateSaleItemInput[];
@@ -43,6 +46,9 @@ export class SaleRepository {
         discountAmount: input.discountAmount ?? 0,
         currency: input.currency ?? 'BRL',
         status: input.status ?? 'confirmed',
+        paymentMethod: input.paymentMethod ?? null,
+        channel: input.channel ?? null,
+        region: input.region ?? null,
         soldAt: input.soldAt,
         metadata: asJson(input.metadata),
         items: {
@@ -143,6 +149,25 @@ export class SaleRepository {
     });
   }
 
+  async findByExternalId({
+    tenantId,
+    dataSourceId,
+    externalId,
+  }: {
+    tenantId: string;
+    dataSourceId?: string;
+    externalId: string;
+  }) {
+    return this.db.sale.findFirst({
+      where: {
+        tenantId,
+        externalId,
+        ...(dataSourceId ? { dataSourceId } : {}),
+      },
+      select: { id: true },
+    });
+  }
+
   /**
    * Upsert by `(tenantId, dataSourceId, externalId)` — the idempotency key of a
    * sync (spec §38). On update the items are replaced, not appended: re-running
@@ -170,6 +195,9 @@ export class SaleRepository {
             discountAmount: input.discountAmount ?? 0,
             currency: input.currency ?? 'BRL',
             status: input.status ?? existing.status,
+            paymentMethod: input.paymentMethod ?? null,
+            channel: input.channel ?? null,
+            region: input.region ?? null,
             soldAt: input.soldAt,
             metadata: asJson(input.metadata),
             items: {

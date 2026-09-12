@@ -10,6 +10,10 @@ export type CreateCustomerInput = {
   email?: string | null;
   phone?: string | null;
   document?: string | null;
+  segment?: string | null;
+  city?: string | null;
+  state?: string | null;
+  acquisitionSource?: string | null;
   status?: CustomerStatus;
   metadata?: unknown;
 };
@@ -28,6 +32,10 @@ export class CustomerRepository {
         email: input.email ?? null,
         phone: input.phone ?? null,
         document: input.document ?? null,
+        segment: input.segment ?? null,
+        city: input.city ?? null,
+        state: input.state ?? null,
+        acquisitionSource: input.acquisitionSource ?? null,
         status: input.status ?? 'active',
         metadata: asJson(input.metadata),
       },
@@ -164,6 +172,10 @@ export class CustomerRepository {
           email: input.email ?? null,
           phone: input.phone ?? null,
           document: input.document ?? null,
+          segment: input.segment ?? null,
+          city: input.city ?? null,
+          state: input.state ?? null,
+          acquisitionSource: input.acquisitionSource ?? null,
           status: input.status ?? existing.status,
           metadata: asJson(input.metadata),
         },

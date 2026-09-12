@@ -41,6 +41,14 @@ export class TenantRepository {
     });
   }
 
+  async listActive() {
+    return this.db.tenant.findMany({
+      where: { status: 'active' },
+      select: { id: true, timezone: true, currency: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   async update({
     tenantId,
     data,

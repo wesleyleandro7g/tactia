@@ -182,7 +182,18 @@ enum InteractionIntent {
   complaint
   praise
   question
+  purchase_intent
+  cancellation_intent
+  price_objection
+  delivery_issue
+  support
   other
+}
+
+enum InteractionUrgency {
+  low
+  medium
+  high
 }
 
 // ---------------------------------------------------------------------------
@@ -286,8 +297,18 @@ model Tenant {
   imports      Import[]
   qualityReports DataQualityReport[]
   metrics        Metric[]
+  metricSnapshots MetricSnapshot[]
   insights       Insight[]
   recommendations Recommendation[]
+  briefings      Briefing[]
+  goals          Goal[]
+  businessFacts  BusinessFact[]
+  tenantSettings TenantSettings?
+  expenses       Expense[]
+  payments       Payment[]
+  inventoryLevels InventoryLevel[]
+  campaigns      Campaign[]
+  leadStageTransitions LeadStageTransition[]
   conversations  Conversation[]
   actions          Action[]
   actionExecutions ActionExecution[]
@@ -313,6 +334,8 @@ model User {
   auditLogs      AuditLog[]
   sellers        Seller[]
   conversations  Conversation[]
+  insightFeedbacks InsightFeedback[]
+  businessFacts  BusinessFact[]
 
   @@index([email])
   @@index([createdAt])
@@ -375,6 +398,10 @@ model Customer {
   email        String?
   phone        String?
   document     String?
+  segment      String?
+  city         String?
+  state        String?
+  acquisitionSource String? @map("acquisition_source")
   status       CustomerStatus @default(active)
   metadata     Json?
   deletedAt    DateTime?      @map("deleted_at")
@@ -409,9 +436,12 @@ model Lead {
   score        Int?
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
+  sellerId     String?    @map("seller_id") @db.Uuid
   tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  seller       Seller?    @relation(fields: [sellerId], references: [id], onDelete: SetNull)
   activities   Activity[]
+  stageTransitions LeadStageTransition[]
 
   @@unique([tenantId, dataSourceId, externalId])
   @@index([tenantId, status])
@@ -429,6 +459,7 @@ model Product {
   name         String
   sku          String?
   category     String?
+  supplier     String?
   cost         Decimal?      @db.Decimal(18, 4)
   price        Decimal?      @db.Decimal(18, 4)
   status       ProductStatus @default(active)
@@ -438,6 +469,8 @@ model Product {
   updatedAt    DateTime      @updatedAt @map("updated_at")
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   saleItems    SaleItem[]
+  interactions Interaction[]
+  inventoryLevels InventoryLevel[]
 
   @@unique([tenantId, dataSourceId, externalId])
   @@index([tenantId, status])
@@ -464,6 +497,7 @@ model Seller {
   user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   sales        Sale[]
   activities   Activity[]
+  leads        Lead[]
 
   @@unique([tenantId, dataSourceId, externalId])
   @@index([tenantId, status])
@@ -485,6 +519,9 @@ model Sale {
   discountAmount Decimal    @default(0) @map("discount_amount") @db.Decimal(18, 4)
   currency       String     @default("BRL") @db.Char(3)
   status         SaleStatus @default(confirmed)
+  paymentMethod  String?    @map("payment_method")
+  channel        String?
+  region         String?
   soldAt         DateTime   @map("sold_at")
   metadata       Json?
   createdAt      DateTime   @default(now()) @map("created_at")
@@ -493,6 +530,7 @@ model Sale {
   customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
   seller         Seller?    @relation(fields: [sellerId], references: [id], onDelete: SetNull)
   items          SaleItem[]
+  payments       Payment[]
 
   @@unique([tenantId, dataSourceId, externalId])
   @@index([tenantId, status])
@@ -523,14 +561,16 @@ model SaleItem {
 }
 
 model Activity {
-  id         String       @id @db.Uuid
-  tenantId   String       @map("tenant_id") @db.Uuid
-  type       ActivityType
-  customerId String?      @map("customer_id") @db.Uuid
-  leadId     String?      @map("lead_id") @db.Uuid
-  sellerId   String?      @map("seller_id") @db.Uuid
-  occurredAt DateTime     @map("occurred_at")
-  metadata   Json?
+  id           String       @id @db.Uuid
+  tenantId     String       @map("tenant_id") @db.Uuid
+  dataSourceId String?      @map("data_source_id") @db.Uuid
+  externalId   String?      @map("external_id")
+  type         ActivityType
+  customerId   String?      @map("customer_id") @db.Uuid
+  leadId       String?      @map("lead_id") @db.Uuid
+  sellerId     String?      @map("seller_id") @db.Uuid
+  occurredAt   DateTime     @map("occurred_at")
+  metadata     Json?
   createdAt  DateTime     @default(now()) @map("created_at")
   tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -543,6 +583,7 @@ model Activity {
   @@index([tenantId, customerId])
   @@index([tenantId, leadId])
   @@index([tenantId, sellerId])
+  @@unique([tenantId, dataSourceId, externalId])
   @@map("activities")
 }
 
@@ -559,6 +600,11 @@ model Interaction {
   occurredAt   DateTime             @map("occurred_at")
   intent       InteractionIntent?
   topics       String[]             @default([])
+  /// -1 (very negative) .. 1 (very positive), set by the classifier.
+  sentiment    Decimal?             @db.Decimal(3, 2)
+  urgency      InteractionUrgency?
+  /// Product the message is about, when the classifier can link it.
+  productId    String?              @map("product_id") @db.Uuid
   /// Written via raw SQL (pgvector). Never selected through Prisma.
   embedding    Unsupported("vector")?
   metadata     Json?
@@ -566,6 +612,7 @@ model Interaction {
   updatedAt    DateTime             @updatedAt @map("updated_at")
   tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer     Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  product      Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, dataSourceId, externalId])
   @@index([tenantId, occurredAt])
@@ -573,6 +620,8 @@ model Interaction {
   @@index([tenantId, intent, occurredAt])
   @@index([tenantId, channel])
   @@index([tenantId, dataSourceId])
+  @@index([tenantId, productId])
+  @@index([tenantId, urgency, occurredAt])
   @@map("interactions")
 }
 
@@ -750,6 +799,27 @@ model Metric {
   @@map("metrics")
 }
 
+/// Daily materialized metric values (Insights v2 — Etapa 11). Source of truth for
+/// trends, baselines and forecasts; recomputed for the last 3 days on every run.
+model MetricSnapshot {
+  id           String   @id @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  metricKey    String   @map("metric_key")
+  /// 'total' | 'product' | 'seller' | 'category' | 'customer'
+  dimension    String   @default("total")
+  /// Entity id / category name; '' for dimension = 'total'.
+  dimensionKey String   @default("") @map("dimension_key")
+  bucketDate   DateTime @map("bucket_date") @db.Date
+  value        Decimal  @db.Decimal(18, 4)
+  computedAt   DateTime @default(now()) @map("computed_at")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, metricKey, dimension, dimensionKey, bucketDate])
+  @@index([tenantId, metricKey, dimension, bucketDate])
+  @@index([tenantId, bucketDate])
+  @@map("metric_snapshots")
+}
+
 // ---------------------------------------------------------------------------
 // Intelligence — Rules, Insights, Recommendations (Etapa 5)
 // ---------------------------------------------------------------------------
@@ -767,15 +837,222 @@ model Insight {
   periodFrom      DateTime        @map("period_from")
   periodTo        DateTime        @map("period_to")
   resolvedAt      DateTime?       @map("resolved_at")
+  /// Entity the insight is about (product, customer, seller, source...). Null = tenant-wide.
+  entityType      String?         @map("entity_type")
+  entityId        String?         @map("entity_id") @db.Uuid
+  /// Estimated financial impact (tenant currency). Drives ranking.
+  impactAmount    Decimal?        @map("impact_amount") @db.Decimal(18, 4)
+  /// 0..1 — how much the rule trusts the signal (sample size, baseline quality).
+  confidence      Float?
+  /// impact × confidence × urgency — used to rank and cap insights per run.
+  score           Float           @default(0)
+  /// Stable identity of the finding: ruleKey + entity. Dedup and auto-resolve key.
+  fingerprint     String
+  /// Root-cause decomposition (contributors, price×volume×mix).
+  drivers         Json?
+  autoResolvedAt  DateTime?       @map("auto_resolved_at")
+  dismissReason   String?         @map("dismiss_reason")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   recommendations Recommendation[]
+  feedbacks       InsightFeedback[]
 
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
   @@index([tenantId, ruleKey, status])
+  @@index([tenantId, fingerprint, status])
+  @@index([tenantId, status, score])
+  @@index([tenantId, entityType, entityId])
   @@map("insights")
+}
+
+/// Weekly narrative built from deterministic facts (Etapa 11). Numbers in
+/// `content` must appear in `facts` — the generator rejects and retries once.
+model Briefing {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  periodFrom DateTime @map("period_from")
+  periodTo   DateTime @map("period_to")
+  content    String
+  facts      Json
+  sources    Json
+  model      String
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, periodFrom, periodTo])
+  @@map("briefings")
+}
+
+model Goal {
+  id          String   @id @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  scope       String   @default("tenant")
+  scopeId     String?  @map("scope_id") @db.Uuid
+  metricKey   String   @map("metric_key")
+  periodType  String   @map("period_type")
+  periodStart DateTime @map("period_start")
+  target      Decimal  @db.Decimal(18, 4)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, periodStart])
+  @@index([tenantId, metricKey])
+  @@map("goals")
+}
+
+model LeadStageTransition {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  leadId     String   @map("lead_id") @db.Uuid
+  fromStatus String   @map("from_status")
+  toStatus   String   @map("to_status")
+  occurredAt DateTime @map("occurred_at")
+  sellerId   String?  @map("seller_id") @db.Uuid
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@index([leadId, occurredAt])
+  @@map("lead_stage_transitions")
+}
+
+model BusinessFact {
+  id          String    @id @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  kind        String
+  text        String
+  entityType  String?   @map("entity_type")
+  entityId    String?   @map("entity_id") @db.Uuid
+  validFrom   DateTime? @map("valid_from")
+  validTo     DateTime? @map("valid_to")
+  source      String    @default("user")
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  author      User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, kind])
+  @@map("business_facts")
+}
+
+model InsightFeedback {
+  id        String   @id @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  insightId String   @map("insight_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  useful    Boolean
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  insight   Insight  @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([insightId, userId])
+  @@index([tenantId, createdAt])
+  @@map("insight_feedbacks")
+}
+
+model TenantSettings {
+  id         String   @id @db.Uuid
+  tenantId   String   @unique @map("tenant_id") @db.Uuid
+  thresholds Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  overdue
+  cancelled
+}
+
+model Expense {
+  id          String   @id @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  dataSourceId String? @map("data_source_id") @db.Uuid
+  externalId  String?  @map("external_id")
+  category    String
+  description String?
+  amount      Decimal  @db.Decimal(18, 4)
+  occurredAt  DateTime @map("occurred_at")
+  recurring   Boolean  @default(false)
+  supplier    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, category])
+  @@map("expenses")
+}
+
+model Payment {
+  id           String        @id @db.Uuid
+  tenantId     String        @map("tenant_id") @db.Uuid
+  dataSourceId String?       @map("data_source_id") @db.Uuid
+  externalId   String?       @map("external_id")
+  saleId       String        @map("sale_id") @db.Uuid
+  amount       Decimal       @db.Decimal(18, 4)
+  method       String?
+  dueAt        DateTime      @map("due_at")
+  paidAt       DateTime?     @map("paid_at")
+  status       PaymentStatus @default(pending)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sale         Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, status, dueAt])
+  @@index([tenantId, saleId])
+  @@map("payments")
+}
+
+model InventoryLevel {
+  id           String   @id @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  dataSourceId String?  @map("data_source_id") @db.Uuid
+  externalId   String?  @map("external_id")
+  productId    String   @map("product_id") @db.Uuid
+  quantity     Decimal  @db.Decimal(18, 4)
+  minQuantity  Decimal? @map("min_quantity") @db.Decimal(18, 4)
+  recordedAt   DateTime @map("recorded_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, productId, recordedAt])
+  @@map("inventory_levels")
+}
+
+model Campaign {
+  id           String    @id @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  dataSourceId String?   @map("data_source_id") @db.Uuid
+  externalId   String?   @map("external_id")
+  name         String
+  source       String
+  spend        Decimal   @db.Decimal(18, 4)
+  startsAt     DateTime  @map("starts_at")
+  endsAt       DateTime? @map("ends_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dataSourceId, externalId])
+  @@index([tenantId, source])
+  @@index([tenantId, startsAt])
+  @@map("campaigns")
 }
 
 model Recommendation {

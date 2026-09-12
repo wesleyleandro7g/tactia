@@ -6,6 +6,7 @@ export type CreateLeadInput = {
   dataSourceId?: string | null;
   externalId?: string | null;
   customerId?: string | null;
+  sellerId?: string | null;
   name: string;
   email?: string | null;
   phone?: string | null;
@@ -25,6 +26,7 @@ export class LeadRepository {
         dataSourceId: input.dataSourceId ?? null,
         externalId: input.externalId ?? null,
         customerId: input.customerId ?? null,
+        sellerId: input.sellerId ?? null,
         name: input.name,
         email: input.email ?? null,
         phone: input.phone ?? null,
@@ -80,6 +82,7 @@ export class LeadRepository {
     id: string;
     data: {
       customerId?: string | null;
+      sellerId?: string | null;
       name?: string;
       email?: string | null;
       phone?: string | null;
@@ -92,6 +95,86 @@ export class LeadRepository {
     const existing = await this.findById({ tenantId, id });
     if (!existing) return null;
     return this.db.lead.update({ where: { id }, data });
+  }
+
+  async findByExternalId({
+    tenantId,
+    dataSourceId,
+    externalId,
+  }: {
+    tenantId: string;
+    dataSourceId?: string;
+    externalId: string;
+  }) {
+    return this.db.lead.findFirst({
+      where: {
+        tenantId,
+        externalId,
+        ...(dataSourceId ? { dataSourceId } : {}),
+      },
+      select: { id: true, status: true },
+    });
+  }
+
+  /**
+   * Upsert by `(tenantId, dataSourceId, externalId)`. Status changes write a
+   * LeadStageTransition so the funnel can measure time-in-stage on import.
+   */
+  async upsertByExternalId(input: CreateLeadInput & { dataSourceId: string; externalId: string }) {
+    const existing = await this.db.lead.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        dataSourceId: input.dataSourceId,
+        externalId: input.externalId,
+      },
+    });
+
+    if (existing) {
+      const nextStatus = input.status ?? existing.status;
+      const updated = await this.db.lead.update({
+        where: { id: existing.id },
+        data: {
+          customerId: input.customerId ?? null,
+          sellerId: input.sellerId ?? null,
+          name: input.name,
+          email: input.email ?? null,
+          phone: input.phone ?? null,
+          source: input.source ?? null,
+          status: nextStatus,
+          score: input.score ?? null,
+        },
+      });
+      if (nextStatus !== existing.status) {
+        await this.db.leadStageTransition.create({
+          data: {
+            id: createId(),
+            tenantId: input.tenantId,
+            leadId: existing.id,
+            fromStatus: existing.status,
+            toStatus: nextStatus,
+            occurredAt: new Date(),
+            sellerId: updated.sellerId ?? existing.sellerId,
+          },
+        });
+      }
+      return { entity: updated, created: false };
+    }
+
+    const created = await this.create(input);
+    if (created.status !== 'new') {
+      await this.db.leadStageTransition.create({
+        data: {
+          id: createId(),
+          tenantId: input.tenantId,
+          leadId: created.id,
+          fromStatus: 'new',
+          toStatus: created.status,
+          occurredAt: new Date(),
+          sellerId: created.sellerId,
+        },
+      });
+    }
+    return { entity: created, created: true };
   }
 
   async delete({ tenantId, id }: { tenantId: string; id: string }) {

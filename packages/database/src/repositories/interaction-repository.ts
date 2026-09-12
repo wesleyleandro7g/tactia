@@ -4,6 +4,7 @@ import {
   type InteractionChannel,
   type InteractionDirection,
   type InteractionIntent,
+  type InteractionUrgency,
   type PrismaClient,
 } from '../client';
 import { asJson } from '../json';
@@ -38,6 +39,9 @@ export type InteractionRecord = {
   occurredAt: Date;
   intent: InteractionIntent | null;
   topics: string[];
+  sentiment: { toNumber(): number } | null;
+  urgency: InteractionUrgency | null;
+  productId: string | null;
   metadata: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -58,6 +62,9 @@ const interactionSelect = {
   occurredAt: true,
   intent: true,
   topics: true,
+  sentiment: true,
+  urgency: true,
+  productId: true,
   metadata: true,
   createdAt: true,
   updatedAt: true,
@@ -110,6 +117,8 @@ export class InteractionRepository {
     take,
     channel,
     intent,
+    urgency,
+    productId,
     customerId,
     search,
     from,
@@ -120,6 +129,8 @@ export class InteractionRepository {
     take: number;
     channel?: InteractionChannel;
     intent?: InteractionIntent;
+    urgency?: InteractionUrgency;
+    productId?: string;
     customerId?: string;
     search?: string;
     from?: Date;
@@ -129,6 +140,8 @@ export class InteractionRepository {
       tenantId,
       ...(channel ? { channel } : {}),
       ...(intent ? { intent } : {}),
+      ...(urgency ? { urgency } : {}),
+      ...(productId ? { productId } : {}),
       ...(customerId ? { customerId } : {}),
       ...(from || to
         ? { occurredAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } }
@@ -173,7 +186,7 @@ export class InteractionRepository {
           occurredAt: input.occurredAt,
           metadata: asJson(input.metadata),
           ...(bodyChanged
-            ? { intent: null, topics: [] }
+            ? { intent: null, topics: [], sentiment: null, urgency: null, productId: null }
             : {
                 ...(input.intent !== undefined ? { intent: input.intent } : {}),
                 ...(input.topics !== undefined ? { topics: input.topics } : {}),
@@ -216,19 +229,31 @@ export class InteractionRepository {
     id,
     intent,
     topics,
+    sentiment,
+    urgency,
+    productId,
     embedding,
   }: {
     tenantId: string;
     id: string;
     intent: InteractionIntent;
     topics: string[];
+    sentiment?: number | null;
+    urgency?: InteractionUrgency | null;
+    productId?: string | null;
     embedding: number[];
   }) {
     const existing = await this.findById({ tenantId, id });
     if (!existing) return;
     await this.db.interaction.update({
       where: { id },
-      data: { intent, topics },
+      data: {
+        intent,
+        topics,
+        sentiment: sentiment == null ? null : Math.max(-1, Math.min(1, sentiment)),
+        urgency: urgency ?? null,
+        productId: productId ?? null,
+      },
     });
     const vector = toVectorLiteral(embedding);
     await this.db.$executeRaw`
@@ -276,6 +301,9 @@ export class InteractionRepository {
         occurred_at AS "occurredAt",
         intent,
         topics,
+        sentiment,
+        urgency,
+        product_id AS "productId",
         metadata,
         created_at AS "createdAt",
         updated_at AS "updatedAt",

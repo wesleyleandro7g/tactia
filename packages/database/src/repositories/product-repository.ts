@@ -9,6 +9,7 @@ export type CreateProductInput = {
   name: string;
   sku?: string | null;
   category?: string | null;
+  supplier?: string | null;
   cost?: number | null;
   price?: number | null;
   status?: ProductStatus;
@@ -28,6 +29,7 @@ export class ProductRepository {
         name: input.name,
         sku: input.sku ?? null,
         category: input.category ?? null,
+        supplier: input.supplier ?? null,
         cost: input.cost ?? null,
         price: input.price ?? null,
         status: input.status ?? 'active',
@@ -149,6 +151,7 @@ export class ProductRepository {
           name: input.name,
           sku: input.sku ?? null,
           category: input.category ?? null,
+          supplier: input.supplier ?? null,
           cost: input.cost,
           price: input.price,
           status: input.status ?? existing.status,
