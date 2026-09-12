@@ -13,3 +13,4 @@ packages/database/src/generated
 apps/web/next-env.d.ts
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+*.playwright-mcp 

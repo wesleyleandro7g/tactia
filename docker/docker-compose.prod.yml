@@ -78,6 +78,9 @@ services:
       TACTIA_OPERATOR_EMAILS: ${TACTIA_OPERATOR_EMAILS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
+      LLM_CLASSIFIER_MODEL: ${LLM_CLASSIFIER_MODEL:-}
+      JOBS_ENABLED: ${JOBS_ENABLED:-true}
+      CRON_SECRET: ${CRON_SECRET:-}
     volumes:
       - uploads_data:/data/uploads
     depends_on:

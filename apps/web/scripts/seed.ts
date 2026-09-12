@@ -55,7 +55,7 @@ async function ensureIdentity() {
   await prisma.authAccount.create({
     data: {
       id: createId(),
-      issuer: 'credential',
+      issuer: process.env.NODE_ENV === 'production' ? 'credential' : 'local:credential',
       accountId: authUserId,
       providerId: 'credential',
       userId: authUserId,
