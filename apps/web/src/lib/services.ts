@@ -40,6 +40,7 @@ import {
   KnowledgeDocumentRepository,
   MediaAssetRepository,
   TenantApiKeyRepository,
+  WhatsappAuthorizedNumberRepository,
 } from '@tactia/database';
 import {
   ActivityService,
@@ -80,6 +81,7 @@ import {
   ThresholdCalibrator,
   TenantApiKeyService,
   UserService,
+  WhatsappAuthorizedNumberService,
 } from '@tactia/domain';
 import { MetricEngine, SnapshotEngine } from '@tactia/intelligence';
 import {
@@ -145,6 +147,7 @@ const actionRepository = new ActionRepository(prisma);
 const actionExecutionRepository = new ActionExecutionRepository(prisma);
 const approvalRepository = new ApprovalRepository(prisma);
 const tenantApiKeyRepository = new TenantApiKeyRepository(prisma);
+const whatsappAuthorizedNumberRepository = new WhatsappAuthorizedNumberRepository(prisma);
 
 // ---------------------------------------------------------------------------
 // Services
@@ -318,6 +321,12 @@ export const mediaIngestService = new MediaIngestService({
 export const credentialService = new CredentialService(credentialRepository);
 
 export const tenantApiKeyService = new TenantApiKeyService(tenantApiKeyRepository, auditLogService);
+
+export const whatsappAuthorizedNumberService = new WhatsappAuthorizedNumberService(
+  whatsappAuthorizedNumberRepository,
+  membershipRepository,
+  auditLogService,
+);
 
 export const dataSourceService = new DataSourceService(
   dataSourceRepository,

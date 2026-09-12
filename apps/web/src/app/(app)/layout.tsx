@@ -30,10 +30,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const nav: NavItem[] = [...BASE_NAV];
   if (ctx.role && hasMinRole(ctx.role, 'admin')) {
     const onboarding = nav.findIndex((item) => item.href === '/onboarding');
-    nav.splice(onboarding === -1 ? nav.length : onboarding, 0, {
-      href: '/settings/api-keys',
-      label: 'API keys',
-    });
+    const insertAt = onboarding === -1 ? nav.length : onboarding;
+    nav.splice(
+      insertAt,
+      0,
+      { href: '/settings/api-keys', label: 'API keys' },
+      { href: '/settings/whatsapp', label: 'WhatsApp' },
+    );
   }
   if (operator) nav.push({ href: '/admin', label: 'Admin' });
 

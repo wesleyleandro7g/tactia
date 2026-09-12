@@ -155,6 +155,7 @@ O chat nunca executa nada: uma proposta de ação sempre cai em `/approvals`.
 | `DATABASE_URL` | `health` 503, aplicação inutilizável |
 | `LLM_API_KEY` | Apenas o chat fica indisponível |
 | `TACTIA_OPERATOR_EMAILS` | Vazio = `/admin` responde 404 para todos |
+| `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Webhook do WhatsApp não processa |
 
 **Trocar `ENCRYPTION_KEY` invalida todas as credenciais existentes** (AES-GCM
 falha na autenticação da tag). Se for inevitável: recrie as credentials
@@ -267,6 +268,23 @@ Se `JOBS_ENABLED` estiver off, sync e ações continuam **inline** no request.
 Clientes MCP (Claude Desktop, outro agente interno) chamam `POST /api/v1/mcp` com uma API key do tenant. Isso executa as **mesmas tools** do chat. Números vêm no JSON `data` + `sources`. Se o cliente MCP **escrever** uma frase com número inventado, a Tactia não intercepta — o guardrail de prosa vale no orchestrator do chat. Ações (`propose_action`) entram na fila de aprovação.
 
 Owner/admin emite a key em `/settings/api-keys` (o secret aparece **uma vez**). Não use `CRON_SECRET` aqui — é segredo de plataforma, não de tenant.
+
+## 13.2 Chat via WhatsApp (Evolution API)
+
+Owner/admin autoriza números em `/settings/whatsapp`. Cada número pertence a um
+usuário da empresa e usa o mesmo assistente do `/chat`.
+
+O webhook é `POST /api/v1/webhooks/evolution` (sempre 200). Configure na Evolution
+o evento `MESSAGES_UPSERT` e o header `apikey` igual a `EVOLUTION_WEBHOOK_SECRET`
+(ou `EVOLUTION_API_KEY` se o secret não estiver definido). Use o **nome** da
+instância em `EVOLUTION_INSTANCE`, não o UUID.
+
+| Sintoma | Causa | Ação |
+|---|---|---|
+| Mensagem autorizada sem resposta | `EVOLUTION_*` ausente ou instância errada | Conferir env, `grep Evolution` nos logs |
+| Número cadastrado, bot ignora | Número normalizado diferente (DDI) | Cadastre com DDI, ex. `5511999999999` |
+| Eco / loop | Webhook processou `fromMe` | Esperado ignorar; se persistir, filtre `SEND_MESSAGE` na Evolution |
+| `/nova` no WhatsApp | Comando de nova thread | Responde "Nova conversa iniciada" |
 
 ```bash
 # Listar tools (Accept precisa dos dois tipos; o SDK Streamable HTTP exige)

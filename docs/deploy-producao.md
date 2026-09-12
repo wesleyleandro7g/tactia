@@ -62,6 +62,13 @@ S3_FORCE_PATH_STYLE=true
 # Operadores internos (acesso ao /admin)
 TACTIA_OPERATOR_EMAILS=voce@empresa.com
 
+# WhatsApp via Evolution API (opcional). Sem isso o cadastro em
+# /settings/whatsapp funciona, mas o bot não responde no WhatsApp.
+EVOLUTION_API_URL=https://evolution.suaempresa.com
+EVOLUTION_API_KEY=
+EVOLUTION_INSTANCE=tactia
+# EVOLUTION_WEBHOOK_SECRET=
+
 WEB_PORT=3000
 LOG_LEVEL=info
 ```
@@ -83,6 +90,7 @@ openssl rand -hex 32
 | `DATABASE_URL` | `health` responde 503, aplicação inutilizável |
 | `LLM_API_KEY` | Apenas o chat fica indisponível |
 | `TACTIA_OPERATOR_EMAILS` | Vazio = `/admin` responde 404 para todos |
+| `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Cadastro de números funciona; o webhook ignora mensagens |
 
 > **Guarde `ENCRYPTION_KEY` em local seguro.** Trocá-la invalida todas as
 > credenciais existentes (AES-GCM falha na autenticação da tag). Se for
@@ -190,6 +198,10 @@ usam `https://` e reinicie o container `web` se necessário.
    ficam no volume `uploads_data` (`UPLOAD_DIR=/data/uploads`).
 
 4. Valide em `/dashboard`, teste o `/chat` e confira `/approvals`.
+5. (Opcional) Chat no WhatsApp: owner/admin cadastra números em `/settings/whatsapp`.
+   Na Evolution, aponte o webhook da instância para
+   `https://tactia.suaempresa.com/api/v1/webhooks/evolution` com o evento
+   `MESSAGES_UPSERT`. Header `apikey` = `EVOLUTION_WEBHOOK_SECRET` ou `EVOLUTION_API_KEY`.
 
 O passo a passo completo está em [onboarding-cliente.md](./onboarding-cliente.md).
 

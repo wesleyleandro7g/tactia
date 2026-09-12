@@ -67,6 +67,12 @@ export type {
 export { CredentialService, encrypt, decrypt } from './services/credential-service';
 export { TenantApiKeyService } from './services/tenant-api-key-service';
 export type { VerifiedTenantApiKey } from './services/tenant-api-key-service';
+export { WhatsappAuthorizedNumberService } from './services/whatsapp-authorized-number-service';
+export { normalizeWhatsappPhone, INVALID_WHATSAPP_PHONE } from './whatsapp/phone';
+export {
+  createWhatsappNumberSchema,
+  updateWhatsappNumberSchema,
+} from './schemas/whatsapp';
 export {
   parseTenantApiKeyToken,
   generateTenantApiKeySecret,

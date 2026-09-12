@@ -364,6 +364,7 @@ model Tenant {
   documentChunks     DocumentChunk[]
   mediaAssets        MediaAsset[]
   apiKeys            TenantApiKey[]
+  whatsappNumbers    WhatsappAuthorizedNumber[]
 
   @@unique([slug])
   @@index([status])
@@ -388,6 +389,7 @@ model User {
   insightFeedbacks InsightFeedback[]
   businessFacts  BusinessFact[]
   createdApiKeys TenantApiKey[]
+  whatsappNumbers WhatsappAuthorizedNumber[]
 
   @@index([email])
   @@index([createdAt])
@@ -433,6 +435,27 @@ model TenantApiKey {
   @@unique([prefix])
   @@index([tenantId, revokedAt])
   @@map("tenant_api_keys")
+}
+
+model WhatsappAuthorizedNumber {
+  id                   String    @id @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  phone                String
+  label                String?
+  conversationId       String?   @map("conversation_id") @db.Uuid
+  lastInboundMessageId String?   @map("last_inbound_message_id")
+  disabledAt           DateTime? @map("disabled_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation         Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@unique([phone])
+  @@index([tenantId, disabledAt])
+  @@index([userId])
+  @@map("whatsapp_authorized_numbers")
 }
 
 model AuditLog {
@@ -1173,6 +1196,7 @@ model Conversation {
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]
+  whatsappNumbers WhatsappAuthorizedNumber[]
 
   @@index([tenantId, createdAt])
   @@index([tenantId, userId, updatedAt])
