@@ -131,7 +131,7 @@ export function FileDropzone({
         />
 
         {loading ? (
-          <span aria-live="polite" className="relative text-sm text-muted">
+          <span aria-live="polite" className="relative text-sm text-muted-foreground">
             Enviando arquivo…
           </span>
         ) : ready ? (
@@ -139,8 +139,8 @@ export function FileDropzone({
             <span className="rounded-full border border-success/40 bg-card px-3 py-1 text-sm tabular text-fg">
               {fileName}
             </span>
-            {fileSize ? <span className="text-xs text-muted tabular">{formatBytes(fileSize)}</span> : null}
-            <span className="text-xs text-muted">Clique ou arraste para trocar</span>
+            {fileSize ? <span className="text-xs text-muted-foreground tabular">{formatBytes(fileSize)}</span> : null}
+            <span className="text-xs text-muted-foreground">Clique ou arraste para trocar</span>
           </span>
         ) : (
           <span className="relative flex flex-col items-center gap-2">
@@ -148,7 +148,7 @@ export function FileDropzone({
               aria-hidden="true"
               className={cn(
                 'flex h-12 w-12 items-center justify-center rounded-xl border text-lg',
-                dragging ? 'border-accent text-accent' : 'border-border text-muted',
+                dragging ? 'border-accent text-accent' : 'border-border text-muted-foreground',
               )}
             >
               ↓
@@ -156,7 +156,7 @@ export function FileDropzone({
             <span className="text-sm font-medium text-fg">
               {dragging ? 'Solte o CSV aqui' : 'Arraste o arquivo ou clique para escolher'}
             </span>
-            <span className="text-xs text-muted">CSV até 20 MB</span>
+            <span className="text-xs text-muted-foreground">CSV até 20 MB</span>
           </span>
         )}
       </button>
@@ -179,7 +179,7 @@ export function FileDropzone({
       {ready && onClear && !loading ? (
         <button
           type="button"
-          className="self-start text-xs text-muted underline-offset-2 hover:text-fg hover:underline"
+          className="self-start text-xs text-muted-foreground underline-offset-2 hover:text-fg hover:underline"
           onClick={onClear}
         >
           Remover arquivo

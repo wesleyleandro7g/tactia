@@ -35,7 +35,7 @@ export function WizardStepper({
                   failed && 'border-danger/40 bg-danger-soft text-danger',
                   !failed && active && 'border-accent/40 bg-accent-soft text-accent',
                   !failed && done && 'border-success/40 bg-success-soft text-success',
-                  !failed && !active && !done && 'border-border text-muted',
+                  !failed && !active && !done && 'border-border text-muted-foreground',
                 )}
               >
                 <span aria-hidden="true">{done && !failed ? '✓' : index + 1}</span>
@@ -49,7 +49,7 @@ export function WizardStepper({
         })}
       </ol>
 
-      <p className="text-sm text-muted md:hidden">
+      <p className="text-sm text-muted-foreground md:hidden">
         Passo {current + 1} de {steps.length} — {steps[current]?.label}
       </p>
     </>

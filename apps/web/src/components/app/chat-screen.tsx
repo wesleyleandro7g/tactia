@@ -1,6 +1,6 @@
 import { hasMinRole } from '@tactia/domain';
-import { ChatPanel, type ChatMessageView } from '@/components/app/chat-panel';
-import { ConversationList } from '@/components/app/conversation-list';
+import { ChatShell } from '@/components/app/chat-shell';
+import type { ChatMessageView } from '@/components/app/chat-panel';
 import { requireTenant } from '@/lib/server-context';
 import { conversationService } from '@/lib/services';
 
@@ -21,6 +21,8 @@ export function toMessageView(message: MessageRow): ChatMessageView {
   const metadata = (message.metadata ?? {}) as {
     sources?: ChatMessageView['sources'];
     proposals?: ChatMessageView['proposals'];
+    followUps?: string[];
+    toolCalls?: Array<{ name: string }>;
   };
 
   return {
@@ -29,6 +31,8 @@ export function toMessageView(message: MessageRow): ChatMessageView {
     content: message.content,
     sources: metadata.sources ?? [],
     proposals: metadata.proposals ?? [],
+    followUps: metadata.followUps ?? [],
+    toolsUsed: (metadata.toolCalls ?? []).map((call) => call.name),
   };
 }
 
@@ -47,23 +51,12 @@ export async function ChatScreen({ conversationId }: { conversationId: string | 
   ]);
 
   return (
-    <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[16rem_1fr] lg:gap-8">
-      <div className="order-2 lg:order-1">
-        <ConversationList
-          conversations={conversationPage.items}
-          {...(conversationId ? { activeId: conversationId } : {})}
-        />
-      </div>
-
-      <div className="order-1 lg:order-2">
-        <h1 className="mb-4 text-2xl font-semibold">Chat</h1>
-        <ChatPanel
-          conversationId={conversationId}
-          initialMessages={(messages as MessageRow[]).map(toMessageView)}
-          llmConfigured={llmConfigured()}
-          canApprove={hasMinRole(ctx.role, 'admin')}
-        />
-      </div>
-    </div>
+    <ChatShell
+      conversationId={conversationId}
+      conversations={conversationPage.items}
+      initialMessages={(messages as MessageRow[]).map(toMessageView)}
+      llmConfigured={llmConfigured()}
+      canApprove={hasMinRole(ctx.role, 'admin')}
+    />
   );
 }

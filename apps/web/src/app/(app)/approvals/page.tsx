@@ -58,7 +58,7 @@ export default async function ApprovalsPage({
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Aprovações</h1>
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             Nenhuma ação é executada sem uma decisão humana registrada.
           </p>
         </div>
@@ -70,7 +70,7 @@ export default async function ApprovalsPage({
               aria-current={status === filter.value ? 'page' : undefined}
               className={cn(
                 'rounded-lg border border-border px-3 py-1.5 text-xs',
-                status === filter.value ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-card',
+                status === filter.value ? 'bg-accent-soft text-accent' : 'text-muted-foreground hover:bg-card',
               )}
             >
               {filter.label}
@@ -120,7 +120,7 @@ export default async function ApprovalsPage({
                 row.error ? (
                   <span className="text-danger">{row.error}</span>
                 ) : row.output ? (
-                  <span className="text-muted">
+                  <span className="text-muted-foreground">
                     {Object.entries(row.output as Record<string, unknown>)
                       .slice(0, 2)
                       .map(([key, value]) => `${key}: ${String(value)}`)

@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { MessageSquare } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/cn';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 import { formatDateTime } from '@/lib/format';
 
 export type ConversationSummary = {
@@ -9,46 +11,67 @@ export type ConversationSummary = {
   updatedAt: Date | string;
 };
 
-/** Histórico de conversas do usuário (cada usuário vê apenas as suas). */
+/** Histórico de conversas — sidebar com scroll próprio. */
 export function ConversationList({
   conversations,
   activeId,
+  onNavigate,
 }: {
   conversations: ConversationSummary[];
   activeId?: string;
+  onNavigate?: () => void;
 }) {
   return (
-    <nav aria-label="Conversas" className="flex flex-col gap-3">
-      <Link href="/chat" className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}>
-        Nova conversa
-      </Link>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-border px-3 py-3">
+        <Link
+          href="/chat"
+          onClick={onNavigate}
+          className={cn(
+            buttonVariants({ variant: 'outline', size: 'sm' }),
+            'w-full justify-start gap-2',
+          )}
+        >
+          <MessageSquare className="size-4" aria-hidden="true" />
+          Nova conversa
+        </Link>
+      </div>
 
-      {conversations.length === 0 ? (
-        <p className="text-xs text-muted">Nenhuma conversa ainda.</p>
-      ) : (
-        <ul className="flex flex-col gap-1">
-          {conversations.map((conversation) => {
-            const active = conversation.id === activeId;
-            return (
-              <li key={conversation.id}>
-                <Link
-                  href={`/chat/${conversation.id}`}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'block rounded-lg px-3 py-2 text-sm transition-colors',
-                    active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-card hover:text-fg',
-                  )}
-                >
-                  <span className="line-clamp-2">{conversation.title}</span>
-                  <span className="mt-0.5 block text-xs text-subtle">
-                    {formatDateTime(conversation.updatedAt)}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </nav>
+      <ScrollArea className="min-h-0 flex-1">
+        <nav aria-label="Conversas" className="px-2 py-2">
+          {conversations.length === 0 ? (
+            <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+              Nenhuma conversa ainda.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-0.5">
+              {conversations.map((conversation) => {
+                const active = conversation.id === activeId;
+                return (
+                  <li key={conversation.id}>
+                    <Link
+                      href={`/chat/${conversation.id}`}
+                      onClick={onNavigate}
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        'block rounded-lg px-3 py-2.5 text-sm transition-colors',
+                        active
+                          ? 'bg-background font-medium text-foreground shadow-sm ring-1 ring-border'
+                          : 'text-muted-foreground hover:bg-background/80 hover:text-foreground',
+                      )}
+                    >
+                      <span className="line-clamp-2 leading-snug">{conversation.title}</span>
+                      <span className="mt-1 block text-[0.7rem] text-muted-foreground/80">
+                        {formatDateTime(conversation.updatedAt)}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </nav>
+      </ScrollArea>
+    </div>
   );
 }

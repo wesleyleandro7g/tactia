@@ -1,13 +1,16 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/cn';
+import { cn } from '@/lib/utils';
+import { Skeleton as ShadcnSkeleton } from '@/components/ui/skeleton';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '@/components/ui/empty';
 
 export function Skeleton({ className }: { className?: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn('animate-pulse rounded-md bg-border/50', className)}
-    />
-  );
+  return <ShadcnSkeleton aria-hidden="true" className={className} />;
 }
 
 /** Placeholder de card enquanto o RSC resolve os dados. */
@@ -33,15 +36,12 @@ export type EmptyStateProps = {
 
 export function EmptyState({ title, description, action, className }: EmptyStateProps) {
   return (
-    <div
-      className={cn(
-        'flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center',
-        className,
-      )}
-    >
-      <p className="font-medium">{title}</p>
-      {description ? <p className="max-w-md text-sm text-muted">{description}</p> : null}
-      {action ? <div className="mt-2">{action}</div> : null}
-    </div>
+    <Empty className={cn('border border-dashed border-border px-6 py-10', className)}>
+      <EmptyHeader>
+        <EmptyTitle className="text-base font-medium">{title}</EmptyTitle>
+        {description ? <EmptyDescription>{description}</EmptyDescription> : null}
+      </EmptyHeader>
+      {action ? <EmptyContent>{action}</EmptyContent> : null}
+    </Empty>
   );
 }

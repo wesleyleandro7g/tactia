@@ -64,7 +64,7 @@ export function OperatorActionButton({
         {pending ? pendingLabel : label}
       </Button>
       {message ? (
-        <p aria-live="polite" className="text-xs text-muted">
+        <p aria-live="polite" className="text-xs text-muted-foreground">
           {message}
         </p>
       ) : null}

@@ -4,14 +4,20 @@ import {
   ActivityRepository,
   ApprovalRepository,
   AuditLogRepository,
+  BusinessFactRepository,
+  CampaignRepository,
   ConversationRepository,
   CredentialRepository,
   CustomerRepository,
   DataQualityReportRepository,
   DataSourceRepository,
+  ExpenseRepository,
   ImportRepository,
+  BriefingRepository,
+  InsightFeedbackRepository,
   InsightRepository,
   InteractionRepository,
+  InventoryLevelRepository,
   LeadRepository,
   MappingRepository,
   MembershipRepository,
@@ -25,37 +31,52 @@ import {
   SellerRepository,
   SyncJobRepository,
   TenantRepository,
+  TenantSettingsRepository,
   UserRepository,
+  GoalRepository,
+  PaymentRepository,
 } from '@tactia/database';
 import {
   ActivityService,
+  AnalyticsService,
   AuditLogService,
+  BriefingService,
+  BusinessFactService,
+  CampaignService,
   ConversationService,
   CredentialService,
   CustomerService,
   DataSourceService,
+  ExpenseService,
+  GoalService,
   ImportService,
   IntelligencePipelineService,
+  InsightFeedbackService,
   InsightService,
   InteractionEnrichmentService,
   InteractionService,
+  InventoryService,
   LeadService,
   MembershipService,
   MetricService,
+  PaymentService,
   ProductService,
   RecommendationService,
   SaleService,
   SellerService,
+  SnapshotService,
   SyncService,
   TenantService,
+  ThresholdCalibrator,
   UserService,
 } from '@tactia/domain';
-import { MetricEngine } from '@tactia/intelligence';
+import { MetricEngine, SnapshotEngine } from '@tactia/intelligence';
 import {
   ActionService,
   ApprovalService,
   ConsoleEmailSender,
   ExecutionEngine,
+  PgBossJobQueue,
   createDefaultActionRegistry,
 } from '@tactia/execution';
 import {
@@ -65,12 +86,13 @@ import {
   createLLMAdapterFromEnv,
 } from '@tactia/ai';
 import { betterAuthProvider } from './auth-provider';
+import { getJobQueue, JOBS, jobsEnabled, type SyncJob } from './jobs';
 
 // ---------------------------------------------------------------------------
 // Repositories
 // ---------------------------------------------------------------------------
 
-const tenantRepository = new TenantRepository(prisma);
+export const tenantRepository = new TenantRepository(prisma);
 const userRepository = new UserRepository(prisma);
 const membershipRepository = new MembershipRepository(prisma);
 const auditLogRepository = new AuditLogRepository(prisma);
@@ -80,6 +102,14 @@ const productRepository = new ProductRepository(prisma);
 const sellerRepository = new SellerRepository(prisma);
 const saleRepository = new SaleRepository(prisma);
 const activityRepository = new ActivityRepository(prisma);
+const goalRepository = new GoalRepository(prisma);
+const businessFactRepository = new BusinessFactRepository(prisma);
+const insightFeedbackRepository = new InsightFeedbackRepository(prisma);
+const tenantSettingsRepository = new TenantSettingsRepository(prisma);
+const expenseRepository = new ExpenseRepository(prisma);
+const paymentRepository = new PaymentRepository(prisma);
+const inventoryLevelRepository = new InventoryLevelRepository(prisma);
+const campaignRepository = new CampaignRepository(prisma);
 const interactionRepository = new InteractionRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
 const dataSourceRepository = new DataSourceRepository(prisma);
@@ -90,6 +120,7 @@ const importRepository = new ImportRepository(prisma);
 const dataQualityReportRepository = new DataQualityReportRepository(prisma);
 const metricRepository = new MetricRepository(prisma);
 const insightRepository = new InsightRepository(prisma);
+const briefingRepository = new BriefingRepository(prisma);
 const recommendationRepository = new RecommendationRepository(prisma);
 const conversationRepository = new ConversationRepository(prisma);
 const messageRepository = new MessageRepository(prisma);
@@ -116,7 +147,7 @@ export const membershipService = new MembershipService(membershipRepository, aud
 
 export const customerService = new CustomerService(customerRepository, auditLogService);
 
-export const leadService = new LeadService(leadRepository, customerRepository, auditLogService);
+export const leadService = new LeadService(leadRepository, customerRepository, auditLogService, prisma);
 
 export const productService = new ProductService(productRepository, auditLogService);
 
@@ -138,12 +169,37 @@ export const activityService = new ActivityService(
   auditLogService,
 );
 
-const llmAdapter = createLLMAdapterFromEnv({
-  LLM_PROVIDER: process.env.LLM_PROVIDER,
-  LLM_API_KEY: process.env.LLM_API_KEY,
-  LLM_MODEL: process.env.LLM_MODEL,
-  LLM_BASE_URL: process.env.LLM_BASE_URL,
-});
+export const goalService = new GoalService(goalRepository);
+export const businessFactService = new BusinessFactService(businessFactRepository);
+export const expenseService = new ExpenseService(expenseRepository);
+export const paymentService = new PaymentService(paymentRepository, saleRepository);
+export const inventoryService = new InventoryService(inventoryLevelRepository, productRepository);
+export const campaignService = new CampaignService(campaignRepository);
+
+export { insightFeedbackRepository, tenantSettingsRepository };
+
+export const insightFeedbackService = new InsightFeedbackService(
+  insightFeedbackRepository,
+  insightRepository,
+);
+
+const thresholdCalibrator = new ThresholdCalibrator(
+  insightFeedbackRepository,
+  tenantSettingsRepository,
+);
+
+// Classification runs over thousands of short messages: it uses the cheaper
+// tier (LLM_CLASSIFIER_MODEL), while the chat uses the strong model (lib/ai.ts).
+const llmAdapter = createLLMAdapterFromEnv(
+  {
+    LLM_PROVIDER: process.env.LLM_PROVIDER,
+    LLM_API_KEY: process.env.LLM_API_KEY,
+    LLM_MODEL: process.env.LLM_MODEL,
+    LLM_CLASSIFIER_MODEL: process.env.LLM_CLASSIFIER_MODEL,
+    LLM_BASE_URL: process.env.LLM_BASE_URL,
+  },
+  'classifier',
+);
 const embeddingAdapter = createEmbeddingAdapterFromEnv({
   LLM_PROVIDER: process.env.LLM_PROVIDER,
   LLM_API_KEY: process.env.LLM_API_KEY,
@@ -162,6 +218,7 @@ export const interactionEnrichmentService = new InteractionEnrichmentService({
   interactions: interactionRepository,
   classifier: interactionClassifier,
   embedder: embeddingAdapter,
+  products: productRepository,
 });
 
 export const interactionService = new InteractionService(
@@ -184,8 +241,39 @@ export const importService = new ImportService(importRepository);
 
 const metricEngine = new MetricEngine(prisma);
 export const metricService = new MetricService(metricEngine, metricRepository);
+// One snapshot engine shared by analytics (trends), the pipeline (baselines) and jobs.
+const snapshotEngine = new SnapshotEngine(prisma, metricEngine);
+export const snapshotService = new SnapshotService(prisma, snapshotEngine);
+export const analyticsService = new AnalyticsService(prisma, snapshotEngine);
 
 export const insightService = new InsightService(insightRepository);
+
+const briefingNarratorAdapter = createLLMAdapterFromEnv(
+  {
+    LLM_PROVIDER: process.env.LLM_PROVIDER,
+    LLM_API_KEY: process.env.LLM_API_KEY,
+    LLM_MODEL: process.env.LLM_MODEL,
+    LLM_BASE_URL: process.env.LLM_BASE_URL,
+  },
+  'chat',
+);
+export const briefingService = new BriefingService(
+  prisma,
+  briefingRepository,
+  briefingNarratorAdapter
+    ? {
+        narrate: async ({ system, user }) => {
+          const result = await briefingNarratorAdapter.complete({
+            system,
+            messages: [{ role: 'user', content: user }],
+            temperature: 0.3,
+            maxOutputTokens: 1200,
+          });
+          return { text: result.text, model: briefingNarratorAdapter.model };
+        },
+      }
+    : null,
+);
 
 export const recommendationService = new RecommendationService(
   recommendationRepository,
@@ -197,6 +285,21 @@ export const intelligencePipelineService = new IntelligencePipelineService(
   insightRepository,
   recommendationRepository,
   auditLogService,
+  {
+    snapshots: snapshotEngine,
+    thresholds: (tenantId) => thresholdCalibrator.calibrate(tenantId),
+    facts: async (tenantId) => {
+      const items = await businessFactRepository.listActive(tenantId, new Date());
+      return items.map((fact) => ({
+        kind: fact.kind as 'fact' | 'event' | 'preference',
+        text: fact.text,
+        entityType: fact.entityType,
+        entityId: fact.entityId,
+        validFrom: fact.validFrom,
+        validTo: fact.validTo,
+      }));
+    },
+  },
 );
 
 export const syncService = new SyncService({
@@ -213,6 +316,12 @@ export const syncService = new SyncService({
   sellers: sellerRepository,
   sales: saleRepository,
   interactions: interactionRepository,
+  leads: leadRepository,
+  activities: activityRepository,
+  expenses: expenseRepository,
+  payments: paymentRepository,
+  inventoryLevels: inventoryLevelRepository,
+  campaigns: campaignRepository,
   enrichInteractions: async ({ tenantId, dataSourceId }) => {
     await interactionEnrichmentService.enrichPending({ tenantId, dataSourceId });
   },
@@ -221,6 +330,16 @@ export const syncService = new SyncService({
   onSyncCompleted: async ({ tenantId, userId }) => {
     await intelligencePipelineService.run({ tenantId, actorCtx: { tenantId, userId } });
   },
+  enqueueSync: jobsEnabled()
+    ? async (job) => {
+        const queue = getJobQueue();
+        if (!queue) {
+          await syncService.executeSync(job.tenantId, job.syncJobId, job);
+          return;
+        }
+        await queue.publish<SyncJob>(JOBS.sync, job, { singletonKey: job.syncJobId });
+      }
+    : undefined,
 });
 
 export const conversationService = new ConversationService(
@@ -254,6 +373,7 @@ export const executionEngine = new ExecutionEngine({
   approvals: approvalRepository,
   registry: actionRegistry,
   auditLogs: auditLogService,
+  queue: getJobQueue() ?? undefined,
 });
 
 export const actionService = new ActionService(

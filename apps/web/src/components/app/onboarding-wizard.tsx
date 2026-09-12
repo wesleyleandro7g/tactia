@@ -381,9 +381,9 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Dados</p>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Dados</p>
           <h1 className="text-2xl font-semibold tracking-tight">Trazer seus dados</h1>
-          <p className="max-w-xl text-sm text-muted">
+          <p className="max-w-xl text-sm text-muted-foreground">
             Importe um arquivo por vez. Ordem recomendada: clientes, produtos, vendedores e, por
             último, vendas.
           </p>
@@ -458,7 +458,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                     }`}
                   >
                     <span className="block text-sm font-medium">{option.title}</span>
-                    <span className="mt-1 block text-xs text-muted">{option.hint}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{option.hint}</span>
                   </button>
                 );
               })}
@@ -480,7 +480,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                   open={advancedOpen}
                   onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
                 >
-                  <summary className="cursor-pointer text-sm text-muted">
+                  <summary className="cursor-pointer text-sm text-muted-foreground">
                     Opção avançada: caminho no servidor
                   </summary>
                   <div className="mt-3">
@@ -653,7 +653,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                     </Field>
                   ) : null}
 
-                  <p className="text-xs text-muted">{mappedCount} de {columns.length} colunas ligadas</p>
+                  <p className="text-xs text-muted-foreground">{mappedCount} de {columns.length} colunas ligadas</p>
                 </div>
 
                 <ul className="flex flex-col gap-2">
@@ -664,7 +664,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                     >
                       <span className="text-sm">
                         {column.name}{' '}
-                        <span className="text-xs text-muted">({column.type})</span>
+                        <span className="text-xs text-muted-foreground">({column.type})</span>
                       </span>
                       <Select
                         aria-label={`Destino da coluna ${column.name}`}
@@ -700,7 +700,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
           <div className="mt-4 flex flex-col gap-5">
             {pending && !syncJob ? (
               <div className="flex flex-col gap-3" aria-live="polite" aria-busy="true">
-                <p className="text-sm text-muted">
+                <p className="text-sm text-muted-foreground">
                   {previewRows.length === 0 && !mappingSaved
                     ? 'Carregando prévia…'
                     : 'Importando… isso pode levar alguns instantes.'}
@@ -747,11 +747,11 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                   <ResultStat label="Vendedores" value={formatInteger(initial.summary.sellers)} />
                   <ResultStat label="Produtos" value={formatInteger(initial.summary.products)} />
                 </ul>
-                <p className="text-sm text-muted">
+                <p className="text-sm text-muted-foreground">
                   {formatCurrency(initial.summary.revenue)} em vendas analisadas
                 </p>
 
-                <p className="text-xs text-muted tabular">
+                <p className="text-xs text-muted-foreground tabular">
                   Lidos {formatInteger(syncJob.recordsRead)} · criados{' '}
                   {formatInteger(syncJob.recordsCreated)} · atualizados{' '}
                   {formatInteger(syncJob.recordsUpdated)} · falhas{' '}
@@ -818,7 +818,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
 function ResultStat({ label, value }: { label: string; value: string }) {
   return (
     <li className="rounded-xl border border-border bg-bg px-3 py-3">
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-medium tabular">{value}</p>
     </li>
   );

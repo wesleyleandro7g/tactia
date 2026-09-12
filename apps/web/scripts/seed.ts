@@ -140,6 +140,7 @@ async function seedBusiness(tenantId: string) {
           name: `Produto ${i + 1}`,
           sku: `SKU-${String(i + 1).padStart(3, '0')}`,
           category: categories[i % categories.length],
+          supplier: i % 4 === 0 ? 'Fornecedor Alfa' : 'Fornecedor Beta',
           cost,
           price,
           status: 'active',
@@ -160,6 +161,10 @@ async function seedBusiness(tenantId: string) {
           phone: `119${String(10000000 + i).slice(0, 8)}`,
           document: String(10000000000 + i),
           status: rand() > 0.1 ? 'active' : 'inactive',
+          segment: i % 5 === 0 ? 'enterprise' : i % 2 === 0 ? 'smb' : 'startup',
+          city: i % 3 === 0 ? 'São Paulo' : i % 3 === 1 ? 'Curitiba' : 'Belo Horizonte',
+          state: i % 3 === 0 ? 'SP' : i % 3 === 1 ? 'PR' : 'MG',
+          acquisitionSource: i % 2 === 0 ? 'website' : 'referral',
         },
       }),
     ),
@@ -174,6 +179,7 @@ async function seedBusiness(tenantId: string) {
           tenantId,
           externalId: `lead-${i + 1}`,
           customerId: i < 10 ? customers[i]!.id : null,
+          sellerId: sellers[i % sellers.length]!.id,
           name: `Lead ${i + 1}`,
           email: `lead${i + 1}@demo.tactia`,
           source: i % 2 === 0 ? 'website' : 'referral',
@@ -251,6 +257,9 @@ async function seedBusiness(tenantId: string) {
         currency: 'BRL',
         status,
         soldAt,
+        paymentMethod: i % 3 === 0 ? 'boleto' : i % 3 === 1 ? 'pix' : 'card',
+        channel: i % 2 === 0 ? 'inside_sales' : 'partner',
+        region: i % 3 === 0 ? 'sudeste' : i % 3 === 1 ? 'sul' : 'nordeste',
         metadata: { seed: true, dropWindow: inDropWindow },
         items: { create: items },
       },
@@ -320,6 +329,121 @@ async function seedInteractions(tenantId: string, customerIds: string[]) {
   console.log(`Interactions seed: ${samples.length} messages`);
 }
 
+function brCalendarParts(d = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: get('year'), month: get('month'), day: get('day') };
+}
+
+/**
+ * Fills the current calendar month (America/Sao_Paulo) when the DB was seeded
+ * before month rollover. Idempotent: skips if any sale already exists in-month.
+ */
+async function seedCurrentMonthSales(tenantId: string) {
+  const { year, month, day: todayDay } = brCalendarParts();
+  // soldAt noon UTC on each calendar day (matches historical seed pattern)
+  const monthStart = new Date(Date.UTC(year, month - 1, 1, 12, 0, 0, 0));
+  const monthEndExclusive = new Date(Date.UTC(year, month, 1, 12, 0, 0, 0));
+  const throughDay = new Date(Date.UTC(year, month - 1, todayDay + 1, 12, 0, 0, 0));
+  const rangeEnd = throughDay < monthEndExclusive ? throughDay : monthEndExclusive;
+
+  const existing = await prisma.sale.count({
+    where: {
+      tenantId,
+      soldAt: { gte: monthStart, lt: rangeEnd },
+    },
+  });
+  if (existing > 0) {
+    console.log(`Current-month sales seed: ${existing} already present, skipping`);
+    return;
+  }
+
+  const [customers, products, sellers] = await Promise.all([
+    prisma.customer.findMany({
+      where: { tenantId, status: 'active', deletedAt: null },
+      select: { id: true },
+    }),
+    prisma.product.findMany({
+      where: { tenantId, status: 'active' },
+      select: { id: true, price: true },
+    }),
+    prisma.seller.findMany({
+      where: { tenantId, status: 'active' },
+      select: { id: true },
+    }),
+  ]);
+
+  if (customers.length === 0 || products.length === 0 || sellers.length === 0) {
+    console.log('Current-month sales seed: missing customers/products/sellers, skipping');
+    return;
+  }
+
+  const rand = mulberry32(year * 100 + month);
+  const dayCount = todayDay;
+  // ~5–8 sales/day → healthy "este mês" demo (August pace without drop window)
+  const targetSales = dayCount * (5 + Math.floor(rand() * 4));
+  const existingSaleCount = await prisma.sale.count({ where: { tenantId } });
+  const monthTag = `${year}${String(month).padStart(2, '0')}`;
+
+  let created = 0;
+  for (let i = 0; i < targetSales; i++) {
+    const dayOfMonth = 1 + Math.floor(rand() * dayCount);
+    const soldAt = new Date(Date.UTC(year, month - 1, dayOfMonth, 12, 0, 0, 0));
+
+    const customer = customers[Math.floor(rand() * customers.length)]!;
+    const seller = sellers[Math.floor(rand() * sellers.length)]!;
+    const itemCount = 1 + Math.floor(rand() * 3);
+    const items = [];
+    let totalAmount = 0;
+
+    for (let j = 0; j < itemCount; j++) {
+      const product = products[Math.floor(rand() * products.length)]!;
+      const quantity = 1 + Math.floor(rand() * 4);
+      const unitPrice = Number(product.price ?? 100);
+      const factor = 0.9 + rand() * 0.3;
+      const lineTotal = Math.round(quantity * unitPrice * factor * 100) / 100;
+      totalAmount += lineTotal;
+      items.push({
+        id: createId(),
+        tenantId,
+        productId: product.id,
+        quantity,
+        unitPrice,
+        discountAmount: 0,
+        totalAmount: lineTotal,
+      });
+    }
+
+    const statusRoll = rand();
+    const status = statusRoll > 0.95 ? 'cancelled' : statusRoll > 0.92 ? 'refunded' : 'confirmed';
+
+    await prisma.sale.create({
+      data: {
+        id: createId(),
+        tenantId,
+        externalId: `sale-${monthTag}-${existingSaleCount + created + 1}`,
+        customerId: customer.id,
+        sellerId: seller.id,
+        totalAmount: Math.round(totalAmount * 100) / 100,
+        discountAmount: 0,
+        currency: 'BRL',
+        status,
+        soldAt,
+        metadata: { seed: true, currentMonthTopUp: true },
+        items: { create: items },
+      },
+    });
+    created += 1;
+  }
+
+  console.log(`Current-month sales seed: ${created} sales across ${dayCount} day(s) of ${monthTag}`);
+}
+
 async function seedActions(tenantId: string) {
   // Built-in action definitions (Etapa 7). Idempotent: skips existing types.
   const defaults = [
@@ -358,11 +482,143 @@ async function seedActions(tenantId: string) {
   console.log(`Actions seed: ${created} new definition(s), ${defaults.length} total`);
 }
 
+async function seedExtendedEntities(tenantId: string) {
+  const existingExpenses = await prisma.expense.count({ where: { tenantId } });
+  if (existingExpenses > 0) {
+    console.log('Extended seed already applied');
+    return;
+  }
+
+  const categories = ['folha', 'aluguel', 'marketing', 'software', 'logistica'];
+  for (let i = 0; i < 24; i++) {
+    await prisma.expense.create({
+      data: {
+        id: createId(),
+        tenantId,
+        externalId: `expense-${i + 1}`,
+        category: categories[i % categories.length]!,
+        description: `Despesa ${categories[i % categories.length]} ${i + 1}`,
+        amount: 8000 + (i % 5) * 1500,
+        occurredAt: daysAgo(10 + i * 7),
+        recurring: i % 4 === 0,
+        supplier: i % 2 === 0 ? 'Fornecedor Alfa' : 'Fornecedor Beta',
+      },
+    });
+  }
+
+  const sales = await prisma.sale.findMany({
+    where: { tenantId, status: 'confirmed' },
+    select: { id: true, totalAmount: true, soldAt: true },
+    take: 80,
+    orderBy: { soldAt: 'desc' },
+  });
+  for (let i = 0; i < sales.length; i++) {
+    const sale = sales[i]!;
+    const paid = i % 5 !== 0;
+    const overdue = i % 7 === 0;
+    await prisma.payment.create({
+      data: {
+        id: createId(),
+        tenantId,
+        externalId: `payment-${i + 1}`,
+        saleId: sale.id,
+        amount: sale.totalAmount,
+        method: i % 2 === 0 ? 'boleto' : 'pix',
+        dueAt: new Date(sale.soldAt.getTime() + 14 * 24 * 60 * 60 * 1000),
+        paidAt: paid ? new Date(sale.soldAt.getTime() + 10 * 24 * 60 * 60 * 1000) : null,
+        status: paid ? 'paid' : overdue ? 'overdue' : 'pending',
+      },
+    });
+  }
+
+  const products = await prisma.product.findMany({
+    where: { tenantId },
+    select: { id: true },
+    take: 20,
+  });
+  for (let i = 0; i < products.length; i++) {
+    await prisma.inventoryLevel.create({
+      data: {
+        id: createId(),
+        tenantId,
+        externalId: `stock-${i + 1}`,
+        productId: products[i]!.id,
+        quantity: i < 4 ? 2 : i > 15 ? 180 : 40,
+        minQuantity: 10,
+        recordedAt: daysAgo(1),
+      },
+    });
+  }
+
+  const campaignSources = ['website', 'ads', 'referral'];
+  for (let i = 0; i < 3; i++) {
+    await prisma.campaign.create({
+      data: {
+        id: createId(),
+        tenantId,
+        externalId: `campaign-${i + 1}`,
+        name: `Campanha ${campaignSources[i]}`,
+        source: campaignSources[i]!,
+        spend: 4000 + i * 2500,
+        startsAt: daysAgo(40),
+        endsAt: daysAgo(5),
+      },
+    });
+  }
+
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  await prisma.goal.create({
+    data: {
+      id: createId(),
+      tenantId,
+      scope: 'tenant',
+      metricKey: 'revenue',
+      periodType: 'month',
+      periodStart: monthStart,
+      target: 180000,
+    },
+  });
+
+  await prisma.businessFact.create({
+    data: {
+      id: createId(),
+      tenantId,
+      kind: 'event',
+      text: 'A vendedora Ana ficou de licença nas duas últimas semanas de agosto.',
+      source: 'user',
+    },
+  });
+
+  const leads = await prisma.lead.findMany({ where: { tenantId }, select: { id: true, status: true, sellerId: true } });
+  for (const lead of leads) {
+    if (lead.status === 'new') continue;
+    await prisma.leadStageTransition.create({
+      data: {
+        id: createId(),
+        tenantId,
+        leadId: lead.id,
+        fromStatus: 'new',
+        toStatus: lead.status,
+        occurredAt: daysAgo(20),
+        sellerId: lead.sellerId,
+      },
+    });
+  }
+
+  console.log(
+    `Extended seed: ${await prisma.expense.count({ where: { tenantId } })} expenses, ${await prisma.payment.count({ where: { tenantId } })} payments, ${await prisma.inventoryLevel.count({ where: { tenantId } })} inventory rows, ${await prisma.campaign.count({ where: { tenantId } })} campaigns`,
+  );
+}
+
 async function main() {
   const { tenant } = await ensureIdentity();
   console.log(`Identity ready: ${DEMO_EMAIL} / password123 (${tenant.name})`);
   await seedBusiness(tenant.id);
+  await seedCurrentMonthSales(tenant.id);
   await seedActions(tenant.id);
+  await seedExtendedEntities(tenant.id);
   const customerRows = await prisma.customer.findMany({
     where: { tenantId: tenant.id },
     select: { id: true },

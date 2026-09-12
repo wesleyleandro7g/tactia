@@ -18,10 +18,22 @@ export const TARGET_ENTITIES = [
   { value: 'lead', label: 'Leads' },
   { value: 'sale', label: 'Vendas' },
   { value: 'interaction', label: 'Interações' },
+  { value: 'activity', label: 'Atividades' },
+  { value: 'expense', label: 'Despesas' },
+  { value: 'payment', label: 'Pagamentos' },
+  { value: 'inventory_level', label: 'Estoque' },
+  { value: 'campaign', label: 'Campanhas' },
 ] as const;
 
 const FIELDS_BY_ENTITY: Record<string, MappingField[]> = {
-  customer: [IGNORE, ...SHARED_IDS],
+  customer: [
+    IGNORE,
+    ...SHARED_IDS,
+    { value: 'segment', label: 'Segmento' },
+    { value: 'city', label: 'Cidade' },
+    { value: 'state', label: 'Estado' },
+    { value: 'acquisition_source', label: 'Origem de aquisição' },
+  ],
   lead: [
     IGNORE,
     { value: 'external_id', label: 'ID externo' },
@@ -31,6 +43,8 @@ const FIELDS_BY_ENTITY: Record<string, MappingField[]> = {
     { value: 'source', label: 'Origem' },
     { value: 'status', label: 'Status' },
     { value: 'score', label: 'Score' },
+    { value: 'customer_external_id', label: 'ID externo do cliente' },
+    { value: 'seller_external_id', label: 'ID externo do vendedor' },
   ],
   product: [
     IGNORE,
@@ -38,6 +52,7 @@ const FIELDS_BY_ENTITY: Record<string, MappingField[]> = {
     { value: 'name', label: 'Nome' },
     { value: 'sku', label: 'SKU' },
     { value: 'category', label: 'Categoria' },
+    { value: 'supplier', label: 'Fornecedor' },
     { value: 'price', label: 'Preço' },
     { value: 'cost', label: 'Custo' },
     { value: 'status', label: 'Status' },
@@ -62,6 +77,9 @@ const FIELDS_BY_ENTITY: Record<string, MappingField[]> = {
     { value: 'discount_amount', label: 'Desconto' },
     { value: 'currency', label: 'Moeda' },
     { value: 'status', label: 'Status' },
+    { value: 'payment_method', label: 'Forma de pagamento' },
+    { value: 'channel', label: 'Canal' },
+    { value: 'region', label: 'Região' },
   ],
   interaction: [
     IGNORE,
@@ -74,6 +92,52 @@ const FIELDS_BY_ENTITY: Record<string, MappingField[]> = {
     { value: 'customer_external_id', label: 'ID externo do cliente' },
     { value: 'customer_email', label: 'E-mail do cliente' },
     { value: 'customer_phone', label: 'Telefone do cliente' },
+  ],
+  activity: [
+    IGNORE,
+    { value: 'external_id', label: 'ID externo' },
+    { value: 'type', label: 'Tipo' },
+    { value: 'occurred_at', label: 'Data da atividade' },
+    { value: 'customer_external_id', label: 'ID externo do cliente' },
+    { value: 'lead_external_id', label: 'ID externo do lead' },
+    { value: 'seller_external_id', label: 'ID externo do vendedor' },
+  ],
+  expense: [
+    IGNORE,
+    { value: 'external_id', label: 'ID externo' },
+    { value: 'category', label: 'Categoria' },
+    { value: 'description', label: 'Descrição' },
+    { value: 'amount', label: 'Valor' },
+    { value: 'occurred_at', label: 'Data' },
+    { value: 'recurring', label: 'Recorrente' },
+    { value: 'supplier', label: 'Fornecedor' },
+  ],
+  payment: [
+    IGNORE,
+    { value: 'external_id', label: 'ID externo' },
+    { value: 'sale_external_id', label: 'ID externo da venda' },
+    { value: 'amount', label: 'Valor' },
+    { value: 'method', label: 'Método' },
+    { value: 'due_at', label: 'Vencimento' },
+    { value: 'paid_at', label: 'Pago em' },
+    { value: 'status', label: 'Status' },
+  ],
+  inventory_level: [
+    IGNORE,
+    { value: 'external_id', label: 'ID externo' },
+    { value: 'product_external_id', label: 'ID externo do produto' },
+    { value: 'quantity', label: 'Quantidade' },
+    { value: 'min_quantity', label: 'Quantidade mínima' },
+    { value: 'recorded_at', label: 'Data do registro' },
+  ],
+  campaign: [
+    IGNORE,
+    { value: 'external_id', label: 'ID externo' },
+    { value: 'name', label: 'Nome' },
+    { value: 'source', label: 'Fonte' },
+    { value: 'spend', label: 'Investimento' },
+    { value: 'starts_at', label: 'Início' },
+    { value: 'ends_at', label: 'Fim' },
   ],
 };
 
@@ -104,6 +168,13 @@ const COLUMN_ALIASES: Record<string, string> = {
   produto: 'product_external_id',
   mensagem: 'body',
   texto: 'body',
+  segmento: 'segment',
+  cidade: 'city',
+  estado: 'state',
+  fornecedor: 'supplier',
+  canal: 'channel',
+  regiao: 'region',
+  forma_pagamento: 'payment_method',
 };
 
 export function targetFieldsFor(entity: string): MappingField[] {

@@ -1,16 +1,22 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/cn';
+import { cn } from '@/lib/utils';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export type Column<T> = {
   key: string;
   header: string;
-  /** Alinha à direita (números). */
   numeric?: boolean;
   render: (row: T) => ReactNode;
 };
 
 export type DataTableProps<T> = {
-  /** Obrigatório: descreve a tabela para leitor de tela (pode ficar visível). */
   caption: string;
   captionVisible?: boolean;
   columns: Column<T>[];
@@ -20,10 +26,6 @@ export type DataTableProps<T> = {
   className?: string;
 };
 
-/**
- * Tabela mínima e acessível: caption obrigatório, `th scope="col"` e container
- * focável para permitir scroll horizontal por teclado.
- */
 export function DataTable<T>({
   caption,
   captionVisible = false,
@@ -41,56 +43,48 @@ export function DataTable<T>({
         className,
       )}
     >
-      <table className="w-full border-collapse text-sm">
-        <caption
-          className={cn(
-            captionVisible ? 'px-4 py-3 text-left text-sm text-muted' : 'sr-only',
-          )}
-        >
+      <Table>
+        <caption className={cn(captionVisible ? 'px-4 py-3 text-left text-sm text-muted-foreground' : 'sr-only')}>
           {caption}
         </caption>
-        <thead>
-          <tr className="border-b border-border bg-card">
+        <TableHeader>
+          <TableRow className="border-border bg-muted/40 hover:bg-muted/40">
             {columns.map((column) => (
-              <th
+              <TableHead
                 key={column.key}
-                scope="col"
                 className={cn(
-                  'px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted',
+                  'text-xs font-medium uppercase tracking-wide text-muted-foreground',
                   column.numeric ? 'text-right' : 'text-left',
                 )}
               >
                 {column.header}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="px-4 py-8 text-center text-muted">
+            <TableRow>
+              <TableCell colSpan={columns.length} className="py-8 text-center text-muted-foreground">
                 {emptyLabel}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)} className="border-b border-border/60 last:border-0">
+              <TableRow key={rowKey(row)} className="border-border/60">
                 {columns.map((column) => (
-                  <td
+                  <TableCell
                     key={column.key}
-                    className={cn(
-                      'px-4 py-3 align-top',
-                      column.numeric && 'tabular text-right',
-                    )}
+                    className={cn('align-top', column.numeric && 'tabular text-right')}
                   >
                     {column.render(row)}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

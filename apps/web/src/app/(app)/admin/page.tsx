@@ -24,7 +24,7 @@ export default async function AdminPage() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold">Admin interno</h1>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           Visão cross-tenant para diagnóstico. Toda ação daqui fica registrada no audit log do
           tenant afetado.
         </p>

@@ -117,7 +117,7 @@ export function ApprovalQueue({
                   <p className="font-medium">
                     {ACTION_TYPE_LABELS[execution.actionType] ?? execution.actionName}
                   </p>
-                  <p className="text-xs text-muted">
+                  <p className="text-xs text-muted-foreground">
                     {ORIGIN_LABELS[execution.origin] ?? execution.origin} ·{' '}
                     {formatDateTime(approval.createdAt)}
                   </p>
@@ -128,13 +128,13 @@ export function ApprovalQueue({
               </div>
 
               {approval.reason ? (
-                <p className="mt-3 text-sm text-muted">Motivo: {approval.reason}</p>
+                <p className="mt-3 text-sm text-muted-foreground">Motivo: {approval.reason}</p>
               ) : null}
 
               <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 {Object.entries(execution.input).map(([key, value]) => (
                   <div key={key} className="col-span-2 grid grid-cols-subgrid">
-                    <dt className="text-xs uppercase tracking-wide text-muted">{key}</dt>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">{key}</dt>
                     <dd className="break-words">{String(value)}</dd>
                   </div>
                 ))}
@@ -195,7 +195,7 @@ export function ApprovalQueue({
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-muted">
+                  <p className="mt-4 text-sm text-muted-foreground">
                     Apenas owner ou admin pode aprovar ou rejeitar.
                   </p>
                 )

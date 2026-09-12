@@ -28,7 +28,7 @@ export default async function AdminTenantPage({ params }: { params: Promise<{ id
           ← Todos os tenants
         </Link>
         <h1 className="text-2xl font-semibold">{tenant.name}</h1>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           {tenant.slug} · {tenant.currency} · {tenant.timezone} ·{' '}
           <Badge tone={statusTone(tenant.status)}>{tenant.status}</Badge>
         </p>
@@ -191,7 +191,7 @@ export default async function AdminTenantPage({ params }: { params: Promise<{ id
         </h2>
         {insights.length === 0 ? (
           <Card>
-            <p className="text-sm text-muted">Nenhum insight gerado.</p>
+            <p className="text-sm text-muted-foreground">Nenhum insight gerado.</p>
           </Card>
         ) : (
           <ul className="flex flex-col gap-2">

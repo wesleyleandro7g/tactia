@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Alert } from '@/components/ui/alert';
+import { ThemeToggle } from '@/components/app/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, Input } from '@/components/ui/field';
 import { authClient } from '@/lib/auth-client';
 
 export default function SignupPage() {
@@ -42,63 +47,61 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <h1 className="text-2xl font-semibold">Criar empresa</h1>
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Seu nome
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Senha
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Nome da empresa
-          <input
-            required
-            minLength={2}
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2"
-          />
-        </label>
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <button
-          disabled={pending}
-          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {pending ? 'Criando…' : 'Criar e entrar'}
-        </button>
-      </form>
-      <p className="mt-4 text-sm text-[var(--muted)]">
-        Já tem conta?{' '}
-        <Link href="/login" className="text-[var(--accent)]">
-          Entrar
-        </Link>
-      </p>
+    <main className="relative flex min-h-screen items-center justify-center bg-background px-6 py-12">
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+        <ThemeToggle />
+      </div>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl">Criar empresa</CardTitle>
+          <CardDescription>Configure sua conta e comece a usar a Tactia.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <Field htmlFor="name" label="Seu nome">
+              <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
+            </Field>
+            <Field htmlFor="email" label="Email">
+              <Input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field htmlFor="password" label="Senha">
+              <Input
+                id="password"
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
+            <Field htmlFor="company" label="Nome da empresa">
+              <Input
+                id="company"
+                required
+                minLength={2}
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+            </Field>
+            {error ? <Alert tone="danger">{error}</Alert> : null}
+            <Button type="submit" loading={pending} className="w-full">
+              {pending ? 'Criando…' : 'Criar e entrar'}
+            </Button>
+          </form>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Já tem conta?{' '}
+            <Link href="/login" className="text-primary hover:underline">
+              Entrar
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }

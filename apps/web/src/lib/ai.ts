@@ -15,6 +15,9 @@ import {
   insightService,
   interactionService,
   metricService,
+  analyticsService,
+  briefingService,
+  businessFactService,
   productService,
   recommendationService,
   saleService,
@@ -39,11 +42,14 @@ export const toolRegistry = new ToolRegistry(
   createDefaultTools(
     {
       metrics: metricService,
+      analytics: analyticsService,
       customers: customerService,
       products: productService,
       sellers: sellerService,
       sales: saleService,
       insights: insightService,
+      briefings: briefingService,
+      facts: businessFactService,
       recommendations: recommendationService,
       interactions: interactionService,
       embedder: createEmbeddingAdapterFromEnv({
@@ -62,6 +68,46 @@ export const contextBuilder = new ContextBuilder({
   tenants: tenantService,
   metrics: metricService,
   insights: insightService,
+  providers: {
+    goals: async (ctx) => {
+      const items = await analyticsService.getGoalsProgress(ctx);
+      return items.map((goal) => ({
+        id: goal.id,
+        metricKey: goal.metricKey,
+        scope: goal.scope,
+        scopeLabel: goal.scope === 'tenant' ? null : goal.scope,
+        target: goal.target,
+        achieved: goal.achieved,
+        progress: goal.progress,
+        requiredDailyPace: goal.requiredDailyPace,
+        projected: goal.projected,
+        onTrack: goal.onTrack,
+        periodEnd: goal.periodEnd,
+      }));
+    },
+    facts: async (ctx) => {
+      const { items } = await businessFactService.listActive(ctx);
+      return items.map((fact) => ({
+        id: fact.id,
+        kind: fact.kind,
+        text: fact.text,
+        validFrom: fact.validFrom?.toISOString() ?? null,
+        validTo: fact.validTo?.toISOString() ?? null,
+      }));
+    },
+    briefing: async (ctx) => {
+      const latest = await briefingService.latest(ctx);
+      if (!latest) return null;
+      const headline = latest.content.split('\n').find((line) => line.trim().length > 0) ?? 'Briefing semanal';
+      return {
+        id: latest.id,
+        periodFrom: latest.periodFrom.toISOString(),
+        periodTo: latest.periodTo.toISOString(),
+        createdAt: latest.createdAt.toISOString(),
+        headline: headline.replace(/^#+\s*/, '').slice(0, 160),
+      };
+    },
+  },
 });
 
 let cachedOrchestrator: Orchestrator | null = null;
@@ -72,12 +118,16 @@ let cachedOrchestrator: Orchestrator | null = null;
  */
 export function getOrchestrator(): Orchestrator {
   if (!cachedOrchestrator) {
-    const llm = requireLLMAdapter({
-      LLM_PROVIDER: process.env.LLM_PROVIDER,
-      LLM_API_KEY: process.env.LLM_API_KEY,
-      LLM_MODEL: process.env.LLM_MODEL,
-      LLM_BASE_URL: process.env.LLM_BASE_URL,
-    });
+    const llm = requireLLMAdapter(
+      {
+        LLM_PROVIDER: process.env.LLM_PROVIDER,
+        LLM_API_KEY: process.env.LLM_API_KEY,
+        LLM_MODEL: process.env.LLM_MODEL,
+        LLM_CLASSIFIER_MODEL: process.env.LLM_CLASSIFIER_MODEL,
+        LLM_BASE_URL: process.env.LLM_BASE_URL,
+      },
+      'chat',
+    );
     cachedOrchestrator = new Orchestrator({ llm, tools: toolRegistry, contextBuilder });
   }
   return cachedOrchestrator;
@@ -95,6 +145,7 @@ export function toToolContext(ctx: RequestContext): ToolContext {
 export function answerMetadata(answer: ChatAnswer) {
   return {
     sources: answer.sources,
+    ...(answer.followUps.length > 0 ? { followUps: answer.followUps } : {}),
     toolCalls: answer.toolCalls.map((call) => ({
       name: call.name,
       input: call.input,

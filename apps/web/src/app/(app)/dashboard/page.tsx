@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { MetricResult } from '@tactia/intelligence';
+import { BriefingCard } from '@/components/app/briefing-card';
 import { InsightList, type InsightView } from '@/components/app/insight-list';
 import { MetricCard } from '@/components/app/metric-card';
 import { RecommendationList, type RecommendationView } from '@/components/app/recommendation-list';
@@ -12,6 +13,7 @@ import { cn } from '@/lib/cn';
 import { formatCurrency, formatInteger, formatPeriod, resolveRangeParam } from '@/lib/format';
 import { requireTenant } from '@/lib/server-context';
 import {
+  briefingService,
   insightService,
   metricService,
   recommendationService,
@@ -53,7 +55,7 @@ export default async function DashboardPage({
   const params = await searchParams;
   const period = resolveRangeParam(params);
 
-  const [bulk, revenueSeries, salesSeries, insightPage, recommendationPage, salesTotal] =
+  const [bulk, revenueSeries, salesSeries, insightPage, recommendationPage, salesTotal, latestBriefing] =
     await Promise.all([
       safeMetric(() =>
         metricService.calculateBulk(ctx, {
@@ -78,6 +80,7 @@ export default async function DashboardPage({
       insightService.list(ctx, { status: 'open', page: '1', pageSize: '20' }),
       recommendationService.list(ctx, { status: 'pending', page: '1', pageSize: '10' }),
       saleService.list(ctx, { page: '1', pageSize: '1' }),
+      briefingService.latest(ctx),
     ]);
 
   const metrics = new Map((bulk?.metrics ?? []).map((metric) => [metric.key, metric]));
@@ -121,6 +124,7 @@ export default async function DashboardPage({
   return (
     <div className="flex flex-col gap-8">
       <PageHeader period={period} />
+      <BriefingCard briefing={latestBriefing} />
 
       {bulk === null ? (
         <Alert tone="danger" title="Não foi possível calcular as métricas">
@@ -156,12 +160,14 @@ export default async function DashboardPage({
           />
         </div>
         {(revenue?.value ?? 0) === 0 ? (
-          <p className="mt-3 text-sm text-muted">Sem vendas confirmadas neste período.</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Sem vendas confirmadas neste período.
+          </p>
         ) : null}
       </section>
 
       <section aria-labelledby="trends" className="flex flex-col gap-4">
-        <h2 id="trends" className="text-lg font-medium">
+        <h2 id="trends" className="text-lg font-medium text-foreground">
           Tendências
         </h2>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -186,7 +192,7 @@ export default async function DashboardPage({
             <h2 id="insights" className="text-lg font-medium">
               Insights
             </h2>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted-foreground">
               Detectados por regras determinísticas sobre as métricas do período.
             </p>
           </div>
@@ -210,7 +216,7 @@ function PageHeader({ period }: { period: { from: Date; to: Date } }) {
     <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           Período: {formatPeriod({ from: period.from, to: period.to })}
         </p>
       </div>
@@ -220,7 +226,8 @@ function PageHeader({ period }: { period: { from: Date; to: Date } }) {
             key={preset.label}
             href={presetHref(preset.days)}
             className={cn(
-              'rounded-lg border border-border px-3 py-1.5 text-xs text-muted hover:bg-card hover:text-fg',
+              'rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground',
+              'hover:border-primary/40 hover:bg-accent-soft hover:text-primary',
             )}
           >
             {preset.label}

@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Alert } from '@/components/ui/alert';
+import { ThemeToggle } from '@/components/app/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, Input } from '@/components/ui/field';
 import { authClient } from '@/lib/auth-client';
 
 export default function LoginPage() {
@@ -27,44 +32,49 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <h1 className="text-2xl font-semibold">Entrar</h1>
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Senha
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2"
-          />
-        </label>
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <button
-          disabled={pending}
-          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {pending ? 'Entrando…' : 'Entrar'}
-        </button>
-      </form>
-      <p className="mt-4 text-sm text-[var(--muted)]">
-        Não tem conta?{' '}
-        <Link href="/signup" className="text-[var(--accent)]">
-          Criar empresa
-        </Link>
-      </p>
+    <main className="relative flex min-h-screen items-center justify-center bg-background px-6 py-12">
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+        <ThemeToggle />
+      </div>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl">Entrar</CardTitle>
+          <CardDescription>Acesse a camada de inteligência operacional da sua empresa.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <Field htmlFor="email" label="Email">
+              <Input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field htmlFor="password" label="Senha">
+              <Input
+                id="password"
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
+            {error ? <Alert tone="danger">{error}</Alert> : null}
+            <Button type="submit" loading={pending} className="w-full">
+              {pending ? 'Entrando…' : 'Entrar'}
+            </Button>
+          </form>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Não tem conta?{' '}
+            <Link href="/signup" className="text-primary hover:underline">
+              Criar empresa
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }

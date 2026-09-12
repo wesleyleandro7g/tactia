@@ -118,6 +118,7 @@ export const POST = createApiHandler(
         message: assistantMessage,
         answer: {
           content: answer.content,
+          followUps: answer.followUps,
           sources: answer.sources,
           toolCalls: answer.toolCalls,
           proposals: answer.proposals,
@@ -160,6 +161,7 @@ export const POST = createApiHandler(
               type: 'done',
               messageId: assistantMessage.id,
               content: answer.content,
+              followUps: answer.followUps,
               sources: answer.sources,
               toolCalls: answer.toolCalls.map((call) => ({ name: call.name, input: call.input })),
               proposals: answer.proposals,

@@ -16,20 +16,24 @@ import {
   ActivityRepository,
   ApprovalRepository,
   AuditLogRepository,
+  CampaignRepository,
   ConversationRepository,
   CredentialRepository,
   CustomerRepository,
   DataQualityReportRepository,
   DataSourceRepository,
+  ExpenseRepository,
   ImportRepository,
   InsightRepository,
   InteractionRepository,
+  InventoryLevelRepository,
   LeadRepository,
   MappingRepository,
   MembershipRepository,
   MessageRepository,
   MetricRepository,
   prisma,
+  PaymentRepository,
   ProductRepository,
   RawRecordRepository,
   RecommendationRepository,
@@ -42,6 +46,7 @@ import {
 import {
   ActivityService,
   AuditLogService,
+  AnalyticsService,
   ConversationService,
   CustomerService,
   DataSourceService,
@@ -93,6 +98,10 @@ const sellerRepository = new SellerRepository(prisma);
 const saleRepository = new SaleRepository(prisma);
 const activityRepository = new ActivityRepository(prisma);
 const interactionRepository = new InteractionRepository(prisma);
+const expenseRepository = new ExpenseRepository(prisma);
+const paymentRepository = new PaymentRepository(prisma);
+const inventoryLevelRepository = new InventoryLevelRepository(prisma);
+const campaignRepository = new CampaignRepository(prisma);
 const dataSourceRepository = new DataSourceRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
 const syncJobRepository = new SyncJobRepository(prisma);
@@ -158,7 +167,7 @@ const interactionService = new InteractionService(
   customerRepository,
   auditLogService,
 );
-const leadService = new LeadService(leadRepository, customerRepository, auditLogService);
+const leadService = new LeadService(leadRepository, customerRepository, auditLogService, prisma);
 void leadService;
 void activityService;
 
@@ -169,6 +178,7 @@ const dataSourceService = new DataSourceService(
   auditLogService,
 );
 const metricService = new MetricService(new MetricEngine(prisma), metricRepository);
+const analyticsService = new AnalyticsService(prisma);
 const insightService = new InsightService(insightRepository);
 const recommendationService = new RecommendationService(recommendationRepository, auditLogService);
 const intelligencePipelineService = new IntelligencePipelineService(
@@ -193,6 +203,12 @@ const syncService = new SyncService({
   sellers: sellerRepository,
   sales: saleRepository,
   interactions: interactionRepository,
+  leads: leadRepository,
+  activities: activityRepository,
+  expenses: expenseRepository,
+  payments: paymentRepository,
+  inventoryLevels: inventoryLevelRepository,
+  campaigns: campaignRepository,
   onSyncCompleted: async ({ tenantId, syncJobId, userId }) => {
     pipelineRuns.push(syncJobId);
     await intelligencePipelineService.run({ tenantId, actorCtx: { tenantId, userId } });
@@ -235,6 +251,7 @@ const toolRegistry = new ToolRegistry(
   createDefaultTools(
     {
       metrics: metricService,
+      analytics: analyticsService,
       customers: customerService,
       products: productService,
       sellers: sellerService,
@@ -696,5 +713,16 @@ describe('Fluxo do piloto (spec §2)', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     expect(memberUserId).toBeTruthy();
+  });
+
+  it('14. as tools de metas, funil e lucro operacional estão registradas', () => {
+    expect(toolRegistry.has('get_goals_progress')).toBe(true);
+    expect(toolRegistry.has('get_funnel')).toBe(true);
+    expect(toolRegistry.has('get_profitability')).toBe(true);
+    expect(toolRegistry.has('get_cash_flow')).toBe(true);
+    expect(toolRegistry.has('get_inventory_risk')).toBe(true);
+    expect(toolRegistry.has('get_acquisition')).toBe(true);
+    expect(toolRegistry.has('remember_fact')).toBe(true);
+    expect(toolRegistry.has('simulate')).toBe(true);
   });
 });

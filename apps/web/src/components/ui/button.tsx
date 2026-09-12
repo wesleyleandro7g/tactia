@@ -1,62 +1,83 @@
+import { Button as ButtonPrimitive } from '@base-ui/react/button';
 import { cva, type VariantProps } from 'class-variance-authority';
 import type { ButtonHTMLAttributes } from 'react';
-import { cn } from '@/lib/cn';
+import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 
-const button = cva(
-  'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors ' +
-    'disabled:cursor-not-allowed disabled:opacity-60',
+const buttonVariants = cva(
+  'group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
   {
     variants: {
       variant: {
-        primary: 'bg-accent text-accent-fg hover:bg-accent/90',
-        secondary: 'border border-border bg-card text-fg hover:bg-card-hover',
-        ghost: 'text-muted hover:bg-card hover:text-fg',
-        danger: 'bg-danger-soft text-danger hover:bg-danger/20',
-        success: 'bg-success-soft text-success hover:bg-success/20',
+        default: 'bg-primary text-primary-foreground hover:bg-primary/80',
+        primary: 'bg-primary text-primary-foreground hover:bg-primary/80',
+        outline:
+          'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground',
+        secondary:
+          'border border-border bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+        ghost: 'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground',
+        destructive:
+          'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20',
+        danger:
+          'bg-danger-soft text-danger hover:bg-danger/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20',
+        success:
+          'bg-success-soft text-success hover:bg-success/20 focus-visible:border-success/40 focus-visible:ring-success/20',
+        link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        sm: 'h-8 px-3 text-xs',
-        md: 'h-10 px-4 text-sm',
-        lg: 'h-11 px-5 text-sm',
-        icon: 'h-9 w-9',
+        default:
+          'h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+        xs: 'h-6 gap-1 rounded-md px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*="size-"])]:size-3',
+        sm: 'h-7 gap-1 rounded-md px-2.5 text-[0.8rem] has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*="size-"])]:size-3.5',
+        md: 'h-10 gap-1.5 px-4 text-sm',
+        lg: 'h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+        icon: 'size-8',
+        'icon-xs': 'size-6 rounded-md [&_svg:not([class*="size-"])]:size-3',
+        'icon-sm': 'size-7 rounded-md',
+        'icon-lg': 'size-9',
       },
     },
-    defaultVariants: { variant: 'primary', size: 'md' },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
   },
 );
 
-/** Mesmas classes do Button, para aplicar em `<Link>` sem duplicar estilo. */
-export const buttonVariants = button;
+type ShadcnVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
+
+function resolveVariant(variant?: ShadcnVariant | 'primary'): ShadcnVariant {
+  if (variant === 'primary') return 'default';
+  return variant ?? 'default';
+}
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
-  VariantProps<typeof button> & {
-    /** Mostra o estado de carregamento e desabilita o botão. */
+  Omit<VariantProps<typeof buttonVariants>, 'variant'> & {
+    variant?: ShadcnVariant | 'primary';
     loading?: boolean;
   };
 
 export function Button({
   className,
-  variant,
-  size,
+  variant = 'default',
+  size = 'default',
   loading = false,
   disabled,
   children,
   ...props
 }: ButtonProps) {
   return (
-    <button
-      className={cn(button({ variant, size }), className)}
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant: resolveVariant(variant), size, className }))}
       disabled={disabled ?? loading}
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? (
-        <span
-          aria-hidden="true"
-          className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-        />
-      ) : null}
+      {loading ? <Spinner className="size-3.5" /> : null}
       {children}
-    </button>
+    </ButtonPrimitive>
   );
 }
+
+export { buttonVariants };

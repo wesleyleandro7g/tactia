@@ -1,14 +1,14 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import type { HTMLAttributes } from 'react';
-import { cn } from '@/lib/cn';
+import { cn } from '@/lib/utils';
 
 const badge = cva(
-  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
+  'inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap',
   {
     variants: {
       tone: {
-        neutral: 'bg-border/60 text-muted',
-        accent: 'bg-accent-soft text-accent',
+        neutral: 'bg-border/60 text-muted-foreground',
+        accent: 'bg-accent-soft text-primary',
         success: 'bg-success-soft text-success',
         warning: 'bg-warning-soft text-warning',
         danger: 'bg-danger-soft text-danger',
@@ -61,3 +61,5 @@ export function severityTone(severity: string): BadgeTone {
 export function statusTone(status: string): BadgeTone {
   return STATUS_TONES[status] ?? 'neutral';
 }
+
+export { badge as badgeVariants };

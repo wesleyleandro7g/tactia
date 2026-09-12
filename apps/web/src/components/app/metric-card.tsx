@@ -31,27 +31,33 @@ export function MetricCard({
 
   const Icon = direction === 'up' ? ArrowUp : direction === 'down' ? ArrowDown : ArrowRight;
   const tone =
-    direction === 'up' ? 'text-success' : direction === 'down' ? 'text-danger' : 'text-muted';
+    direction === 'up' ? 'text-success' : direction === 'down' ? 'text-danger' : 'text-muted-foreground';
 
   return (
     <Card
       role="article"
       aria-labelledby={id}
-      className={cn('flex flex-col gap-1', emphasis && 'border-accent/30')}
+      className={cn(
+        'flex flex-col gap-1',
+        emphasis && 'border-primary/40 bg-accent-soft',
+      )}
     >
       <CardLabel id={id}>{label}</CardLabel>
-      <p className="tabular text-2xl font-semibold">{value}</p>
+      <p className="tabular text-2xl font-semibold text-foreground">{value}</p>
       {direction !== 'none' && deltaFraction !== undefined ? (
         <p className={cn('flex items-center gap-1 text-xs', tone)}>
-          <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+          <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
           <span>
-            {formatPercentDelta(deltaFraction)} {comparisonLabel}
+            <span className="font-medium">{formatPercentDelta(deltaFraction)}</span>{' '}
+            <span className="text-muted-foreground">{comparisonLabel}</span>
           </span>
         </p>
       ) : (
-        <p className="text-xs text-muted">{hint ?? 'sem comparação disponível'}</p>
+        <p className="text-xs text-muted-foreground">{hint ?? 'sem comparação disponível'}</p>
       )}
-      {hint && direction !== 'none' ? <p className="text-xs text-muted">{hint}</p> : null}
+      {hint && direction !== 'none' ? (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      ) : null}
     </Card>
   );
 }

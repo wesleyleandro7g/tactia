@@ -50,7 +50,7 @@ export function RunPipelineButton({ from, to }: { from: string; to: string }) {
         Rodar análise
       </Button>
       {result ? (
-        <p aria-live="polite" className="text-xs text-muted">
+        <p aria-live="polite" className="text-xs text-muted-foreground">
           {result}
         </p>
       ) : null}
