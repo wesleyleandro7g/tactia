@@ -215,11 +215,11 @@ describe('InsightEngine — deduplication', () => {
       thresholds: DEFAULT_THRESHOLDS,
     });
 
-    const created = await insightEngine.processEvents(tenantId, events);
-    expect(created.length).toBeGreaterThan(0);
+    const result = await insightEngine.processEvents(tenantId, events);
+    expect(result.created.length).toBeGreaterThan(0);
 
     const list = await insightRepo.list({ tenantId });
-    expect(list.total).toBe(created.length);
+    expect(list.total).toBe(result.created.length);
   });
 
   it('does NOT create duplicate insights on second run', async () => {

@@ -17,6 +17,7 @@ import {
   TenantRepository,
 } from '@tactia/database';
 import { MetricEngine } from '../metric-engine';
+import { METRIC_KEYS } from '../types';
 
 // ---------------------------------------------------------------------------
 // Setup helpers
@@ -266,9 +267,9 @@ describe('MetricEngine — breakdown by product', () => {
 });
 
 describe('MetricEngine — calculateAll', () => {
-  it('returns all 7 metrics', async () => {
+  it('returns all built-in metrics', async () => {
     const results = await engine.calculateAll({ tenantId, period: periodJan });
-    expect(results).toHaveLength(7);
+    expect(results).toHaveLength(METRIC_KEYS.length);
     const keys = results.map((r) => r.key);
     expect(keys).toContain('complaint_count');
     expect(keys).toContain('revenue');
@@ -276,7 +277,7 @@ describe('MetricEngine — calculateAll', () => {
     expect(keys).toContain('average_ticket');
     expect(keys).toContain('customer_count');
     expect(keys).toContain('revenue_growth');
-    expect(keys).toContain('sales_growth');
+    expect(keys).toContain('pending_amount');
   });
 });
 

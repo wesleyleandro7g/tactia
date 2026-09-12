@@ -11,7 +11,19 @@ export const updateDataSourceSchema = createDataSourceSchema.partial();
 
 export const createMappingSchema = z.object({
   sourceEntity: z.string().min(1),
-  targetEntity: z.enum(['customer', 'lead', 'product', 'seller', 'sale', 'interaction']),
+  targetEntity: z.enum([
+    'customer',
+    'lead',
+    'product',
+    'seller',
+    'sale',
+    'interaction',
+    'activity',
+    'expense',
+    'payment',
+    'inventory_level',
+    'campaign',
+  ]),
   configuration: z.object({
     fields: z.array(
       z.object({

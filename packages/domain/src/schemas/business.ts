@@ -35,6 +35,7 @@ export const createLeadSchema = z.object({
   status: z.enum(['new', 'contacted', 'qualified', 'proposal', 'won', 'lost']).optional(),
   score: z.number().int().min(0).max(100).nullable().optional(),
   customerId: optionalId,
+  sellerId: optionalId,
   externalId: z.string().trim().min(1).max(120).nullable().optional(),
 });
 
@@ -109,13 +110,26 @@ export const updateActivitySchema = createActivitySchema.partial();
 
 export const interactionChannelSchema = z.enum(['whatsapp', 'email', 'note', 'other']);
 export const interactionDirectionSchema = z.enum(['inbound', 'outbound', 'internal']);
-export const interactionIntentSchema = z.enum(['complaint', 'praise', 'question', 'other']);
+export const interactionIntentSchema = z.enum([
+  'complaint',
+  'praise',
+  'question',
+  'purchase_intent',
+  'cancellation_intent',
+  'price_objection',
+  'delivery_issue',
+  'support',
+  'other',
+]);
+export const interactionUrgencySchema = z.enum(['low', 'medium', 'high']);
 
 export const listInteractionQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).max(120).optional(),
   customerId: z.string().uuid().optional(),
   channel: interactionChannelSchema.optional(),
   intent: interactionIntentSchema.optional(),
+  urgency: interactionUrgencySchema.optional(),
+  productId: z.string().uuid().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
 });

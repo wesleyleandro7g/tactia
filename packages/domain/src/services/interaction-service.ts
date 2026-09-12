@@ -45,6 +45,8 @@ export class InteractionService {
       take,
       channel: parsed.channel as InteractionChannel | undefined,
       intent: parsed.intent as InteractionIntent | undefined,
+      urgency: parsed.urgency,
+      productId: parsed.productId,
       customerId: parsed.customerId,
       search: parsed.search,
       from,

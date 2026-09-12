@@ -14,7 +14,7 @@ export const calculateMetricSchema = z.object({
   withComparison: z.boolean().optional().default(false),
   breakdown: z
     .object({
-      dimension: z.enum(['product', 'seller', 'time']),
+      dimension: z.enum(['product', 'seller', 'time', 'category']),
       granularity: z.enum(['day', 'week', 'month']).optional(),
     })
     .optional(),
@@ -24,7 +24,7 @@ export const listMetricsQuerySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   withComparison: z.string().optional(),
-  breakdownDimension: z.enum(['product', 'seller', 'time']).optional(),
+  breakdownDimension: z.enum(['product', 'seller', 'time', 'category']).optional(),
   breakdownGranularity: z.enum(['day', 'week', 'month']).optional(),
   keys: z.string().optional(), // comma-separated metric keys
 });
@@ -80,7 +80,7 @@ export class MetricService {
     const breakdown =
       parsed.breakdownDimension
         ? {
-            dimension: parsed.breakdownDimension as 'product' | 'seller' | 'time',
+            dimension: parsed.breakdownDimension as 'product' | 'seller' | 'time' | 'category',
             granularity: parsed.breakdownGranularity as 'day' | 'week' | 'month' | undefined,
           }
         : undefined;

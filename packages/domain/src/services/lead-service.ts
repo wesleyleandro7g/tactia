@@ -1,6 +1,12 @@
-import type { CustomerRepository, LeadRepository, LeadStatus } from '@tactia/database';
+import type {
+  CustomerRepository,
+  LeadRepository,
+  LeadStatus,
+  PrismaClient,
+} from '@tactia/database';
 import {
   AppError,
+  createId,
   ErrorCode,
   paginationArgs,
   type RequestContext,
@@ -14,6 +20,7 @@ export class LeadService {
     private readonly leads: LeadRepository,
     private readonly customers: CustomerRepository,
     private readonly auditLogs: AuditLogService,
+    private readonly db: PrismaClient,
   ) {}
 
   async list(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -67,8 +74,23 @@ export class LeadService {
       });
       if (!customer) throw new AppError(ErrorCode.NOT_FOUND, 'Customer not found');
     }
+    const existing = await this.leads.findById({ tenantId: ctx.tenantId, id });
+    if (!existing) throw new AppError(ErrorCode.NOT_FOUND, 'Lead not found');
     const lead = await this.leads.update({ tenantId: ctx.tenantId, id, data: input });
     if (!lead) throw new AppError(ErrorCode.NOT_FOUND, 'Lead not found');
+    if (input.status && input.status !== existing.status) {
+      await this.db.leadStageTransition.create({
+        data: {
+          id: createId(),
+          tenantId: ctx.tenantId,
+          leadId: id,
+          fromStatus: existing.status,
+          toStatus: input.status,
+          occurredAt: new Date(),
+          sellerId: lead.sellerId ?? existing.sellerId,
+        },
+      });
+    }
     await this.auditLogs.record(ctx, {
       action: AuditAction.LEAD_UPDATED,
       entityType: 'lead',

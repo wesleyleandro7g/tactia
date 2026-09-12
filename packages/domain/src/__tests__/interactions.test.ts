@@ -1,10 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  ActivityRepository,
   AuditLogRepository,
+  CampaignRepository,
   CustomerRepository,
+  ExpenseRepository,
   InteractionRepository,
+  InventoryLevelRepository,
+  LeadRepository,
   MembershipRepository,
   prisma,
+  PaymentRepository,
   ProductRepository,
   SaleRepository,
   SellerRepository,
@@ -26,6 +32,12 @@ const interactions = new InteractionRepository(prisma);
 const products = new ProductRepository(prisma);
 const sellers = new SellerRepository(prisma);
 const sales = new SaleRepository(prisma);
+const leads = new LeadRepository(prisma);
+const activities = new ActivityRepository(prisma);
+const expenses = new ExpenseRepository(prisma);
+const payments = new PaymentRepository(prisma);
+const inventoryLevels = new InventoryLevelRepository(prisma);
+const campaigns = new CampaignRepository(prisma);
 const auditLogs = new AuditLogService(new AuditLogRepository(prisma));
 const tenantService = new TenantService(tenants, memberships, auditLogs);
 
@@ -215,6 +227,12 @@ describe('InteractionService', () => {
       sellers,
       sales,
       interactions,
+      leads,
+      activities,
+      expenses,
+      payments,
+      inventoryLevels,
+      campaigns,
     };
     const created = await normalizeToCanonical(
       tenantA,

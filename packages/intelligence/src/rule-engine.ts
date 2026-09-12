@@ -1,337 +1,117 @@
-import type { PrismaClient } from '@tactia/database';
+import { logger } from '@tactia/shared';
+import { NULL_BASELINE_PROVIDER, SnapshotBaselineProvider, type BaselineProvider } from './baseline';
 import { MetricEngine } from './metric-engine';
-import {
-  type DetectedEvent,
-  type MetricPeriod,
-  type MetricResult,
-  type TenantThresholds,
-} from './types';
+import type { SnapshotEngine } from './snapshot-engine';
+import { DEFAULT_RULES, ruleKeysOf } from './rules';
+import { previousPeriodOf, type Rule, type RuleContext, type RuleInput } from './rules/types';
+import { eventFingerprint } from './scoring';
+import { decomposeChange } from './variance-decomposition';
+import type { DetectedEvent } from './types';
 
-// ---------------------------------------------------------------------------
-// Rule context
-// ---------------------------------------------------------------------------
+export type { RuleContext, RuleInput } from './rules/types';
 
-export type RuleContext = {
-  tenantId: string;
-  period: MetricPeriod;
-  db: PrismaClient;
-  thresholds: TenantThresholds;
+/**
+ * RuleEngine v2: evaluates a pluggable set of rules over a shared context
+ * (metrics, decomposition, thresholds, business facts). Rules fail
+ * independently — one broken rule never aborts the pipeline.
+ */
+export type RuleEngineOptions = {
+  rules?: Rule[];
+  /** Snapshot engine → statistical baseline for rules. */
+  snapshots?: SnapshotEngine;
+  /** Explicit provider (tests). Takes precedence over `snapshots`. */
+  baseline?: BaselineProvider;
 };
 
-// ---------------------------------------------------------------------------
-// Individual rules
-// ---------------------------------------------------------------------------
-
-async function ruleRevenueDrop(ctx: RuleContext, engine: MetricEngine): Promise<DetectedEvent[]> {
-  const result = await engine.calculate('revenue_growth', {
-    tenantId: ctx.tenantId,
-    period: ctx.period,
-  });
-
-  // `revenue_growth` já É a variação vs. o período anterior. Pedir `comparison`
-  // para essa métrica compararia crescimento com crescimento (derivada segunda)
-  // e produzia percentuais irreais (-95% virava "195%").
-  const change = result.value;
-  if (change <= ctx.thresholds.revenueDrop) {
-    const revenue = await engine.calculate('revenue', {
-      tenantId: ctx.tenantId,
-      period: ctx.period,
-      withComparison: true,
-    });
-    const pct = Math.round(Math.abs(change) * 100);
-    return [
-      {
-        ruleKey: 'revenue_drop',
-        type: 'anomaly',
-        severity: change <= -0.3 ? 'critical' : 'high',
-        title: `Queda de receita de ${pct}%`,
-        description: `A receita caiu ${pct}% em relação ao período anterior.`,
-        // A receita com comparação entra como evidência: é o número que o
-        // usuário reconhece ("R$ 200 contra R$ 4.000").
-        evidence: [result, revenue],
-        periodFrom: ctx.period.from,
-        periodTo: ctx.period.to,
-      },
-    ];
-  }
-  return [];
-}
-
-async function ruleRevenueGrowth(ctx: RuleContext, engine: MetricEngine): Promise<DetectedEvent[]> {
-  const result = await engine.calculate('revenue_growth', {
-    tenantId: ctx.tenantId,
-    period: ctx.period,
-  });
-
-  const change = result.value;
-  if (change >= ctx.thresholds.revenueGrowth) {
-    const revenue = await engine.calculate('revenue', {
-      tenantId: ctx.tenantId,
-      period: ctx.period,
-      withComparison: true,
-    });
-    const pct = Math.round(change * 100);
-    return [
-      {
-        ruleKey: 'revenue_growth',
-        type: 'performance',
-        severity: 'medium',
-        title: `Crescimento de receita de ${pct}%`,
-        description: `A receita cresceu ${pct}% em relação ao período anterior.`,
-        evidence: [result, revenue],
-        periodFrom: ctx.period.from,
-        periodTo: ctx.period.to,
-      },
-    ];
-  }
-  return [];
-}
-
-async function ruleProductChanges(
-  ctx: RuleContext,
-  engine: MetricEngine,
-): Promise<DetectedEvent[]> {
-  const current = await engine.calculate('revenue', {
-    tenantId: ctx.tenantId,
-    period: ctx.period,
-    breakdown: { dimension: 'product' },
-  });
-
-  const duration = ctx.period.to.getTime() - ctx.period.from.getTime();
-  const prevPeriod: MetricPeriod = {
-    from: new Date(ctx.period.from.getTime() - duration),
-    to: new Date(ctx.period.to.getTime() - duration),
-  };
-
-  const previous = await engine.calculate('revenue', {
-    tenantId: ctx.tenantId,
-    period: prevPeriod,
-    breakdown: { dimension: 'product' },
-  });
-
-  const prevMap = new Map<string, number>(
-    (previous.breakdown?.items ?? []).map((i) => [i.key, i.value]),
-  );
-
-  const events: DetectedEvent[] = [];
-  for (const item of current.breakdown?.items ?? []) {
-    const prev = prevMap.get(item.key) ?? 0;
-    if (prev === 0) continue;
-    const change = (item.value - prev) / prev;
-
-    if (change >= ctx.thresholds.productChange) {
-      const pct = Math.round(change * 100);
-      events.push({
-        ruleKey: 'product_growth',
-        type: 'performance',
-        severity: 'medium',
-        title: `Produto com crescimento de ${pct}%`,
-        description: `Produto ${item.label ?? item.key} cresceu ${pct}% em receita no período.`,
-        evidence: [current, previous],
-        periodFrom: ctx.period.from,
-        periodTo: ctx.period.to,
-      });
-    } else if (change <= -ctx.thresholds.productChange) {
-      const pct = Math.round(Math.abs(change) * 100);
-      events.push({
-        ruleKey: 'product_decline',
-        type: 'warning',
-        severity: 'medium',
-        title: `Produto com queda de ${pct}%`,
-        description: `Produto ${item.label ?? item.key} caiu ${pct}% em receita no período.`,
-        evidence: [current, previous],
-        periodFrom: ctx.period.from,
-        periodTo: ctx.period.to,
-      });
-    }
-  }
-  return events;
-}
-
-async function ruleInactiveLeads(ctx: RuleContext): Promise<DetectedEvent[]> {
-  const cutoff = new Date(Date.now() - ctx.thresholds.inactiveLeadDays * 24 * 60 * 60 * 1000);
-  const count = await ctx.db.lead.count({
-    where: {
-      tenantId: ctx.tenantId,
-      status: { notIn: ['won', 'lost'] },
-      activities: {
-        none: {
-          createdAt: { gte: cutoff },
-        },
-      },
-    },
-  });
-
-  if (count > 0) {
-    // Produce a synthetic MetricResult-like object for evidence
-    const evidence: MetricResult = {
-      key: 'inactive_leads_count',
-      value: count,
-      period: {
-        from: ctx.period.from.toISOString(),
-        to: ctx.period.to.toISOString(),
-      },
-    };
-    return [
-      {
-        ruleKey: 'inactive_leads',
-        type: 'opportunity',
-        severity: count >= 10 ? 'high' : 'medium',
-        title: `${count} lead${count > 1 ? 's' : ''} sem atividade há mais de ${ctx.thresholds.inactiveLeadDays} dias`,
-        description: `Há ${count} lead${count > 1 ? 's ativos' : ' ativo'} sem nenhuma atividade registrada nos últimos ${ctx.thresholds.inactiveLeadDays} dias.`,
-        evidence: [evidence],
-        periodFrom: ctx.period.from,
-        periodTo: ctx.period.to,
-      },
-    ];
-  }
-  return [];
-}
-
-async function ruleInactiveCustomers(ctx: RuleContext): Promise<DetectedEvent[]> {
-  const cutoff = new Date(
-    Date.now() - ctx.thresholds.inactiveCustomerDays * 24 * 60 * 60 * 1000,
-  );
-  const count = await ctx.db.customer.count({
-    where: {
-      tenantId: ctx.tenantId,
-      status: 'active',
-      deletedAt: null,
-      sales: {
-        none: {
-          status: 'confirmed',
-          soldAt: { gte: cutoff },
-        },
-      },
-    },
-  });
-
-  if (count > 0) {
-    const evidence: MetricResult = {
-      key: 'inactive_customers_count',
-      value: count,
-      period: {
-        from: ctx.period.from.toISOString(),
-        to: ctx.period.to.toISOString(),
-      },
-    };
-    return [
-      {
-        ruleKey: 'inactive_customers',
-        type: 'opportunity',
-        severity: count >= 20 ? 'high' : 'medium',
-        title: `${count} cliente${count > 1 ? 's' : ''} inativo${count > 1 ? 's' : ''} (sem compra há ${ctx.thresholds.inactiveCustomerDays}+ dias)`,
-        description: `Há ${count} cliente${count > 1 ? 's ativos' : ' ativo'} sem compras confirmadas nos últimos ${ctx.thresholds.inactiveCustomerDays} dias.`,
-        evidence: [evidence],
-        periodFrom: ctx.period.from,
-        periodTo: ctx.period.to,
-      },
-    ];
-  }
-  return [];
-}
-
-async function ruleSellerPerformanceDeviation(
-  ctx: RuleContext,
-  engine: MetricEngine,
-): Promise<DetectedEvent[]> {
-  const result = await engine.calculate('revenue', {
-    tenantId: ctx.tenantId,
-    period: ctx.period,
-    breakdown: { dimension: 'seller' },
-  });
-
-  const items = result.breakdown?.items ?? [];
-  if (items.length < 2) return [];
-
-  const total = items.reduce((s, i) => s + i.value, 0);
-  const avg = total / items.length;
-
-  const events: DetectedEvent[] = [];
-  for (const item of items) {
-    if (avg === 0) continue;
-    const deviation = (item.value - avg) / avg;
-    if (deviation <= -ctx.thresholds.sellerDeviationFactor) {
-      const pct = Math.round(Math.abs(deviation) * 100);
-      events.push({
-        ruleKey: 'seller_performance_deviation',
-        type: 'warning',
-        severity: 'medium',
-        title: `Vendedor ${pct}% abaixo da média`,
-        description: `${item.label ?? item.key} está ${pct}% abaixo da receita média dos vendedores no período.`,
-        evidence: [result],
-        periodFrom: ctx.period.from,
-        periodTo: ctx.period.to,
-      });
-    }
-  }
-  return events;
-}
-
-async function ruleComplaintVolume(
-  ctx: RuleContext,
-  engine: MetricEngine,
-): Promise<DetectedEvent[]> {
-  const result = await engine.calculate('complaint_count', {
-    tenantId: ctx.tenantId,
-    period: ctx.period,
-    withComparison: true,
-  });
-
-  const current = result.value;
-  const previous = result.comparison?.value ?? 0;
-  const change = result.comparison?.change ?? 0;
-
-  if (current === 0) return [];
-  if (previous === 0 && current < 3) return [];
-  if (previous > 0 && change < ctx.thresholds.complaintGrowth) return [];
-
-  const evidence: MetricResult = result;
-  return [
-    {
-      ruleKey: 'complaint_volume',
-      type: 'warning',
-      severity: current >= 10 || change >= 1 ? 'high' : 'medium',
-      title:
-        previous === 0
-          ? `${current} reclamação${current > 1 ? 'ões' : ''} no período`
-          : `Reclamações ${Math.round(change * 100)}% acima do período anterior`,
-      description:
-        previous === 0
-          ? `Foram classificadas ${current} interação${current > 1 ? 'ões' : ''} como reclamação no período.`
-          : `As reclamações passaram de ${previous} para ${current} em relação ao período anterior.`,
-      evidence: [evidence],
-      periodFrom: ctx.period.from,
-      periodTo: ctx.period.to,
-    },
-  ];
-}
-
-// ---------------------------------------------------------------------------
-// RuleEngine
-// ---------------------------------------------------------------------------
-
 export class RuleEngine {
-  constructor(private readonly engine: MetricEngine) {}
+  private readonly rules: Rule[];
+  private readonly baseline: BaselineProvider;
 
-  async evaluate(ctx: RuleContext): Promise<DetectedEvent[]> {
-    const allResults = await Promise.allSettled([
-      ruleRevenueDrop(ctx, this.engine),
-      ruleRevenueGrowth(ctx, this.engine),
-      ruleProductChanges(ctx, this.engine),
-      ruleInactiveLeads(ctx),
-      ruleInactiveCustomers(ctx),
-      ruleSellerPerformanceDeviation(ctx, this.engine),
-      ruleComplaintVolume(ctx, this.engine),
-    ]);
+  constructor(
+    private readonly engine: MetricEngine,
+    options: RuleEngineOptions | Rule[] = {},
+  ) {
+    const opts: RuleEngineOptions = Array.isArray(options) ? { rules: options } : options;
+    this.rules = opts.rules ?? DEFAULT_RULES;
+    this.baseline =
+      opts.baseline ??
+      (opts.snapshots ? new SnapshotBaselineProvider(opts.snapshots) : NULL_BASELINE_PROVIDER);
+  }
+
+  /** Insight ruleKeys produced by this engine (drives auto-resolve). */
+  ruleKeys(): string[] {
+    return ruleKeysOf(this.rules);
+  }
+
+  buildContext(input: RuleInput): RuleContext {
+    const currency = input.currency ?? 'BRL';
+    const facts = input.facts ?? [];
+    const now = Date.now();
+    const suppressed = new Set(
+      facts
+        .filter((fact) => fact.entityType && fact.entityId)
+        .filter((fact) => {
+          const from = fact.validFrom?.getTime() ?? -Infinity;
+          const to = fact.validTo?.getTime() ?? Infinity;
+          return from <= now && now <= to;
+        })
+        .map((fact) => `${fact.entityType}:${fact.entityId}`),
+    );
+
+    return {
+      ...input,
+      currency,
+      metrics: this.engine,
+      previousPeriod: previousPeriodOf(input.period),
+      decompose: (args) =>
+        decomposeChange(input.db, { ...args, tenantId: input.tenantId, currency }),
+      isSuppressed: (entityType, entityId) => suppressed.has(`${entityType}:${entityId}`),
+      baseline: this.baseline,
+      baselineFor: async (query) => {
+        try {
+          return await this.baseline.forMetric(input.tenantId, {
+            ...query,
+            period: query.period ?? input.period,
+            anomalyZ: query.anomalyZ ?? input.thresholds.anomalyZScore,
+          });
+        } catch (error) {
+          logger.warn(
+            {
+              tenant_id: input.tenantId,
+              operation: 'baseline',
+              metric: query.metric,
+              err: error instanceof Error ? error.message : String(error),
+            },
+            'baseline unavailable',
+          );
+          return null;
+        }
+      },
+    };
+  }
+
+  async evaluate(input: RuleInput): Promise<DetectedEvent[]> {
+    const ctx = this.buildContext(input);
+    const results = await Promise.allSettled(this.rules.map((rule) => rule.evaluate(ctx)));
 
     const events: DetectedEvent[] = [];
-    for (const result of allResults) {
+    results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
-        events.push(...result.value);
+        for (const event of result.value) {
+          events.push({ ...event, fingerprint: eventFingerprint(event) });
+        }
+      } else {
+        logger.warn(
+          {
+            tenant_id: input.tenantId,
+            operation: 'rule_evaluate',
+            rule: this.rules[index]?.key,
+            err: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          },
+          'rule evaluation failed',
+        );
       }
-      // Individual rule failures are logged but don't abort the pipeline
-    }
+    });
     return events;
   }
 }

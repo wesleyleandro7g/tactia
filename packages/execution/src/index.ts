@@ -8,6 +8,14 @@ export { createTaskAction, createTaskInputSchema, type CreateTaskDeps } from './
 export { sendEmailAction, sendEmailInputSchema, type SendEmailDeps } from './actions/send-email';
 export { ConsoleEmailSender, MemoryEmailSender } from './email-sender';
 export { InlineJobQueue } from './job-queue';
+export {
+  PgBossJobQueue,
+  ACTION_EXECUTE_JOB,
+  type ActionExecuteJob,
+  type JobHandler,
+  type PgBossJobQueueOptions,
+  type PublishOptions,
+} from './pg-boss-job-queue';
 export { ExecutionEngine, type ExecutionEngineDeps } from './execution-engine';
 export { ActionService } from './action-service';
 export { ApprovalService } from './approval-service';

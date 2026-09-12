@@ -7,15 +7,21 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  ActivityRepository,
   AuditLogRepository,
+  CampaignRepository,
   CredentialRepository,
   CustomerRepository,
   DataQualityReportRepository,
   DataSourceRepository,
+  ExpenseRepository,
   ImportRepository,
   InteractionRepository,
+  InventoryLevelRepository,
+  LeadRepository,
   MappingRepository,
   prisma,
+  PaymentRepository,
   ProductRepository,
   RawRecordRepository,
   SaleRepository,
@@ -44,6 +50,12 @@ const productRepo = new ProductRepository(prisma);
 const sellerRepo = new SellerRepository(prisma);
 const saleRepo = new SaleRepository(prisma);
 const interactionRepo = new InteractionRepository(prisma);
+const leadRepo = new LeadRepository(prisma);
+const activityRepo = new ActivityRepository(prisma);
+const expenseRepo = new ExpenseRepository(prisma);
+const paymentRepo = new PaymentRepository(prisma);
+const inventoryLevelRepo = new InventoryLevelRepository(prisma);
+const campaignRepo = new CampaignRepository(prisma);
 
 const credentialService = new CredentialService(credentialRepo);
 const dataSourceService = new DataSourceService(
@@ -66,6 +78,12 @@ const syncService = new SyncService({
   sellers: sellerRepo,
   sales: saleRepo,
   interactions: interactionRepo,
+  leads: leadRepo,
+  activities: activityRepo,
+  expenses: expenseRepo,
+  payments: paymentRepo,
+  inventoryLevels: inventoryLevelRepo,
+  campaigns: campaignRepo,
 });
 
 let tenantId: string;

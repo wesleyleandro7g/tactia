@@ -1,6 +1,12 @@
 import type {
+  ActivityRepository,
+  CampaignRepository,
   CustomerRepository,
+  ExpenseRepository,
   InteractionRepository,
+  InventoryLevelRepository,
+  LeadRepository,
+  PaymentRepository,
   ProductRepository,
   SaleRepository,
   SellerRepository,
@@ -14,13 +20,32 @@ export type NormalizerRepositories = {
   sellers: SellerRepository;
   sales: SaleRepository;
   interactions: InteractionRepository;
+  leads: LeadRepository;
+  activities: ActivityRepository;
+  expenses: ExpenseRepository;
+  payments: PaymentRepository;
+  inventoryLevels: InventoryLevelRepository;
+  campaigns: CampaignRepository;
 };
 
 /**
  * Canonical entities are upserted in dependency order: a sale can only be
  * written after its customer, product and seller exist (spec §38).
+ * Payment is after sale because it requires saleId.
  */
-export const CANONICAL_ENTITY_ORDER = ['customer', 'product', 'seller', 'interaction', 'sale'] as const;
+export const CANONICAL_ENTITY_ORDER = [
+  'customer',
+  'product',
+  'seller',
+  'lead',
+  'activity',
+  'expense',
+  'inventory_level',
+  'campaign',
+  'interaction',
+  'sale',
+  'payment',
+] as const;
 
 export function canonicalEntityRank(entityType: string): number {
   const index = (CANONICAL_ENTITY_ORDER as readonly string[]).indexOf(entityType);
@@ -59,9 +84,28 @@ function date(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function bool(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  const text = str(value)?.toLowerCase();
+  if (!text) return false;
+  return text === 'true' || text === '1' || text === 'yes' || text === 'sim';
+}
+
 const SALE_STATUSES = new Set(['pending', 'confirmed', 'cancelled', 'refunded']);
 const INTERACTION_CHANNELS = new Set(['whatsapp', 'email', 'note', 'other']);
 const INTERACTION_DIRECTIONS = new Set(['inbound', 'outbound', 'internal']);
+const LEAD_STATUSES = new Set(['new', 'contacted', 'qualified', 'proposal', 'won', 'lost']);
+const ACTIVITY_TYPES = new Set([
+  'call',
+  'email',
+  'meeting',
+  'message',
+  'note',
+  'task',
+  'proposal',
+  'status_change',
+]);
+const PAYMENT_STATUSES = new Set(['pending', 'paid', 'overdue', 'cancelled']);
 
 /**
  * Resolves a reference by `external_id`, preferring the same DataSource and
@@ -113,6 +157,10 @@ export async function normalizeToCanonical(
         email: str(normalized['email']),
         phone: str(normalized['phone']),
         document: str(normalized['document']),
+        segment: str(normalized['segment']),
+        city: str(normalized['city']),
+        state: str(normalized['state']),
+        acquisitionSource: str(normalized['acquisition_source']),
       });
       return { status: created ? 'created' : 'updated' };
     }
@@ -128,6 +176,7 @@ export async function normalizeToCanonical(
         name,
         sku: str(normalized['sku']),
         category: str(normalized['category']),
+        supplier: str(normalized['supplier']),
         price: num(normalized['price']),
         cost: num(normalized['cost']),
       });
@@ -234,6 +283,9 @@ export async function normalizeToCanonical(
         discountAmount,
         currency: str(normalized['currency']) ?? 'BRL',
         status: status as 'pending' | 'confirmed' | 'cancelled' | 'refunded',
+        paymentMethod: str(normalized['payment_method']),
+        channel: str(normalized['channel']),
+        region: str(normalized['region']),
         soldAt,
         items,
       });
@@ -298,6 +350,255 @@ export async function normalizeToCanonical(
         subject: str(normalized['subject']),
         body,
         occurredAt,
+      });
+      return { status: created ? 'created' : 'updated' };
+    }
+
+    case 'lead': {
+      if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
+      const name = str(normalized['name']);
+      if (!name) return { status: 'skipped', reason: 'lead_without_name', sample: externalId };
+
+      const customerExternalId = str(
+        normalized['customer_external_id'] ?? normalized['customer_id'],
+      );
+      const customer = customerExternalId
+        ? await resolveRef(
+            (params) => repositories.customers.findByExternalId(params),
+            tenantId,
+            dataSourceId,
+            customerExternalId,
+          )
+        : null;
+
+      const sellerExternalId = str(normalized['seller_external_id'] ?? normalized['seller_id']);
+      const seller = sellerExternalId
+        ? await resolveRef(
+            (params) => repositories.sellers.findByExternalId(params),
+            tenantId,
+            dataSourceId,
+            sellerExternalId,
+          )
+        : null;
+
+      const rawStatus = str(normalized['status'])?.toLowerCase();
+      const status = rawStatus && LEAD_STATUSES.has(rawStatus) ? rawStatus : 'new';
+      const scoreRaw = num(normalized['score']);
+
+      const { created } = await repositories.leads.upsertByExternalId({
+        tenantId,
+        dataSourceId,
+        externalId,
+        name,
+        email: str(normalized['email']),
+        phone: str(normalized['phone']),
+        source: str(normalized['source']),
+        status: status as 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost',
+        score: scoreRaw == null ? null : Math.round(scoreRaw),
+        customerId: customer?.id ?? null,
+        sellerId: seller?.id ?? null,
+      });
+      return { status: created ? 'created' : 'updated' };
+    }
+
+    case 'activity': {
+      if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
+      const occurredAt = date(normalized['occurred_at'] ?? normalized['date']);
+      if (!occurredAt) {
+        return { status: 'skipped', reason: 'activity_invalid_date', sample: externalId };
+      }
+
+      const rawType = str(normalized['type'])?.toLowerCase();
+      const type = rawType && ACTIVITY_TYPES.has(rawType) ? rawType : 'note';
+
+      const customerExternalId = str(
+        normalized['customer_external_id'] ?? normalized['customer_id'],
+      );
+      const customer = customerExternalId
+        ? await resolveRef(
+            (params) => repositories.customers.findByExternalId(params),
+            tenantId,
+            dataSourceId,
+            customerExternalId,
+          )
+        : null;
+
+      const leadExternalId = str(normalized['lead_external_id'] ?? normalized['lead_id']);
+      const lead = leadExternalId
+        ? await resolveRef(
+            (params) => repositories.leads.findByExternalId(params),
+            tenantId,
+            dataSourceId,
+            leadExternalId,
+          )
+        : null;
+
+      const sellerExternalId = str(normalized['seller_external_id'] ?? normalized['seller_id']);
+      const seller = sellerExternalId
+        ? await resolveRef(
+            (params) => repositories.sellers.findByExternalId(params),
+            tenantId,
+            dataSourceId,
+            sellerExternalId,
+          )
+        : null;
+
+      const { created } = await repositories.activities.upsertByExternalId({
+        tenantId,
+        dataSourceId,
+        externalId,
+        type: type as
+          | 'call'
+          | 'email'
+          | 'meeting'
+          | 'message'
+          | 'note'
+          | 'task'
+          | 'proposal'
+          | 'status_change',
+        occurredAt,
+        customerId: customer?.id ?? null,
+        leadId: lead?.id ?? null,
+        sellerId: seller?.id ?? null,
+      });
+      return { status: created ? 'created' : 'updated' };
+    }
+
+    case 'expense': {
+      if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
+      const category = str(normalized['category']);
+      if (!category) return { status: 'skipped', reason: 'expense_without_category', sample: externalId };
+      const amount = num(normalized['amount']);
+      if (amount === null) {
+        return { status: 'skipped', reason: 'expense_without_amount', sample: externalId };
+      }
+      const occurredAt = date(normalized['occurred_at'] ?? normalized['date']);
+      if (!occurredAt) {
+        return { status: 'skipped', reason: 'expense_invalid_date', sample: externalId };
+      }
+
+      const { created } = await repositories.expenses.upsertByExternalId({
+        tenantId,
+        dataSourceId,
+        externalId,
+        category,
+        description: str(normalized['description']),
+        amount,
+        occurredAt,
+        recurring: bool(normalized['recurring']),
+        supplier: str(normalized['supplier']),
+      });
+      return { status: created ? 'created' : 'updated' };
+    }
+
+    case 'payment': {
+      if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
+      const saleExternalId = str(normalized['sale_external_id'] ?? normalized['sale_id']);
+      if (!saleExternalId) {
+        return { status: 'skipped', reason: 'payment_without_sale', sample: externalId };
+      }
+      const sale = await resolveRef(
+        (params) => repositories.sales.findByExternalId(params),
+        tenantId,
+        dataSourceId,
+        saleExternalId,
+      );
+      if (!sale) {
+        return { status: 'skipped', reason: 'payment_sale_not_found', sample: saleExternalId };
+      }
+      const amount = num(normalized['amount']);
+      if (amount === null) {
+        return { status: 'skipped', reason: 'payment_without_amount', sample: externalId };
+      }
+      const dueAt = date(normalized['due_at'] ?? normalized['date']);
+      if (!dueAt) {
+        return { status: 'skipped', reason: 'payment_invalid_date', sample: externalId };
+      }
+      const paidAt = date(normalized['paid_at']);
+      const rawStatus = str(normalized['status'])?.toLowerCase();
+      const status =
+        rawStatus && PAYMENT_STATUSES.has(rawStatus)
+          ? rawStatus
+          : paidAt
+            ? 'paid'
+            : 'pending';
+
+      const { created } = await repositories.payments.upsertByExternalId({
+        tenantId,
+        dataSourceId,
+        externalId,
+        saleId: sale.id,
+        amount,
+        method: str(normalized['method'] ?? normalized['payment_method']),
+        dueAt,
+        paidAt,
+        status: status as 'pending' | 'paid' | 'overdue' | 'cancelled',
+      });
+      return { status: created ? 'created' : 'updated' };
+    }
+
+    case 'inventory_level': {
+      if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
+      const productExternalId = str(
+        normalized['product_external_id'] ?? normalized['product_id'],
+      );
+      if (!productExternalId) {
+        return { status: 'skipped', reason: 'inventory_without_product', sample: externalId };
+      }
+      const product = await resolveRef(
+        (params) => repositories.products.findByExternalId(params),
+        tenantId,
+        dataSourceId,
+        productExternalId,
+      );
+      if (!product) {
+        return { status: 'skipped', reason: 'inventory_product_not_found', sample: productExternalId };
+      }
+      const quantity = num(normalized['quantity']);
+      if (quantity === null) {
+        return { status: 'skipped', reason: 'inventory_without_quantity', sample: externalId };
+      }
+      const recordedAt = date(normalized['recorded_at'] ?? normalized['date']);
+      if (!recordedAt) {
+        return { status: 'skipped', reason: 'inventory_invalid_date', sample: externalId };
+      }
+
+      const { created } = await repositories.inventoryLevels.upsertByExternalId({
+        tenantId,
+        dataSourceId,
+        externalId,
+        productId: product.id,
+        quantity,
+        minQuantity: num(normalized['min_quantity']),
+        recordedAt,
+      });
+      return { status: created ? 'created' : 'updated' };
+    }
+
+    case 'campaign': {
+      if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
+      const name = str(normalized['name']);
+      if (!name) return { status: 'skipped', reason: 'campaign_without_name', sample: externalId };
+      const source = str(normalized['source']);
+      if (!source) return { status: 'skipped', reason: 'campaign_without_source', sample: externalId };
+      const spend = num(normalized['spend'] ?? normalized['amount']);
+      if (spend === null) {
+        return { status: 'skipped', reason: 'campaign_without_spend', sample: externalId };
+      }
+      const startsAt = date(normalized['starts_at'] ?? normalized['date']);
+      if (!startsAt) {
+        return { status: 'skipped', reason: 'campaign_invalid_date', sample: externalId };
+      }
+
+      const { created } = await repositories.campaigns.upsertByExternalId({
+        tenantId,
+        dataSourceId,
+        externalId,
+        name,
+        source,
+        spend,
+        startsAt,
+        endsAt: date(normalized['ends_at']),
       });
       return { status: created ? 'created' : 'updated' };
     }

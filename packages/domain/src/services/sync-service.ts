@@ -1,11 +1,17 @@
 import type {
+  ActivityRepository,
+  CampaignRepository,
   CredentialRepository,
   CustomerRepository,
   DataQualityReportRepository,
   DataSourceRepository,
+  ExpenseRepository,
   ImportRepository,
   InteractionRepository,
+  InventoryLevelRepository,
+  LeadRepository,
   MappingRepository,
+  PaymentRepository,
   ProductRepository,
   RawRecordRepository,
   SaleRepository,
@@ -43,6 +49,12 @@ export type SyncServiceDeps = {
   sellers: SellerRepository;
   sales: SaleRepository;
   interactions: InteractionRepository;
+  leads: LeadRepository;
+  activities: ActivityRepository;
+  expenses: ExpenseRepository;
+  payments: PaymentRepository;
+  inventoryLevels: InventoryLevelRepository;
+  campaigns: CampaignRepository;
   /**
    * Classifies and embeds interactions written in this sync. Failures here
    * never fail the sync — the intelligence hook still runs afterwards.
@@ -61,6 +73,16 @@ export type SyncServiceDeps = {
     tenantId: string;
     dataSourceId: string;
     syncJobId: string;
+    userId: string | null;
+  }) => Promise<void>;
+  /**
+   * When set, `startSync` enqueues the job instead of running it inline
+   * (pg-boss in production). The worker calls `executeSync`.
+   */
+  enqueueSync?: (job: {
+    tenantId: string;
+    syncJobId: string;
+    requestId: string;
     userId: string | null;
   }) => Promise<void>;
 };
@@ -100,11 +122,12 @@ export class SyncService {
       metadata: { dataSourceId },
     });
 
-    // V0.1 runs inline: the JobQueue driver (pg-boss) plugs in at the app layer.
-    await this.executeSync(tenantId, job.id, {
-      requestId: ctx.requestId,
-      userId: ctx.userId ?? null,
-    });
+    const meta = { requestId: ctx.requestId, userId: ctx.userId ?? null };
+    if (this.deps.enqueueSync) {
+      await this.deps.enqueueSync({ tenantId, syncJobId: job.id, ...meta });
+    } else {
+      await this.executeSync(tenantId, job.id, meta);
+    }
 
     return this.deps.syncJobs.findById({ tenantId, id: job.id });
   }
@@ -419,6 +442,12 @@ export class SyncService {
       sellers: this.deps.sellers,
       sales: this.deps.sales,
       interactions: this.deps.interactions,
+      leads: this.deps.leads,
+      activities: this.deps.activities,
+      expenses: this.deps.expenses,
+      payments: this.deps.payments,
+      inventoryLevels: this.deps.inventoryLevels,
+      campaigns: this.deps.campaigns,
     };
 
     const outcome: EntityOutcome = {

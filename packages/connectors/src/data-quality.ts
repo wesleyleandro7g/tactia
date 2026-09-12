@@ -113,6 +113,124 @@ export function runDataQualityChecks(
         }
         break;
       }
+
+      case 'lead':
+        if (!record['name'] || String(record['name']).trim() === '') {
+          addIssue(errors, 'lead_without_name', record);
+          isValid = false;
+        }
+        if (!record['external_id']) {
+          addIssue(errors, 'missing_external_id', record);
+          isValid = false;
+        }
+        break;
+
+      case 'activity': {
+        const occurredAt = record['occurred_at'] ?? record['date'];
+        if (!occurredAt) {
+          addIssue(errors, 'activity_invalid_date', record);
+          isValid = false;
+        } else {
+          const parsed = new Date(String(occurredAt));
+          if (Number.isNaN(parsed.getTime())) {
+            addIssue(errors, 'activity_invalid_date', occurredAt);
+            isValid = false;
+          }
+        }
+        if (!record['external_id']) {
+          addIssue(errors, 'missing_external_id', record);
+          isValid = false;
+        }
+        break;
+      }
+
+      case 'expense': {
+        if (!record['category'] || String(record['category']).trim() === '') {
+          addIssue(errors, 'expense_without_category', record);
+          isValid = false;
+        }
+        if (record['amount'] == null || record['amount'] === '') {
+          addIssue(errors, 'expense_without_amount', record);
+          isValid = false;
+        }
+        const occurredAt = record['occurred_at'] ?? record['date'];
+        if (!occurredAt) {
+          addIssue(errors, 'expense_invalid_date', record);
+          isValid = false;
+        }
+        if (!record['external_id']) {
+          addIssue(errors, 'missing_external_id', record);
+          isValid = false;
+        }
+        break;
+      }
+
+      case 'payment': {
+        if (!record['sale_id'] && !record['sale_external_id']) {
+          addIssue(errors, 'payment_without_sale', record);
+          isValid = false;
+        }
+        if (record['amount'] == null || record['amount'] === '') {
+          addIssue(errors, 'payment_without_amount', record);
+          isValid = false;
+        }
+        const dueAt = record['due_at'] ?? record['date'];
+        if (!dueAt) {
+          addIssue(errors, 'payment_invalid_date', record);
+          isValid = false;
+        }
+        if (!record['external_id']) {
+          addIssue(errors, 'missing_external_id', record);
+          isValid = false;
+        }
+        break;
+      }
+
+      case 'inventory_level': {
+        if (!record['product_id'] && !record['product_external_id']) {
+          addIssue(errors, 'inventory_without_product', record);
+          isValid = false;
+        }
+        if (record['quantity'] == null || record['quantity'] === '') {
+          addIssue(errors, 'inventory_without_quantity', record);
+          isValid = false;
+        }
+        const recordedAt = record['recorded_at'] ?? record['date'];
+        if (!recordedAt) {
+          addIssue(errors, 'inventory_invalid_date', record);
+          isValid = false;
+        }
+        if (!record['external_id']) {
+          addIssue(errors, 'missing_external_id', record);
+          isValid = false;
+        }
+        break;
+      }
+
+      case 'campaign': {
+        if (!record['name'] || String(record['name']).trim() === '') {
+          addIssue(errors, 'campaign_without_name', record);
+          isValid = false;
+        }
+        if (!record['source'] || String(record['source']).trim() === '') {
+          addIssue(errors, 'campaign_without_source', record);
+          isValid = false;
+        }
+        if (record['spend'] == null && record['amount'] == null) {
+          addIssue(errors, 'campaign_without_spend', record);
+          isValid = false;
+        }
+        const startsAt = record['starts_at'] ?? record['date'];
+        if (!startsAt) {
+          addIssue(errors, 'campaign_invalid_date', record);
+          isValid = false;
+        }
+        if (!record['external_id']) {
+          addIssue(errors, 'missing_external_id', record);
+          isValid = false;
+        }
+        break;
+      }
     }
 
     if (!isValid) invalidCount++;

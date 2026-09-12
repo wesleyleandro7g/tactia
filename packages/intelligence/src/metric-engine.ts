@@ -3,11 +3,13 @@ import {
   METRIC_DEFINITIONS,
   METRIC_KEYS,
   type MetricBreakdownItem,
+  type MetricDimension,
   type MetricInput,
   type MetricKey,
   type MetricPeriod,
   type MetricResult,
   type PeriodGranularity,
+  periodIso,
 } from './types';
 
 // Only confirmed sales contribute to revenue/counts (cancelled/refunded excluded)
@@ -34,10 +36,6 @@ function previousPeriod(p: MetricPeriod): MetricPeriod {
     from: new Date(p.from.getTime() - duration),
     to: new Date(p.to.getTime() - duration),
   };
-}
-
-function periodIso(p: MetricPeriod) {
-  return { from: p.from.toISOString(), to: p.to.toISOString() };
 }
 
 function decimalToNumber(v: { toNumber(): number } | number | null | undefined): number {
@@ -96,6 +94,161 @@ async function queryCustomerCount(db: PrismaClient, tenantId: string, period: Me
     },
   });
   return result.length;
+}
+
+async function queryDiscountTotal(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<number> {
+  const result = await db.sale.aggregate({
+    where: {
+      tenantId,
+      status: CONFIRMED_STATUS,
+      soldAt: { gte: period.from, lt: period.to },
+    },
+    _sum: { discountAmount: true },
+  });
+  return decimalToNumber(result._sum.discountAmount);
+}
+
+async function queryGrossMargin(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<number> {
+  type MarginRow = { revenue: string; cost: string };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = await (db as any).$queryRaw<MarginRow[]>`
+    SELECT
+      COALESCE(SUM(si.total_amount), 0)::text AS revenue,
+      COALESCE(SUM(si.quantity * COALESCE(p.cost, 0)), 0)::text AS cost
+    FROM sale_items si
+    INNER JOIN sales s ON s.id = si.sale_id
+    INNER JOIN products p ON p.id = si.product_id
+    WHERE si.tenant_id = ${tenantId}::uuid
+      AND s.status = 'confirmed'
+      AND s.sold_at >= ${period.from}
+      AND s.sold_at < ${period.to}
+      AND p.cost IS NOT NULL
+  `;
+  const row = rows[0];
+  if (!row) return 0;
+  return parseFloat(row.revenue) - parseFloat(row.cost);
+}
+
+async function queryUnitsSold(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<number> {
+  const result = await db.saleItem.aggregate({
+    where: {
+      tenantId,
+      sale: {
+        status: CONFIRMED_STATUS,
+        soldAt: { gte: period.from, lt: period.to },
+      },
+    },
+    _sum: { quantity: true },
+  });
+  return decimalToNumber(result._sum.quantity);
+}
+
+async function queryClosedRate(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+  status: 'cancelled' | 'refunded',
+): Promise<number> {
+  const closedStatuses = ['confirmed', 'cancelled', 'refunded'] as const;
+  const where = {
+    tenantId,
+    soldAt: { gte: period.from, lt: period.to },
+    status: { in: [...closedStatuses] },
+  };
+  const [closed, matching] = await Promise.all([
+    db.sale.count({ where }),
+    db.sale.count({ where: { ...where, status } }),
+  ]);
+  return closed === 0 ? 0 : matching / closed;
+}
+
+async function queryPendingAmount(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<number> {
+  const result = await db.sale.aggregate({
+    where: {
+      tenantId,
+      status: 'pending',
+      soldAt: { gte: period.from, lt: period.to },
+    },
+    _sum: { totalAmount: true },
+  });
+  return decimalToNumber(result._sum.totalAmount);
+}
+
+async function queryExpenseTotal(db: PrismaClient, tenantId: string, period: MetricPeriod): Promise<number> {
+  const result = await db.expense.aggregate({
+    where: { tenantId, occurredAt: { gte: period.from, lt: period.to } },
+    _sum: { amount: true },
+  });
+  return decimalToNumber(result._sum.amount);
+}
+
+async function queryReceivables(
+  db: PrismaClient,
+  tenantId: string,
+  statuses: Array<'pending' | 'overdue'>,
+): Promise<number> {
+  const result = await db.payment.aggregate({
+    where: { tenantId, status: { in: statuses } },
+    _sum: { amount: true },
+  });
+  return decimalToNumber(result._sum.amount);
+}
+
+async function queryDso(db: PrismaClient, tenantId: string, period: MetricPeriod): Promise<number> {
+  const paid = await db.payment.findMany({
+    where: {
+      tenantId,
+      status: 'paid',
+      paidAt: { gte: period.from, lt: period.to },
+    },
+    select: { paidAt: true, sale: { select: { soldAt: true } } },
+    take: 2000,
+  });
+  if (paid.length === 0) return 0;
+  const days = paid
+    .filter((row) => row.paidAt)
+    .map((row) => (row.paidAt!.getTime() - row.sale.soldAt.getTime()) / (24 * 60 * 60 * 1000));
+  if (days.length === 0) return 0;
+  return days.reduce((s, d) => s + d, 0) / days.length;
+}
+
+async function breakdownBySaleField(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+  field: 'channel' | 'region',
+): Promise<MetricBreakdownItem[]> {
+  const rows = await db.sale.groupBy({
+    by: [field],
+    where: {
+      tenantId,
+      status: CONFIRMED_STATUS,
+      soldAt: { gte: period.from, lt: period.to },
+    },
+    _sum: { totalAmount: true },
+    orderBy: { _sum: { totalAmount: 'desc' } },
+  });
+  return rows.map((row) => ({
+    key: (row[field] as string | null) ?? 'unknown',
+    label: (row[field] as string | null) ?? 'Sem classificação',
+    value: decimalToNumber(row._sum.totalAmount),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +319,55 @@ async function breakdownBySeller(
   }));
 }
 
+/** Customers whose first confirmed sale happened inside the period. */
+async function queryNewCustomers(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<number> {
+  const rows = await db.$queryRaw<Array<{ count: string }>>`
+    SELECT COUNT(*)::text AS count
+    FROM (
+      SELECT customer_id, MIN(sold_at) AS first_sale
+      FROM sales
+      WHERE tenant_id = ${tenantId}::uuid AND status = 'confirmed'
+      GROUP BY customer_id
+    ) firsts
+    WHERE firsts.first_sale >= ${period.from} AND firsts.first_sale < ${period.to}
+  `;
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+async function breakdownByCustomer(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<MetricBreakdownItem[]> {
+  const rows = await db.sale.groupBy({
+    by: ['customerId'],
+    where: {
+      tenantId,
+      status: CONFIRMED_STATUS,
+      soldAt: { gte: period.from, lt: period.to },
+    },
+    _sum: { totalAmount: true },
+    orderBy: { _sum: { totalAmount: 'desc' } },
+  });
+
+  const customerIds = rows.map((r) => r.customerId);
+  const customers = await db.customer.findMany({
+    where: { id: { in: customerIds } },
+    select: { id: true, name: true },
+  });
+  const nameMap = new Map(customers.map((c) => [c.id, c.name]));
+
+  return rows.map((r) => ({
+    key: r.customerId,
+    label: nameMap.get(r.customerId),
+    value: decimalToNumber(r._sum.totalAmount),
+  }));
+}
+
 async function breakdownByTime(
   db: PrismaClient,
   tenantId: string,
@@ -198,6 +400,34 @@ async function breakdownByTime(
   }));
 }
 
+async function breakdownByCategory(
+  db: PrismaClient,
+  tenantId: string,
+  period: MetricPeriod,
+): Promise<MetricBreakdownItem[]> {
+  type CategoryRow = { category: string | null; revenue: string };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = await (db as any).$queryRaw<CategoryRow[]>`
+    SELECT
+      COALESCE(p.category, 'Sem categoria') AS category,
+      COALESCE(SUM(si.total_amount), 0)::text AS revenue
+    FROM sale_items si
+    INNER JOIN sales s ON s.id = si.sale_id
+    INNER JOIN products p ON p.id = si.product_id
+    WHERE si.tenant_id = ${tenantId}::uuid
+      AND s.status = 'confirmed'
+      AND s.sold_at >= ${period.from}
+      AND s.sold_at < ${period.to}
+    GROUP BY p.category
+    ORDER BY revenue DESC
+  `;
+  return (rows as CategoryRow[]).map((row) => ({
+    key: row.category ?? 'Sem categoria',
+    label: row.category ?? 'Sem categoria',
+    value: parseFloat(row.revenue),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // MetricEngine
 // ---------------------------------------------------------------------------
@@ -215,13 +445,13 @@ export class MetricEngine {
 
   /** Calculate a single metric by key */
   async calculate(key: MetricKey, input: MetricInput): Promise<MetricResult> {
-    const { tenantId, period, withComparison = false, breakdown } = input;
+    const { tenantId, period, withComparison = false, compareWith, breakdown } = input;
 
     const current = await this.computeScalar(key, tenantId, period);
 
     let comparison: MetricResult['comparison'];
-    if (withComparison) {
-      const prev = previousPeriod(period);
+    if (withComparison || compareWith) {
+      const prev = compareWith ?? previousPeriod(period);
       const prevValue = await this.computeScalar(key, tenantId, prev);
       const change = percentChange(current, prevValue);
       comparison = {
@@ -251,7 +481,7 @@ export class MetricEngine {
     };
   }
 
-  /** Calculate all 6 metrics at once */
+  /** Calculate all built-in metrics at once */
   async calculateAll(input: MetricInput): Promise<MetricResult[]> {
     return Promise.all(METRIC_KEYS.map((key) => this.calculate(key, input)));
   }
@@ -291,11 +521,63 @@ export class MetricEngine {
 
       case 'complaint_count':
         return queryComplaintCount(this.db, tenantId, period);
+
+      case 'discount_total':
+        return queryDiscountTotal(this.db, tenantId, period);
+
+      case 'gross_margin':
+        return queryGrossMargin(this.db, tenantId, period);
+
+      case 'units_sold':
+        return queryUnitsSold(this.db, tenantId, period);
+
+      case 'cancellation_rate':
+        return queryClosedRate(this.db, tenantId, period, 'cancelled');
+
+      case 'refund_rate':
+        return queryClosedRate(this.db, tenantId, period, 'refunded');
+
+      case 'pending_amount':
+        return queryPendingAmount(this.db, tenantId, period);
+
+      case 'new_customers':
+        return queryNewCustomers(this.db, tenantId, period);
+
+      case 'expense_total':
+        return queryExpenseTotal(this.db, tenantId, period);
+
+      case 'operating_profit': {
+        const [marginReais, expenses] = await Promise.all([
+          queryGrossMargin(this.db, tenantId, period),
+          queryExpenseTotal(this.db, tenantId, period),
+        ]);
+        return marginReais - expenses;
+      }
+
+      case 'break_even_revenue': {
+        const [marginReais, expenses, revenue] = await Promise.all([
+          queryGrossMargin(this.db, tenantId, period),
+          queryExpenseTotal(this.db, tenantId, period),
+          queryRevenue(this.db, tenantId, period),
+        ]);
+        const rate = revenue > 0 ? marginReais / revenue : 0;
+        if (rate <= 0) return 0;
+        return expenses / rate;
+      }
+
+      case 'receivables_open':
+        return queryReceivables(this.db, tenantId, ['pending', 'overdue']);
+
+      case 'overdue_amount':
+        return queryReceivables(this.db, tenantId, ['overdue']);
+
+      case 'dso':
+        return queryDso(this.db, tenantId, period);
     }
   }
 
   private async computeBreakdown(
-    dimension: 'product' | 'seller' | 'time',
+    dimension: MetricDimension,
     tenantId: string,
     period: MetricPeriod,
     granularity?: PeriodGranularity,
@@ -307,6 +589,14 @@ export class MetricEngine {
         return breakdownBySeller(this.db, tenantId, period);
       case 'time':
         return breakdownByTime(this.db, tenantId, period, granularity ?? 'day');
+      case 'category':
+        return breakdownByCategory(this.db, tenantId, period);
+      case 'customer':
+        return breakdownByCustomer(this.db, tenantId, period);
+      case 'channel':
+        return breakdownBySaleField(this.db, tenantId, period, 'channel');
+      case 'region':
+        return breakdownBySaleField(this.db, tenantId, period, 'region');
     }
   }
 }

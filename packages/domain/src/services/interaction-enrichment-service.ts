@@ -1,18 +1,56 @@
-import type { InteractionIntent, InteractionRepository } from '@tactia/database';
+import type { InteractionIntent, InteractionRepository, ProductRepository } from '@tactia/database';
 import { logger } from '@tactia/shared';
 import type {
   ClassifiedInteraction,
+  ClassifierProduct,
   InteractionClassifier,
   InteractionEmbedder,
 } from '../ports/interaction-enrichment';
 
 const BATCH_SIZE = 32;
+const MAX_PRODUCTS_FOR_CLASSIFIER = 150;
 
 export type InteractionEnrichmentDeps = {
   interactions: InteractionRepository;
   classifier?: InteractionClassifier | null;
   embedder?: InteractionEmbedder | null;
+  /** When provided, product mentions are resolved to product ids. */
+  products?: ProductRepository | null;
 };
+
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+/**
+ * Resolves a product mention (classifier output) or a raw message body to a
+ * product id by name match — exact first, then containment.
+ */
+export function resolveProductMention(
+  mention: string | null | undefined,
+  body: string,
+  products: ClassifierProduct[],
+): string | null {
+  if (products.length === 0) return null;
+  const normalizedMention = mention ? normalize(mention) : null;
+  if (normalizedMention) {
+    const exact = products.find((p) => normalize(p.name) === normalizedMention);
+    if (exact) return exact.id;
+    const partial = products.find(
+      (p) => normalize(p.name).includes(normalizedMention) || normalizedMention.includes(normalize(p.name)),
+    );
+    if (partial) return partial.id;
+  }
+  const normalizedBody = normalize(body);
+  // Longest product name first so "Plano Pro Anual" wins over "Plano Pro".
+  const byLength = [...products].sort((a, b) => b.name.length - a.name.length);
+  const inBody = byLength.find((p) => p.name.length >= 4 && normalizedBody.includes(normalize(p.name)));
+  return inBody?.id ?? null;
+}
 
 /**
  * Classifies and embeds pending interactions after sync/create.
@@ -21,11 +59,35 @@ export type InteractionEnrichmentDeps = {
 export class InteractionEnrichmentService {
   constructor(private readonly deps: InteractionEnrichmentDeps) {}
 
+  private async loadProducts(tenantId: string): Promise<ClassifierProduct[]> {
+    if (!this.deps.products) return [];
+    try {
+      const result = await this.deps.products.list({
+        tenantId,
+        skip: 0,
+        take: MAX_PRODUCTS_FOR_CLASSIFIER,
+      });
+      return result.items.map((product) => ({ id: product.id, name: product.name }));
+    } catch (error) {
+      logger.warn(
+        {
+          tenant_id: tenantId,
+          operation: 'interaction_enrich_products',
+          err: error instanceof Error ? error.message : String(error),
+        },
+        'failed to load products for classifier',
+      );
+      return [];
+    }
+  }
+
   async enrichPending(input: { tenantId: string; dataSourceId?: string }): Promise<number> {
     if (!this.deps.classifier && !this.deps.embedder) return 0;
 
     let enriched = 0;
     try {
+      const products = await this.loadProducts(input.tenantId);
+
       for (;;) {
         const pending = await this.deps.interactions.findPendingEnrichment({
           tenantId: input.tenantId,
@@ -44,7 +106,7 @@ export class InteractionEnrichmentService {
         }));
         if (this.deps.classifier) {
           try {
-            classifications = await this.deps.classifier.classify(texts);
+            classifications = await this.deps.classifier.classify(texts, { products });
           } catch (error) {
             logger.warn(
               {
@@ -85,6 +147,9 @@ export class InteractionEnrichmentService {
               id: row.id,
               intent: classified.intent as InteractionIntent,
               topics: classified.topics.slice(0, 5),
+              sentiment: classified.sentiment ?? null,
+              urgency: classified.urgency ?? null,
+              productId: resolveProductMention(classified.productMention, row.body, products),
               embedding,
             });
             enriched += 1;

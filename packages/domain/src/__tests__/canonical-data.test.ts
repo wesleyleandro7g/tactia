@@ -36,7 +36,7 @@ const sales = new SaleRepository(prisma);
 const activities = new ActivityRepository(prisma);
 
 const customerService = new CustomerService(customers, auditLogs);
-const leadService = new LeadService(leads, customers, auditLogs);
+const leadService = new LeadService(leads, customers, auditLogs, prisma);
 const productService = new ProductService(products, auditLogs);
 const sellerService = new SellerService(sellers, auditLogs);
 const saleService = new SaleService(sales, customers, products, sellers, auditLogs);
