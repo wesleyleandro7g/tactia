@@ -60,8 +60,16 @@ function contextSource(): ContextSource {
           currency: 'BRL',
           timezone: 'America/Sao_Paulo',
           today: '2025-01-31',
+          weekday: 'sexta-feira',
+          daysLeftInMonth: 1,
+          daysElapsedInMonth: 31,
         },
         period: PERIOD,
+        trailing30: [],
+        trailingPeriod: PERIOD,
+        goals: [],
+        facts: [],
+        briefing: null,
         metrics: [{ key: 'revenue', value: 1000, change: -0.5, direction: 'down' }],
         insights: [],
         sources: [{ metric: 'revenue', period: PERIOD, value: 1000, tool: 'context' }],
@@ -76,13 +84,15 @@ describe('propose_action tool', () => {
   it('is only registered when an action proposer is injected', () => {
     const readOnly = new ToolRegistry(createDefaultTools(emptyDeps));
     expect(readOnly.has('propose_action')).toBe(false);
+    const readOnlyCount = readOnly.names().length;
+    expect(readOnlyCount).toBeGreaterThanOrEqual(18);
 
     const { port } = recordingProposer();
     const withActions = new ToolRegistry(
       createDefaultTools(emptyDeps, { actionProposer: port }),
     );
     expect(withActions.has('propose_action')).toBe(true);
-    expect(withActions.names()).toHaveLength(9);
+    expect(withActions.names()).toHaveLength(readOnlyCount + 1);
   });
 
   it('forwards the structured payload to the execution engine', async () => {
@@ -239,8 +249,16 @@ describe('propose_action tool', () => {
         currency: 'BRL',
         timezone: 'America/Sao_Paulo',
         today: '2025-01-31',
+        weekday: 'sexta-feira',
+        daysLeftInMonth: 1,
+        daysElapsedInMonth: 31,
       },
       period: PERIOD,
+      trailing30: [],
+      trailingPeriod: PERIOD,
+      goals: [],
+      facts: [],
+      briefing: null,
       metrics: [],
       insights: [],
       sources: [],

@@ -142,6 +142,8 @@ export type ChatTurn = {
 
 export type ChatAnswer = {
   content: string;
+  /** Suggested next questions, parsed from the trailing "Próximos passos" block. */
+  followUps: string[];
   sources: MessageSource[];
   toolCalls: ExecutedToolCall[];
   /** Actions proposed in this turn, awaiting human approval (Etapa 7). */
@@ -159,6 +161,7 @@ export type ChatStreamEvent =
       type: 'tool_result';
       name: string;
       sources: MessageSource[];
+      durationMs?: number;
       proposal?: ActionProposal;
       error?: string;
     }

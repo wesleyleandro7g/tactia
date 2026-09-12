@@ -40,8 +40,16 @@ function contextSource(overrides: Partial<AiContext> = {}): ContextSource {
           currency: 'BRL',
           timezone: 'America/Sao_Paulo',
           today: '2025-01-31',
+          weekday: 'sexta-feira',
+          daysLeftInMonth: 1,
+          daysElapsedInMonth: 31,
         },
         period: PERIOD,
+        trailing30: [],
+        trailingPeriod: PERIOD,
+        goals: [],
+        facts: [],
+        briefing: null,
         metrics: [{ key: 'revenue', value: 1000, change: -0.5, direction: 'down' }],
         insights: [
           {

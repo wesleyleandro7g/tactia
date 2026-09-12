@@ -28,6 +28,7 @@ import {
 } from '@tactia/database';
 import {
   AuditLogService,
+  AnalyticsService,
   CustomerService,
   InsightService,
   InteractionService,
@@ -57,6 +58,7 @@ const insightRepository = new InsightRepository(prisma);
 
 const tenantService = new TenantService(tenants, memberships, auditLogs);
 const metricService = new MetricService(new MetricEngine(prisma), new MetricRepository(prisma));
+const analyticsService = new AnalyticsService(prisma);
 const customerService = new CustomerService(new CustomerRepository(prisma), auditLogs);
 const productService = new ProductService(new ProductRepository(prisma), auditLogs);
 const sellerService = new SellerService(new SellerRepository(prisma), auditLogs);
@@ -81,6 +83,7 @@ const recommendationService = new RecommendationService(
 
 const registry = createDefaultToolRegistry({
   metrics: metricService,
+  analytics: analyticsService,
   customers: customerService,
   products: productService,
   sellers: sellerService,
@@ -321,17 +324,45 @@ afterAll(async () => {
 });
 
 describe('V0.1 tools', () => {
-  it('registers the V0.1 tools plus interaction tools', () => {
-    expect(registry.names().sort()).toEqual([
+  it('registers the read tools plus analytics tools', () => {
+    expect(registry.names().sort()).toEqual(expect.arrayContaining([
+      'compare_periods',
+      'explain_change',
+      'get_insight_detail',
+      'get_trend',
       'get_complaints',
+      'get_customer_profile',
+      'get_customer_segments',
+      'get_customer_voice',
       'get_customers',
+      'get_data_freshness',
+      'get_forecast',
+      'get_funnel',
+      'get_goals_progress',
       'get_insights',
+      'get_inventory_risk',
+      'get_latest_briefing',
+      'get_period_projection',
+      'get_pipeline',
+      'get_profitability',
+      'get_rfm',
+      'get_cohorts',
+      'get_cash_flow',
+      'get_acquisition',
+      'simulate',
+      'remember_fact',
+      'list_business_facts',
+      'get_product_affinity',
+      'get_product_performance',
       'get_products',
       'get_revenue',
       'get_sales',
+      'get_sales_health',
+      'get_seller_performance',
       'get_sellers',
       'search_interactions',
-    ]);
+    ]));
+    expect(registry.has('propose_action')).toBe(false);
   });
 
   it('get_revenue returns the exact revenue with comparison and evidence', async () => {
@@ -502,6 +533,71 @@ describe('V0.1 tools', () => {
     expect(otherData.complaints[0]?.excerpt).toMatch(/tenant vizinho/i);
   });
 
+  it('get_customer_profile returns LTV and interactions for a known customer', async () => {
+    const customers = await registry.execute('get_customers', ctxA, {
+      from: PERIOD.from,
+      to: PERIOD.to,
+      limit: 1,
+    });
+    const customerId = (customers.data as { customers: Array<{ id: string }> }).customers[0]?.id;
+    expect(customerId).toBeTruthy();
+
+    const result = await registry.execute('get_customer_profile', ctxA, {
+      customerId,
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const data = result.data as {
+      found: boolean;
+      lifetime: { ltv: number; totalSales: number };
+      interactions: Array<{ excerpt: string }>;
+    };
+    expect(data.found).toBe(true);
+    expect(data.lifetime.ltv).toBeGreaterThan(0);
+    expect(data.lifetime.totalSales).toBeGreaterThan(0);
+    expect(result.sources[0]?.metric).toBe('customer_profile');
+  });
+
+  it('get_pipeline summarizes lead funnel', async () => {
+    const result = await registry.execute('get_pipeline', ctxA, {});
+    const data = result.data as { totals: { leads: number } };
+    expect(data.totals.leads).toBeGreaterThanOrEqual(1);
+  });
+
+  it('get_period_projection returns linear projection', async () => {
+    const result = await registry.execute('get_period_projection', ctxA, {
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const data = result.data as {
+      current: { revenue: number };
+      projection: { revenueLinear: number };
+    };
+    expect(data.current.revenue).toBe(1000);
+    expect(data.projection.revenueLinear).toBeGreaterThanOrEqual(data.current.revenue);
+  });
+
+  it('get_sales_health includes cancellation and discount metrics', async () => {
+    const result = await registry.execute('get_sales_health', ctxA, {
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const data = result.data as { metrics: Record<string, { key: string }> };
+    expect(data.metrics.cancellation_rate).toBeDefined();
+    expect(data.metrics.discount_total).toBeDefined();
+    expect(result.sources.some((source) => source.metric === 'cancellation_rate')).toBe(true);
+  });
+
+  it('get_customer_voice summarizes intents and channels', async () => {
+    const result = await registry.execute('get_customer_voice', ctxA, {
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const data = result.data as { totals: { complaints: number; praise: number } };
+    expect(data.totals.complaints).toBe(1);
+    expect(data.totals.praise).toBe(1);
+  });
+
   it('isolates tenants: the other tenant sees none of this data', async () => {
     const revenue = await registry.execute('get_revenue', ctxB, {
       from: PERIOD.from,
@@ -560,7 +656,10 @@ describe('V0.1 tools', () => {
     expect(context.metrics.find((metric) => metric.key === 'revenue')?.value).toBe(1000);
     expect(context.metrics.find((metric) => metric.key === 'sales_count')?.value).toBe(3);
     expect(context.insights[0]?.ruleKey).toBe('revenue_drop');
-    expect(context.sources.length).toBe(4);
+    // MTD + trailing-30 sources for every context metric
+    expect(context.sources.length).toBe(context.metrics.length + context.trailing30.length);
+    expect(context.trailing30.find((metric) => metric.key === 'revenue')).toBeDefined();
+    expect(context.company.daysLeftInMonth).toBeGreaterThan(0);
     expect(context.sources.every((source) => source.tool === 'context')).toBe(true);
   });
 });

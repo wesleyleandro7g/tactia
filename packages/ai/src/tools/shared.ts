@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { MetricResult } from '@tactia/intelligence';
 import type {
+  AnalyticsService,
+  BriefingService,
+  BusinessFactService,
   CustomerService,
   InsightService,
   InteractionService,
@@ -20,11 +23,14 @@ import type { MessageSource } from '../types';
  */
 export type ToolDeps = {
   metrics: MetricService;
+  analytics: AnalyticsService;
   customers: CustomerService;
   products: ProductService;
   sellers: SellerService;
   sales: SaleService;
   insights: InsightService;
+  briefings?: BriefingService;
+  facts?: BusinessFactService;
   recommendations: RecommendationService;
   interactions: InteractionService;
   embedder?: EmbeddingAdapter | null;

@@ -1,6 +1,6 @@
 import { AppError, logger } from '@tactia/shared';
 import type { AiContext } from './context-builder';
-import { buildSystemPrompt } from './system-prompt';
+import { buildSystemPrompt, FOLLOW_UPS_HEADING } from './system-prompt';
 import type { ToolRegistry } from './tool-registry';
 import type {
   ActionProposal,
@@ -61,6 +61,33 @@ function containsNumber(text: string): boolean {
   return /\d/.test(text);
 }
 
+const FOLLOW_UPS_PATTERN = new RegExp(
+  `(?:^|\\n)\\s*(?:#{1,4}\\s*|\\*\\*)?${FOLLOW_UPS_HEADING}:?(?:\\*\\*)?\\s*:?\\s*\\n([\\s\\S]*)$`,
+  'i',
+);
+
+/**
+ * Splits the trailing "Próximos passos" block (see system prompt) into the
+ * answer body and a list of suggested follow-up questions. Tolerant: when the
+ * block is missing or malformed the content is returned untouched.
+ */
+export function extractFollowUps(text: string): { content: string; followUps: string[] } {
+  const match = FOLLOW_UPS_PATTERN.exec(text);
+  if (!match || match.index == null) return { content: text.trim(), followUps: [] };
+
+  const block = match[1] ?? '';
+  const followUps = block
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^([-*•]|\d+[.)])\s+/.test(line))
+    .map((line) => line.replace(/^([-*•]|\d+[.)])\s+/, '').replace(/^\*\*|\*\*$/g, '').trim())
+    .filter((line) => line.length > 0 && line.length <= 200)
+    .slice(0, 3);
+
+  if (followUps.length === 0) return { content: text.trim(), followUps: [] };
+  return { content: text.slice(0, match.index).trim(), followUps };
+}
+
 function dedupeSources(sources: MessageSource[]): MessageSource[] {
   const seen = new Map<string, MessageSource>();
   for (const source of sources) {
@@ -104,7 +131,7 @@ export class Orchestrator {
     private readonly deps: OrchestratorDeps,
     config: OrchestratorConfig = {},
   ) {
-    this.maxIterations = config.maxIterations ?? 4;
+    this.maxIterations = config.maxIterations ?? 8;
     this.historyLimit = config.historyLimit ?? 12;
     this.enforceSources = config.enforceSources ?? true;
   }
@@ -135,8 +162,12 @@ export class Orchestrator {
         toolCalls: completion.toolCalls,
       });
 
-      for (const toolCall of completion.toolCalls) {
-        const outcome = await this.executeToolCall(request.ctx, toolCall);
+      // Tool calls of the same round are independent: run them in parallel.
+      const outcomes = await Promise.all(
+        completion.toolCalls.map((toolCall) => this.executeToolCall(request.ctx, toolCall)),
+      );
+      completion.toolCalls.forEach((toolCall, index) => {
+        const outcome = outcomes[index]!;
         messages.push({
           role: 'tool',
           toolCallId: toolCall.id,
@@ -146,7 +177,7 @@ export class Orchestrator {
         executed.push(outcome.executed);
         sources.push(...outcome.executed.sources);
         if (outcome.proposal) proposals.push(outcome.proposal);
-      }
+      });
     }
 
     // Tool budget exhausted: force a final answer with the data already gathered.
@@ -206,7 +237,13 @@ export class Orchestrator {
 
       for (const toolCall of toolCalls) {
         yield { type: 'tool_call', name: toolCall.name, input: toolCall.input };
-        const outcome = await this.executeToolCall(request.ctx, toolCall);
+      }
+      const outcomes = await Promise.all(
+        toolCalls.map((toolCall) => this.executeToolCall(request.ctx, toolCall)),
+      );
+      for (let index = 0; index < toolCalls.length; index += 1) {
+        const toolCall = toolCalls[index]!;
+        const outcome = outcomes[index]!;
         messages.push({
           role: 'tool',
           toolCallId: toolCall.id,
@@ -220,6 +257,7 @@ export class Orchestrator {
           type: 'tool_result',
           name: toolCall.name,
           sources: outcome.executed.sources,
+          durationMs: outcome.executed.durationMs,
           ...(outcome.proposal ? { proposal: outcome.proposal } : {}),
           ...(outcome.executed.error ? { error: outcome.executed.error } : {}),
         };
@@ -309,19 +347,23 @@ export class Orchestrator {
     guardrail?: ChatAnswer['guardrail'],
   ): ChatAnswer {
     const deduped = dedupeSources(sources);
-    let content = text.trim();
+    const split = extractFollowUps(text);
+    let content = split.content;
+    let followUps = split.followUps;
     let flag = guardrail;
 
     if (this.enforceSources && containsNumber(content) && deduped.length === 0) {
       // AI safety: a number without internal evidence never reaches the user.
       logger.warn({ operation: 'ai_guardrail', reason: 'unsourced_numbers' });
       content = UNSOURCED_FALLBACK;
+      followUps = [];
       flag = 'unsourced_numbers';
     }
     if (!content) content = EMPTY_FALLBACK;
 
     return {
       content,
+      followUps,
       sources: deduped,
       toolCalls,
       proposals,

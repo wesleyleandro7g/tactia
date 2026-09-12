@@ -1,13 +1,79 @@
-import type { MetricResult } from '@tactia/intelligence';
+import type { Drivers, MetricResult } from '@tactia/intelligence';
 import type { InsightService, MetricService, TenantService } from '@tactia/domain';
 import { logger } from '@tactia/shared';
 import { currentMonthPeriod, sourceFromMetric } from './tools/shared';
 import type { MessageSource, ToolContext } from './types';
 
+/** Optional providers that enrich the context as later stages land. */
+export type ContextProviders = {
+  /** Active goals with progress (Etapa 12). */
+  goals?: (ctx: ToolContext) => Promise<ContextGoal[]>;
+  /** Business facts declared by the user (Etapa 12). */
+  facts?: (ctx: ToolContext) => Promise<ContextFact[]>;
+  /** Latest weekly briefing (Etapa 11). */
+  briefing?: (ctx: ToolContext) => Promise<ContextBriefing | null>;
+};
+
 export type ContextBuilderDeps = {
   tenants: TenantService;
   metrics: MetricService;
   insights: InsightService;
+  providers?: ContextProviders;
+};
+
+export type ContextMetric = {
+  key: string;
+  value: number;
+  change?: number;
+  direction?: 'up' | 'down' | 'flat';
+  /** Previous-period value, when compared. */
+  previous?: number;
+};
+
+export type ContextInsight = {
+  id: string;
+  ruleKey: string;
+  type: string;
+  severity: string;
+  title: string;
+  impactAmount?: number | null;
+  score?: number;
+  entityType?: string | null;
+  entityId?: string | null;
+  /** One-line root-cause summary ("71% da queda vem de X e Y"). */
+  driversSummary?: string | null;
+  /** Top contributors, for the model to name names without calling a tool. */
+  topDrivers?: Array<{ label: string; delta: number; share: number }>;
+};
+
+export type ContextGoal = {
+  id: string;
+  metricKey: string;
+  scope: string;
+  scopeLabel?: string | null;
+  target: number;
+  achieved: number;
+  progress: number;
+  requiredDailyPace: number | null;
+  projected: number | null;
+  onTrack: boolean | null;
+  periodEnd: string;
+};
+
+export type ContextFact = {
+  id: string;
+  kind: string;
+  text: string;
+  validFrom?: string | null;
+  validTo?: string | null;
+};
+
+export type ContextBriefing = {
+  id: string;
+  periodFrom: string;
+  periodTo: string;
+  createdAt: string;
+  headline: string;
 };
 
 export type AiContext = {
@@ -17,45 +83,103 @@ export type AiContext = {
     currency: string;
     timezone: string;
     today: string;
+    /** pt-BR weekday name, e.g. "quarta-feira". */
+    weekday: string;
+    /** Days remaining in the current month, including today. */
+    daysLeftInMonth: number;
+    daysElapsedInMonth: number;
   };
+  /** Month-to-date period (the default period of every tool). */
   period: { from: string; to: string };
-  /** Key metrics of the period, already compared to the previous period. */
-  metrics: Array<{
-    key: string;
-    value: number;
-    change?: number;
-    direction?: 'up' | 'down' | 'flat';
-  }>;
-  insights: Array<{
-    id: string;
-    ruleKey: string;
-    type: string;
-    severity: string;
-    title: string;
-  }>;
+  /** Key metrics month-to-date, compared to the same window of the previous month. */
+  metrics: ContextMetric[];
+  /** Same metrics over the trailing 30 days, compared to the 30 days before. */
+  trailing30: ContextMetric[];
+  trailingPeriod: { from: string; to: string };
+  /** Top open insights by score, with impact and drivers. */
+  insights: ContextInsight[];
+  goals: ContextGoal[];
+  facts: ContextFact[];
+  briefing: ContextBriefing | null;
   /** Evidence for everything above — carried into the answer metadata (spec §43). */
   sources: MessageSource[];
 };
 
-const CONTEXT_METRICS = ['revenue', 'sales_count', 'average_ticket', 'customer_count'] as const;
+export const CONTEXT_METRICS = [
+  'revenue',
+  'sales_count',
+  'average_ticket',
+  'customer_count',
+  'new_customers',
+  'gross_margin',
+  'discount_total',
+  'pending_amount',
+  'complaint_count',
+  'cancellation_rate',
+] as const;
+
+const WEEKDAYS = [
+  'domingo',
+  'segunda-feira',
+  'terça-feira',
+  'quarta-feira',
+  'quinta-feira',
+  'sexta-feira',
+  'sábado',
+];
+
+function toMetric(result: MetricResult): ContextMetric {
+  return {
+    key: result.key,
+    value: result.value,
+    change: result.comparison?.change,
+    direction: result.comparison?.direction,
+    previous: result.comparison?.value,
+  };
+}
+
+function decimalToNumber(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'object' && value && 'toNumber' in value) {
+    return (value as { toNumber(): number }).toNumber();
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function summarizeDrivers(drivers: unknown): {
+  summary: string | null;
+  top: Array<{ label: string; delta: number; share: number }>;
+} {
+  const parsed = drivers as Drivers | null | undefined;
+  if (!parsed || !Array.isArray(parsed.byDimension)) return { summary: null, top: [] };
+  const best = [...parsed.byDimension]
+    .filter((d) => d.contributors.length > 0)
+    .sort((a, b) => b.explainedShare - a.explainedShare)[0];
+  const top = (best?.contributors ?? [])
+    .filter((c) => Math.sign(c.delta) === Math.sign(parsed.delta) || parsed.delta === 0)
+    .slice(0, 3)
+    .map((c) => ({ label: c.label, delta: c.delta, share: c.share }));
+  return { summary: parsed.summary ?? null, top };
+}
 
 /**
  * Context Builder (spec §41).
  *
  * Assembles the structured context injected into the system prompt: company
- * profile, key metrics of the current period and open insights. The LLM starts
- * every turn already knowing the shape of the business, which keeps most
- * questions to zero or one tool call.
+ * profile, key metrics (month-to-date and trailing 30 days), top open insights
+ * with impact and drivers, goals, business facts and the latest briefing. The
+ * LLM starts every turn already knowing the shape of the business.
  */
 export class ContextBuilder {
   constructor(private readonly deps: ContextBuilderDeps) {}
 
-  async build(ctx: ToolContext, options: { period?: { from: Date; to: Date } } = {}) {
-    const period = options.period ?? currentMonthPeriod();
-
-    const tenant = await this.deps.tenants.get(ctx, ctx.tenantId);
-
-    const metricResults = await Promise.all(
+  private async metricsFor(
+    ctx: ToolContext,
+    period: { from: Date; to: Date },
+  ): Promise<MetricResult[]> {
+    const results = await Promise.all(
       CONTEXT_METRICS.map(async (key) => {
         try {
           return (await this.deps.metrics.calculate(ctx, key, {
@@ -69,40 +193,81 @@ export class ContextBuilder {
         }
       }),
     );
+    return results.filter((result): result is MetricResult => result != null);
+  }
 
-    const insightPage = await this.deps.insights.list(ctx, {
-      status: 'open',
-      page: '1',
-      pageSize: '5',
-    });
+  async build(ctx: ToolContext, options: { period?: { from: Date; to: Date } } = {}) {
+    const now = new Date();
+    const period = options.period ?? currentMonthPeriod(now);
+    const trailingPeriod = {
+      from: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      to: now,
+    };
 
-    const metrics = metricResults.filter((result): result is MetricResult => result != null);
+    const tenant = await this.deps.tenants.get(ctx, ctx.tenantId);
 
+    const [mtd, trailing, insightPage, goals, facts, briefing] = await Promise.all([
+      this.metricsFor(ctx, period),
+      this.metricsFor(ctx, trailingPeriod),
+      this.deps.insights.list(ctx, { status: 'open', page: '1', pageSize: '5', orderBy: 'score' }),
+      this.safe(ctx, 'goals', () => this.deps.providers?.goals?.(ctx) ?? Promise.resolve([])),
+      this.safe(ctx, 'facts', () => this.deps.providers?.facts?.(ctx) ?? Promise.resolve([])),
+      this.safe(ctx, 'briefing', () => this.deps.providers?.briefing?.(ctx) ?? Promise.resolve(null)),
+    ]);
+
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const context: AiContext = {
       company: {
         id: tenant.id,
         name: tenant.name,
         currency: tenant.currency,
         timezone: tenant.timezone,
-        today: new Date().toISOString().slice(0, 10),
+        today: now.toISOString().slice(0, 10),
+        weekday: WEEKDAYS[now.getDay()] ?? '',
+        daysLeftInMonth: daysInMonth - now.getDate() + 1,
+        daysElapsedInMonth: now.getDate(),
       },
       period: { from: period.from.toISOString(), to: period.to.toISOString() },
-      metrics: metrics.map((result) => ({
-        key: result.key,
-        value: result.value,
-        change: result.comparison?.change,
-        direction: result.comparison?.direction,
-      })),
-      insights: insightPage.items.map((insight) => ({
-        id: insight.id,
-        ruleKey: insight.ruleKey,
-        type: insight.type,
-        severity: insight.severity,
-        title: insight.title,
-      })),
-      sources: metrics.map((result) => sourceFromMetric(result, 'context')),
+      metrics: mtd.map(toMetric),
+      trailing30: trailing.map(toMetric),
+      trailingPeriod: {
+        from: trailingPeriod.from.toISOString(),
+        to: trailingPeriod.to.toISOString(),
+      },
+      insights: insightPage.items.map((insight) => {
+        const drivers = summarizeDrivers(insight.drivers);
+        return {
+          id: insight.id,
+          ruleKey: insight.ruleKey,
+          type: insight.type,
+          severity: insight.severity,
+          title: insight.title,
+          impactAmount: decimalToNumber(insight.impactAmount),
+          score: insight.score,
+          entityType: insight.entityType,
+          entityId: insight.entityId,
+          driversSummary: drivers.summary,
+          topDrivers: drivers.top,
+        };
+      }),
+      goals: goals ?? [],
+      facts: facts ?? [],
+      briefing: briefing ?? null,
+      sources: [
+        ...mtd.map((result) => sourceFromMetric(result, 'context')),
+        ...trailing.map((result) => sourceFromMetric(result, 'context')),
+      ],
     };
 
     return context;
+  }
+
+  private async safe<T>(ctx: ToolContext, name: string, fn: () => Promise<T>): Promise<T | null> {
+    try {
+      return await fn();
+    } catch (error) {
+      logger.warn({ tenant_id: ctx.tenantId, provider: name, err: error }, 'context provider failed');
+      return null;
+    }
   }
 }
