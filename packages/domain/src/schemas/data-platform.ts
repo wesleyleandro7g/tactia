@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createDataSourceSchema = z.object({
   name: z.string().min(1).max(200),
-  type: z.enum(['csv', 'xlsx', 'postgres', 'rest', 'google_sheets']),
+  type: z.enum(['csv', 'xlsx', 'postgres', 'rest', 'google_sheets', 'document', 'image', 'audio']),
   configuration: z.record(z.unknown()).optional(),
   credentialId: z.string().uuid().optional().nullable(),
 });

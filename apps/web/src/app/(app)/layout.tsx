@@ -13,6 +13,7 @@ const BASE_NAV: NavItem[] = [
   { href: '/settings/facts', label: 'Fatos' },
   { href: '/settings/memory', label: 'Memória' },
   { href: '/settings/playbooks', label: 'Playbooks' },
+  { href: '/settings/documents', label: 'Documentos' },
   { href: '/onboarding', label: 'Dados' },
 ];
 

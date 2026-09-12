@@ -72,6 +72,8 @@ export type NumberSourceLike = {
   value?: number;
   label?: string;
   excerpt?: string;
+  metric?: string;
+  tool?: string;
 };
 
 /** Allowlist for chat `claim_mismatch`: context metrics + cited sources, plus prose small ints. */
@@ -91,6 +93,9 @@ export function buildClaimAllowlist(
     }
   }
   for (const source of sources) {
+    if (source.metric === 'documents' || source.tool === 'search_documents') {
+      continue;
+    }
     if (source.value != null) values.push(source.value);
     if (source.label) formatted.push(source.label);
     if (source.excerpt) formatted.push(source.excerpt);

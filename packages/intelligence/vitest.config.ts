@@ -9,5 +9,9 @@ export default defineConfig({
         singleFork: true,
       },
     },
+    env: {
+      DATABASE_URL:
+        process.env.DATABASE_URL ?? 'postgresql://tactia:tactia@localhost:5433/tactia_test',
+    },
   },
 });

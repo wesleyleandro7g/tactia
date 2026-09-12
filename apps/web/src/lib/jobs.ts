@@ -14,11 +14,15 @@ export const JOBS = {
   weeklyBriefing: 'briefing.weekly',
   sync: 'sync.execute',
   embedFacts: 'memory.embed_facts',
+  ingestDocument: 'knowledge.ingest',
+  ingestMedia: 'knowledge.ingest_media',
 } as const;
 
 export type DailyJob = { tenantId: string; now?: string };
 export type WeeklyBriefingJob = { tenantId: string; now?: string };
 export type EmbedFactsJob = { tenantId: string };
+export type IngestDocumentJob = { tenantId: string; documentId: string };
+export type IngestMediaJob = { tenantId: string; mediaId: string };
 export type SyncJob = {
   tenantId: string;
   syncJobId: string;
@@ -91,18 +95,22 @@ function hourInTz(now: Date, timeZone: string): { hour: number; weekday: number;
 }
 
 export async function runMemoryEmbed(tenantId: string) {
-  const { businessFactService, episodeService, playbookService } = await import('./services');
+  const { businessFactService, episodeService, playbookService, catalogEmbeddingService } =
+    await import('./services');
   const facts = await businessFactService.embedPending({ tenantId });
   const episodes = await episodeService.embedPending({ tenantId });
   const playbooks = await playbookService.embedPending({ tenantId });
+  const catalog = await catalogEmbeddingService.embedPending({ tenantId });
   logger.info({
     tenant_id: tenantId,
     operation: 'memory_embed',
     facts: facts.embedded,
     episodes: episodes.embedded,
     playbooks: playbooks.embedded,
+    catalog_products: catalog.products,
+    catalog_customers: catalog.customers,
   });
-  return { facts, episodes, playbooks };
+  return { facts, episodes, playbooks, catalog };
 }
 
 export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
@@ -188,6 +196,16 @@ export async function startJobWorkers(): Promise<void> {
 
   await jobQueue.register<EmbedFactsJob>(JOBS.embedFacts, async (data) => {
     await runMemoryEmbed(data.tenantId);
+  });
+
+  await jobQueue.register<IngestDocumentJob>(JOBS.ingestDocument, async (data) => {
+    const { knowledgeDocumentService } = await import('./services');
+    await knowledgeDocumentService.ingest(data);
+  });
+
+  await jobQueue.register<IngestMediaJob>(JOBS.ingestMedia, async (data) => {
+    const { mediaIngestService } = await import('./services');
+    await mediaIngestService.ingest(data);
   });
 
   await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {

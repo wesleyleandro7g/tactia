@@ -7,6 +7,8 @@ export const FACT_CONTEXT_MIN_SCORE = 0.25;
 export const EPISODE_SEARCH_LIMIT = 8;
 export const PLAYBOOK_CONTEXT_K = 3;
 export const EMBED_PENDING_BATCH = 32;
+export const CHUNK_SEARCH_LIMIT = 8;
+export const CATALOG_SEARCH_LIMIT = 8;
 
 export function toVectorLiteral(values: number[]): string {
   if (values.length !== EMBEDDING_DIMENSIONS) {

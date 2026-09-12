@@ -12,7 +12,7 @@ export type EvalCase = {
   expect?: {
     tools?: string[];
     sourcesNonEmpty?: boolean;
-    guardrail?: ChatAnswer['guardrail'];
+    guardrail?: ChatAnswer['guardrail'] | Array<NonNullable<ChatAnswer['guardrail']>>;
     forbidden?: string[];
     required?: string[];
     noProposals?: boolean;

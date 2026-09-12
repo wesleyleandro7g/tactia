@@ -102,4 +102,26 @@ export class DataSourceRepository {
       data: { lastSyncAt },
     });
   }
+
+  async findOrCreateSystem({
+    tenantId,
+    type,
+    name,
+  }: {
+    tenantId: string;
+    type: DataSourceType;
+    name: string;
+  }) {
+    const existing = await this.db.dataSource.findFirst({
+      where: { tenantId, type, status: { not: 'inactive' } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (existing) return existing;
+    return this.create({
+      tenantId,
+      type,
+      name,
+      configuration: { system: true },
+    });
+  }
 }

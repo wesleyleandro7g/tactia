@@ -65,6 +65,18 @@ function evalDeps(): ToolDeps {
     interactions: { list: async () => ({ items: [], total: 0 }), searchSemantic: async () => [] },
     briefings: { latest: async () => null },
     facts: { create: async () => ({ id: 'fact-1', text: 'ok' }), listActive: async () => ({ items: [] }) },
+    documents: {
+      search: async () => [
+        {
+          id: 'chunk-pdf-1',
+          documentId: 'doc-pdf-1',
+          documentTitle: 'Relatório interno',
+          heading: null,
+          page: 1,
+          text: 'A receita no PDF é 10 milhões',
+        },
+      ],
+    },
   } as unknown as ToolDeps;
 }
 

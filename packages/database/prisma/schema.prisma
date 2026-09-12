@@ -78,6 +78,9 @@ enum DataSourceType {
   postgres
   rest
   google_sheets
+  document
+  image
+  audio
 }
 
 enum DataSourceStatus {
@@ -210,6 +213,33 @@ enum InteractionUrgency {
   high
 }
 
+enum KnowledgeDocumentStatus {
+  pending
+  processing
+  ready
+  failed
+}
+
+enum KnowledgeDocumentKind {
+  policy
+  playbook_doc
+  contract
+  other
+}
+
+enum MediaAssetStatus {
+  pending
+  processing
+  ready
+  failed
+}
+
+enum MediaAssetPurpose {
+  knowledge
+  interaction
+  auto
+}
+
 // ---------------------------------------------------------------------------
 // Better Auth tables (provider-owned). Domain User maps via externalAuthId.
 // ---------------------------------------------------------------------------
@@ -329,6 +359,9 @@ model Tenant {
   approvals        Approval[]
   episodes         Episode[]
   playbooks        Playbook[]
+  knowledgeDocuments KnowledgeDocument[]
+  documentChunks     DocumentChunk[]
+  mediaAssets        MediaAsset[]
 
   @@unique([slug])
   @@index([status])
@@ -420,6 +453,9 @@ model Customer {
   acquisitionSource String? @map("acquisition_source")
   status       CustomerStatus @default(active)
   metadata     Json?
+  /// Written via raw SQL (pgvector). Never selected through Prisma.
+  embedding    Unsupported("vector")?
+  embeddedAt   DateTime?      @map("embedded_at")
   deletedAt    DateTime?      @map("deleted_at")
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
@@ -480,6 +516,9 @@ model Product {
   price        Decimal?      @db.Decimal(18, 4)
   status       ProductStatus @default(active)
   metadata     Json?
+  /// Written via raw SQL (pgvector). Never selected through Prisma.
+  embedding    Unsupported("vector")?
+  embeddedAt   DateTime?     @map("embedded_at")
   deletedAt    DateTime?     @map("deleted_at")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
@@ -1249,4 +1288,75 @@ model Playbook {
   @@unique([tenantId, slug])
   @@index([tenantId, enabled])
   @@map("playbooks")
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge documents + multimodal ingest (Etapa 16 / Onda 3)
+// ---------------------------------------------------------------------------
+
+model KnowledgeDocument {
+  id         String                  @id @db.Uuid
+  tenantId   String                  @map("tenant_id") @db.Uuid
+  title      String
+  kind       KnowledgeDocumentKind   @default(other)
+  mime       String
+  storageKey String                  @map("storage_key")
+  checksum   String
+  byteSize   Int                     @map("byte_size")
+  status     KnowledgeDocumentStatus @default(pending)
+  error      String?
+  uploadedBy String?                 @map("uploaded_by") @db.Uuid
+  createdAt  DateTime                @default(now()) @map("created_at")
+  updatedAt  DateTime                @updatedAt @map("updated_at")
+  tenant     Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunks     DocumentChunk[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@unique([tenantId, checksum])
+  @@map("knowledge_documents")
+}
+
+model DocumentChunk {
+  id         String            @id @db.Uuid
+  tenantId   String            @map("tenant_id") @db.Uuid
+  documentId String            @map("document_id") @db.Uuid
+  ordinal    Int
+  heading    String?
+  page       Int?
+  text       String
+  tokenCount Int               @map("token_count")
+  /// Written via raw SQL (pgvector). Never selected through Prisma.
+  embedding  Unsupported("vector")?
+  embeddedAt DateTime?         @map("embedded_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, ordinal])
+  @@index([tenantId, documentId])
+  @@map("document_chunks")
+}
+
+model MediaAsset {
+  id             String            @id @db.Uuid
+  tenantId       String            @map("tenant_id") @db.Uuid
+  purpose        MediaAssetPurpose @default(auto)
+  mime           String
+  storageKey     String            @map("storage_key")
+  checksum       String
+  byteSize       Int               @map("byte_size")
+  status         MediaAssetStatus  @default(pending)
+  error          String?
+  classification String?
+  resultKind     String?           @map("result_kind")
+  resultId       String?           @map("result_id") @db.Uuid
+  uploadedBy     String?           @map("uploaded_by") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("media_assets")
 }

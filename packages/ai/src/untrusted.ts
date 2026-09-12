@@ -9,7 +9,16 @@ const INJECTION_PATTERNS = [
 
 export const INSTRUCTION_REMOVED = '[instrução-removida]';
 
-export type UntrustedOrigin = 'user' | 'tool' | 'fact' | 'interaction' | 'briefing' | 'episode' | 'playbook';
+export type UntrustedOrigin =
+  | 'user'
+  | 'tool'
+  | 'fact'
+  | 'interaction'
+  | 'briefing'
+  | 'episode'
+  | 'playbook'
+  | 'document'
+  | 'media';
 
 /**
  * Strip jailbreak phrases. Does not delete the surrounding text.

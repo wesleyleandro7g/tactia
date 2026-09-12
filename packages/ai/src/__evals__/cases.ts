@@ -91,4 +91,17 @@ export const cases: EvalCase[] = [
     ],
     expect: { noProposals: true },
   },
+  {
+    id: 'E16: document source does not satisfy revenue claim',
+    question: 'Quanto vendemos segundo o PDF?',
+    script: [
+      { toolCalls: [{ name: 'search_documents', input: { query: 'receita' } }] },
+      { text: 'Vendemos R$ 10.000.000.' },
+    ],
+    context: { metrics: [], insights: [], sources: [] },
+    expect: {
+      tools: ['search_documents'],
+      guardrail: ['unsourced_numbers', 'claim_mismatch'],
+    },
+  },
 ];

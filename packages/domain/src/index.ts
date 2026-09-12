@@ -20,13 +20,23 @@ export {
   playbookEmbeddingText,
 } from './memory/playbook';
 export type { PlaybookStep } from './memory/playbook';
-export type { TextEmbedder } from './ports/embedder';
+export { CatalogEmbeddingService } from './services/catalog-embedding-service';
+export { customerEmbeddingText, productEmbeddingText } from './memory/catalog-text';
+export { chunkText, estimateTokens, CHUNK_TARGET_TOKENS, CHUNK_OVERLAP_TOKENS } from './services/chunker';
+export { KnowledgeDocumentService } from './services/knowledge-document-service';
+export { MediaIngestService } from './services/media-ingest-service';
+export { Utf8AndPdfExtractor, PDF_NO_TEXT } from './ports/document-extractor';
+export type { DocumentTextExtractor } from './ports/document-extractor';
+export type { VisionExtractor, AudioTranscriber, VisionClassification } from './ports/media';
+export { VISION_UNAVAILABLE, STT_UNAVAILABLE } from './ports/media';
 export {
   FACT_CONTEXT_K,
   FACT_CONTEXT_MIN_SCORE,
   EPISODE_SEARCH_LIMIT,
   PLAYBOOK_CONTEXT_K,
   EMBEDDING_DIMENSIONS,
+  CHUNK_SEARCH_LIMIT,
+  CATALOG_SEARCH_LIMIT,
 } from '@tactia/database';
 export { ExpenseService } from './services/expense-service';
 export { PaymentService } from './services/payment-service';

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { cases } from './cases';
 import { runEvalCase } from './harness';
 
-describe.each(cases)('E14 $id', (evalCase) => {
-  it(`E14: ${evalCase.id}`, async () => {
+describe.each(cases)('$id', (evalCase) => {
+  it(evalCase.id.startsWith('E16:') ? evalCase.id : `E14: ${evalCase.id}`, async () => {
     const answer = await runEvalCase(evalCase);
     const names = answer.toolCalls.map((call) => call.name);
 
@@ -17,7 +17,12 @@ describe.each(cases)('E14 $id', (evalCase) => {
       expect(answer.sources.length).toBeGreaterThan(0);
     }
     if (evalCase.expect?.guardrail) {
-      expect(answer.guardrail).toBe(evalCase.expect.guardrail);
+      const expected = evalCase.expect.guardrail;
+      if (Array.isArray(expected)) {
+        expect(expected).toContain(answer.guardrail);
+      } else {
+        expect(answer.guardrail).toBe(expected);
+      }
     }
     for (const token of evalCase.expect?.forbidden ?? []) {
       expect(answer.content).not.toContain(token);

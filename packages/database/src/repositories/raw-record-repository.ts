@@ -94,4 +94,16 @@ export class RawRecordRepository {
     ]);
     return { items, total };
   }
+
+  async listVisionPending({ tenantId, take = 50 }: { tenantId: string; take?: number }) {
+    return this.db.rawRecord.findMany({
+      where: {
+        tenantId,
+        processedAt: null,
+        entityType: { in: ['sale', 'expense'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+  }
 }

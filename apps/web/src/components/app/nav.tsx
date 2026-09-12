@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   Database,
   FileText,
+  Files,
   History,
   LayoutDashboard,
   ListChecks,
@@ -42,6 +43,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/settings/facts': BookOpen,
   '/settings/memory': History,
   '/settings/playbooks': ListChecks,
+  '/settings/documents': Files,
   '/onboarding': Database,
   '/admin': Shield,
 };

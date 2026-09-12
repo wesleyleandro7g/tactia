@@ -47,6 +47,13 @@ export {
 export type { EmbeddingAdapter } from './embeddings/types';
 export { MockEmbeddingAdapter } from './embeddings/mock-embedding-adapter';
 export { OpenAIEmbeddingAdapter } from './embeddings/openai-embedding-adapter';
+export { MockVisionExtractor, MockAudioTranscriber } from './media/mock-media-adapters';
+export {
+  OpenAIVisionExtractor,
+  OpenAIAudioTranscriber,
+  createVisionExtractorFromEnv,
+  createAudioTranscriberFromEnv,
+} from './media/openai-media-adapters';
 export {
   LlmInteractionClassifier,
   KeywordInteractionClassifier,
@@ -93,6 +100,8 @@ export {
   createGetSellerPerformanceTool,
   createGetSellersTool,
   createSearchInteractionsTool,
+  createSearchDocumentsTool,
+  createSearchCatalogTool,
   createProposeActionTool,
   currentMonthPeriod,
   periodInputSchema,

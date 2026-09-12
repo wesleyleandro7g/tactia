@@ -2,10 +2,12 @@
 
 import { useId, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { cn } from '@/lib/cn';
-import { MAX_UPLOAD_BYTES, isCsvFile } from '@/lib/csv-upload-shared';
+import { acceptForKinds, isAllowedFile, kindHint, maxBytesForKinds, type UploadKind } from '@/lib/upload-mimes';
 
 export type FileDropzoneProps = {
   accept?: string;
+  kinds?: UploadKind[];
+  hint?: string;
   maxSizeBytes?: number;
   disabled?: boolean;
   loading?: boolean;
@@ -28,8 +30,10 @@ function formatBytes(bytes: number): string {
  * O input de arquivo fica visualmente oculto; o botão carrega o rótulo acessível.
  */
 export function FileDropzone({
-  accept = '.csv,text/csv',
-  maxSizeBytes = MAX_UPLOAD_BYTES,
+  kinds = ['csv'],
+  accept,
+  hint,
+  maxSizeBytes,
   disabled = false,
   loading = false,
   fileName,
@@ -38,6 +42,9 @@ export function FileDropzone({
   onFile,
   onClear,
 }: FileDropzoneProps) {
+  const resolvedAccept = accept ?? acceptForKinds(kinds);
+  const resolvedMax = maxSizeBytes ?? maxBytesForKinds(kinds);
+  const resolvedHint = hint ?? kindHint(kinds);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -46,6 +53,7 @@ export function FileDropzone({
   const shownError = error ?? localError;
   const ready = Boolean(fileName) && !loading;
   const locked = disabled || loading;
+  const maxMb = Math.round(resolvedMax / (1024 * 1024));
 
   function openPicker() {
     if (locked) return;
@@ -54,12 +62,12 @@ export function FileDropzone({
 
   function validateAndEmit(file: File | undefined) {
     if (!file) return;
-    if (!isCsvFile(file)) {
-      setLocalError('Envie um arquivo CSV.');
+    if (!isAllowedFile(file, kinds)) {
+      setLocalError(`Envie um arquivo aceito (${resolvedHint}).`);
       return;
     }
-    if (file.size > maxSizeBytes) {
-      setLocalError('O arquivo pode ter no máximo 20 MB.');
+    if (file.size > resolvedMax) {
+      setLocalError(`O arquivo pode ter no máximo ${maxMb} MB.`);
       return;
     }
     setLocalError(null);
@@ -154,9 +162,9 @@ export function FileDropzone({
               ↓
             </span>
             <span className="text-sm font-medium text-fg">
-              {dragging ? 'Solte o CSV aqui' : 'Arraste o arquivo ou clique para escolher'}
+              {dragging ? 'Solte o arquivo aqui' : 'Arraste o arquivo ou clique para escolher'}
             </span>
-            <span className="text-xs text-muted-foreground">CSV até 20 MB</span>
+            <span className="text-xs text-muted-foreground">{resolvedHint}</span>
           </span>
         )}
       </button>
@@ -165,7 +173,7 @@ export function FileDropzone({
         id={inputId}
         ref={inputRef}
         type="file"
-        accept={accept}
+        accept={resolvedAccept}
         className="sr-only"
         tabIndex={-1}
         aria-hidden="true"

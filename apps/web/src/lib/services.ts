@@ -37,6 +37,8 @@ import {
   PaymentRepository,
   EpisodeRepository,
   PlaybookRepository,
+  KnowledgeDocumentRepository,
+  MediaAssetRepository,
 } from '@tactia/database';
 import {
   ActivityService,
@@ -45,6 +47,7 @@ import {
   BriefingService,
   BusinessFactService,
   CampaignService,
+  CatalogEmbeddingService,
   ConversationService,
   CredentialService,
   CustomerService,
@@ -58,7 +61,9 @@ import {
   InteractionEnrichmentService,
   InteractionService,
   InventoryService,
+  KnowledgeDocumentService,
   LeadService,
+  MediaIngestService,
   MembershipService,
   MetricService,
   EpisodeService,
@@ -85,11 +90,14 @@ import {
 import {
   KeywordInteractionClassifier,
   LlmInteractionClassifier,
+  createAudioTranscriberFromEnv,
   createEmbeddingAdapterFromEnv,
   createLLMAdapterFromEnv,
+  createVisionExtractorFromEnv,
 } from '@tactia/ai';
+import { createObjectStorageFromEnv } from '@tactia/shared/storage';
 import { betterAuthProvider } from './auth-provider';
-import { getJobQueue, JOBS, jobsEnabled, type SyncJob } from './jobs';
+import { getJobQueue, JOBS, jobsEnabled, type IngestDocumentJob, type IngestMediaJob, type SyncJob } from './jobs';
 
 // ---------------------------------------------------------------------------
 // Repositories
@@ -109,6 +117,8 @@ const goalRepository = new GoalRepository(prisma);
 const businessFactRepository = new BusinessFactRepository(prisma);
 const episodeRepository = new EpisodeRepository(prisma);
 const playbookRepository = new PlaybookRepository(prisma);
+const knowledgeDocumentRepository = new KnowledgeDocumentRepository(prisma);
+const mediaAssetRepository = new MediaAssetRepository(prisma);
 const insightFeedbackRepository = new InsightFeedbackRepository(prisma);
 const tenantSettingsRepository = new TenantSettingsRepository(prisma);
 const expenseRepository = new ExpenseRepository(prisma);
@@ -150,11 +160,25 @@ export const userService = new UserService(
 
 export const membershipService = new MembershipService(membershipRepository, auditLogService);
 
-export const customerService = new CustomerService(customerRepository, auditLogService);
+const embeddingAdapter = createEmbeddingAdapterFromEnv({
+  LLM_PROVIDER: process.env.LLM_PROVIDER,
+  LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_MODEL: process.env.LLM_MODEL,
+  LLM_BASE_URL: process.env.LLM_BASE_URL,
+  EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
+});
+
+export const catalogEmbeddingService = new CatalogEmbeddingService(
+  productRepository,
+  customerRepository,
+  embeddingAdapter,
+);
+
+export const customerService = new CustomerService(customerRepository, auditLogService, catalogEmbeddingService);
 
 export const leadService = new LeadService(leadRepository, customerRepository, auditLogService, prisma);
 
-export const productService = new ProductService(productRepository, auditLogService);
+export const productService = new ProductService(productRepository, auditLogService, catalogEmbeddingService);
 
 export const sellerService = new SellerService(sellerRepository, auditLogService);
 
@@ -204,13 +228,6 @@ const llmAdapter = createLLMAdapterFromEnv(
   },
   'classifier',
 );
-const embeddingAdapter = createEmbeddingAdapterFromEnv({
-  LLM_PROVIDER: process.env.LLM_PROVIDER,
-  LLM_API_KEY: process.env.LLM_API_KEY,
-  LLM_MODEL: process.env.LLM_MODEL,
-  LLM_BASE_URL: process.env.LLM_BASE_URL,
-  EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
-});
 
 export const businessFactService = new BusinessFactService(businessFactRepository, embeddingAdapter);
 export const episodeService = new EpisodeService(episodeRepository, embeddingAdapter);
@@ -235,6 +252,65 @@ export const interactionService = new InteractionService(
   auditLogService,
   interactionEnrichmentService,
 );
+
+const objectStorage = createObjectStorageFromEnv();
+const visionExtractor = createVisionExtractorFromEnv({
+  LLM_PROVIDER: process.env.LLM_PROVIDER,
+  LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_BASE_URL: process.env.LLM_BASE_URL,
+  LLM_VISION_MODEL: process.env.LLM_VISION_MODEL,
+  STT_MODEL: process.env.STT_MODEL,
+});
+const audioTranscriber = createAudioTranscriberFromEnv({
+  LLM_PROVIDER: process.env.LLM_PROVIDER,
+  LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_BASE_URL: process.env.LLM_BASE_URL,
+  LLM_VISION_MODEL: process.env.LLM_VISION_MODEL,
+  STT_MODEL: process.env.STT_MODEL,
+});
+
+export const knowledgeDocumentService = new KnowledgeDocumentService({
+  documents: knowledgeDocumentRepository,
+  storage: objectStorage,
+  auditLogs: auditLogService,
+  embedder: embeddingAdapter,
+  enqueueIngest: jobsEnabled()
+    ? async (job) => {
+        const queue = getJobQueue();
+        if (!queue) {
+          await knowledgeDocumentService.ingest(job);
+          return;
+        }
+        await queue.publish<IngestDocumentJob>(JOBS.ingestDocument, job, {
+          singletonKey: job.documentId,
+        });
+      }
+    : undefined,
+});
+
+export const mediaIngestService = new MediaIngestService({
+  media: mediaAssetRepository,
+  storage: objectStorage,
+  dataSources: dataSourceRepository,
+  rawRecords: rawRecordRepository,
+  interactions: interactionRepository,
+  documents: knowledgeDocumentService,
+  vision: visionExtractor,
+  transcriber: audioTranscriber,
+  enrichment: interactionEnrichmentService,
+  enqueueIngest: jobsEnabled()
+    ? async (job) => {
+        const queue = getJobQueue();
+        if (!queue) {
+          await mediaIngestService.ingest(job);
+          return;
+        }
+        await queue.publish<IngestMediaJob>(JOBS.ingestMedia, job, {
+          singletonKey: job.mediaId,
+        });
+      }
+    : undefined,
+});
 
 export const credentialService = new CredentialService(credentialRepository);
 

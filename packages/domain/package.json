@@ -20,12 +20,13 @@
     "@tactia/database": "workspace:*",
     "@tactia/intelligence": "workspace:*",
     "@tactia/shared": "workspace:*",
+    "pdf-parse": "1.1.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "eslint": "^9.34.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "eslint": "^9.34.0"
+    "vitest": "^3.2.4"
   }
 }

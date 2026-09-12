@@ -25,6 +25,8 @@ import {
   saleService,
   sellerService,
   tenantService,
+  knowledgeDocumentService,
+  catalogEmbeddingService,
 } from './services';
 import { createEmbeddingAdapterFromEnv } from '@tactia/ai';
 
@@ -56,6 +58,8 @@ export const toolRegistry = new ToolRegistry(
       playbooks: playbookService,
       recommendations: recommendationService,
       interactions: interactionService,
+      documents: knowledgeDocumentService,
+      catalog: catalogEmbeddingService,
       embedder: createEmbeddingAdapterFromEnv({
         LLM_PROVIDER: process.env.LLM_PROVIDER,
         LLM_API_KEY: process.env.LLM_API_KEY,

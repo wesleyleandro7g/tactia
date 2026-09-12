@@ -8,11 +8,13 @@ import {
 import { assertRole, assertTenantContext } from '../authz';
 import { createCustomerSchema, listQuerySchema, updateCustomerSchema } from '../schemas/business';
 import { AuditAction, type AuditLogService } from './audit-log-service';
+import type { CatalogEmbeddingService } from './catalog-embedding-service';
 
 export class CustomerService {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly auditLogs: AuditLogService,
+    private readonly catalog?: CatalogEmbeddingService,
   ) {}
 
   async list(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -55,6 +57,9 @@ export class CustomerService {
       entityId: customer.id,
       metadata: { name: customer.name },
     });
+    if (this.catalog) {
+      await this.catalog.embedOneCustomer(ctx.tenantId, customer);
+    }
     return customer;
   }
 
@@ -81,6 +86,9 @@ export class CustomerService {
       entityId: id,
       metadata: { ...input },
     });
+    if (this.catalog && customer) {
+      await this.catalog.embedOneCustomer(ctx.tenantId, customer);
+    }
     return customer;
   }
 

@@ -26,6 +26,10 @@ export type {
   InteractionUrgency,
   EpisodeKind,
   EpisodeOutcome,
+  KnowledgeDocumentStatus,
+  KnowledgeDocumentKind,
+  MediaAssetStatus,
+  MediaAssetPurpose,
   Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
@@ -53,6 +57,8 @@ export {
   EPISODE_SEARCH_LIMIT,
   PLAYBOOK_CONTEXT_K,
   EMBED_PENDING_BATCH,
+  CHUNK_SEARCH_LIMIT,
+  CATALOG_SEARCH_LIMIT,
   toVectorLiteral,
 } from './embeddings';
 export { InteractionRepository } from './repositories/interaction-repository';
@@ -124,8 +130,16 @@ export type {
   CreateActionExecutionInput,
   UpdateActionExecutionInput,
 } from './repositories/action-execution-repository';
+export { KnowledgeDocumentRepository } from './repositories/knowledge-document-repository';
+export { MediaAssetRepository } from './repositories/media-asset-repository';
 export type {
-  CreateApprovalInput,
-  ResolveApprovalInput,
-} from './repositories/approval-repository';
+  CreateKnowledgeDocumentInput,
+  KnowledgeDocumentRecord,
+  DocumentChunkRecord,
+  DocumentChunkSearchHit,
+} from './repositories/knowledge-document-repository';
+export type {
+  CreateMediaAssetInput,
+  MediaAssetRecord,
+} from './repositories/media-asset-repository';
 

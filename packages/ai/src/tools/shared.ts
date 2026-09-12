@@ -4,10 +4,12 @@ import type {
   AnalyticsService,
   BriefingService,
   BusinessFactService,
+  CatalogEmbeddingService,
   CustomerService,
   EpisodeService,
   InsightService,
   InteractionService,
+  KnowledgeDocumentService,
   MetricService,
   PlaybookService,
   ProductService,
@@ -38,6 +40,8 @@ export type ToolDeps = {
   recommendations: RecommendationService;
   interactions: InteractionService;
   embedder?: EmbeddingAdapter | null;
+  documents?: KnowledgeDocumentService;
+  catalog?: CatalogEmbeddingService;
 };
 
 /** Optional ISO period accepted by every data tool. */

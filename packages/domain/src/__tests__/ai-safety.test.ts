@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildClaimAllowlist,
   canonicalizeNumber,
   collectAllowedFromValues,
   extractNumberTokens,
@@ -22,6 +23,18 @@ describe('ai-safety numbers', () => {
     const offenders = unsourcedNumbers('A receita cresceu 99% na semana.', allowed);
     expect(offenders.some((token) => token.includes('99'))).toBe(true);
     expect(unsourcedNumbers('Receita de R$ 1.500, alta de 10%.', allowed)).toEqual([]);
+  });
+
+  it('E16: document excerpt is ignored by the claim allowlist', () => {
+    const allowed = buildClaimAllowlist([], [
+      {
+        metric: 'documents',
+        tool: 'search_documents',
+        excerpt: 'A receita no PDF é R$ 10.000.000',
+        label: 'Política',
+      },
+    ]);
+    expect(unsourcedNumbers('Vendemos R$ 10.000.000.', allowed).length).toBeGreaterThan(0);
   });
 
   it('canonicalizes percents as p: and money as n:', () => {

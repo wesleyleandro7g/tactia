@@ -365,6 +365,8 @@ describe('V0.1 tools', () => {
       'get_seller_performance',
       'get_sellers',
       'search_interactions',
+      'search_documents',
+      'search_catalog',
     ]));
     expect(registry.has('propose_action')).toBe(false);
   });

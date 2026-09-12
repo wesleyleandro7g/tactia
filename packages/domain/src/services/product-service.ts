@@ -9,6 +9,7 @@ import { assertRole, assertTenantContext } from '../authz';
 import { createProductSchema, listQuerySchema, updateProductSchema } from '../schemas/business';
 import { mapMoneyFields } from '../utils/serialize';
 import { AuditAction, type AuditLogService } from './audit-log-service';
+import type { CatalogEmbeddingService } from './catalog-embedding-service';
 
 const MONEY = ['cost', 'price'] as const;
 
@@ -33,6 +34,7 @@ export class ProductService {
   constructor(
     private readonly products: ProductRepository,
     private readonly auditLogs: AuditLogService,
+    private readonly catalog?: CatalogEmbeddingService,
   ) {}
 
   private serialize(product: Record<string, unknown>): ProductDto {
@@ -84,6 +86,9 @@ export class ProductService {
       entityId: product.id,
       metadata: { name: product.name },
     });
+    if (this.catalog) {
+      await this.catalog.embedOneProduct(ctx.tenantId, product);
+    }
     return this.serialize(product as unknown as Record<string, unknown>);
   }
 
@@ -111,6 +116,9 @@ export class ProductService {
       entityId: id,
       metadata: { ...input },
     });
+    if (this.catalog) {
+      await this.catalog.embedOneProduct(ctx.tenantId, product);
+    }
     return this.serialize(product as unknown as Record<string, unknown>);
   }
 
