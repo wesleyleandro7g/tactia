@@ -16,7 +16,11 @@ export const staleDataRule: Rule = {
     const events: DetectedEvent[] = [];
     for (const source of sources) {
       // CSV uploads are one-off by nature: only flag connected sources or errors.
-      const connected = source.type === 'postgres' || source.type === 'rest' || source.type === 'google_sheets';
+      const connected =
+        source.type === 'postgres' ||
+        source.type === 'rest' ||
+        source.type === 'google_sheets' ||
+        source.type === 'mcp';
       const ageHours =
         source.lastSyncAt == null ? null : (now - source.lastSyncAt.getTime()) / (60 * 60 * 1000);
       const isStale = ageHours == null || ageHours * 60 * 60 * 1000 > staleMs;

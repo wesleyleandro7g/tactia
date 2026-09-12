@@ -8,6 +8,7 @@ const CPF_CONTEXT = /\b(?:cpf)[\s:.-]*(\d{11})\b/gi;
 const CNPJ_FORMATTED = /\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g;
 const SECRET_SK = /\bsk-[A-Za-z0-9_-]{20,}/g;
 const SECRET_BEARER = /\bBearer\s+\S+/gi;
+const TACTIA_LIVE_KEY = /\btactia_live_[A-Za-z0-9_]+/g;
 /** Grouped card numbers, optional **** in the middle. */
 const PAN_GROUPED = /\b(?:(?:\d{4}|\*{4})[ -]?){3,4}(?:\d{1,4}|\*{4})?\b/g;
 const PAN_CONTIGUOUS = /\b\d{13,19}\b/g;
@@ -36,6 +37,7 @@ export function redactSensitive(text: string): string {
   let out = text;
   out = out.replace(SECRET_SK, '[segredo]');
   out = out.replace(SECRET_BEARER, 'Bearer [segredo]');
+  out = out.replace(TACTIA_LIVE_KEY, '[segredo]');
   out = out.replace(CNPJ_FORMATTED, '[cnpj]');
   out = out.replace(CPF_FORMATTED, '[cpf]');
   out = out.replace(CPF_CONTEXT, '[cpf]');

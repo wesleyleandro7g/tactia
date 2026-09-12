@@ -5,6 +5,8 @@ export { CsvConnector } from './csv-connector';
 export type { CsvConnectorConfig } from './csv-connector';
 export { PostgresConnector } from './postgres-connector';
 export type { PostgresConnectorConfig } from './postgres-connector';
+export { McpConnector, rowsFromToolResult, MCP_HTTP_ACCEPT } from './mcp-connector';
+export type { McpConnectorConfig, McpRpc } from './mcp-connector';
 export { runDataQualityChecks } from './data-quality';
 export type { DataQualityCheckResult, QualityIssue } from './data-quality';
 export {

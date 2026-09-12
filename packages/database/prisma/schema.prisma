@@ -81,6 +81,7 @@ enum DataSourceType {
   document
   image
   audio
+  mcp
 }
 
 enum DataSourceStatus {
@@ -362,6 +363,7 @@ model Tenant {
   knowledgeDocuments KnowledgeDocument[]
   documentChunks     DocumentChunk[]
   mediaAssets        MediaAsset[]
+  apiKeys            TenantApiKey[]
 
   @@unique([slug])
   @@index([status])
@@ -385,6 +387,7 @@ model User {
   conversations  Conversation[]
   insightFeedbacks InsightFeedback[]
   businessFacts  BusinessFact[]
+  createdApiKeys TenantApiKey[]
 
   @@index([email])
   @@index([createdAt])
@@ -410,6 +413,26 @@ model Membership {
   @@index([tenantId, createdAt])
   @@index([deletedAt])
   @@map("memberships")
+}
+
+model TenantApiKey {
+  id         String          @id @db.Uuid
+  tenantId   String          @map("tenant_id") @db.Uuid
+  name       String
+  prefix     String
+  hash       String
+  scopes     String[]        @default(["tools:read"])
+  role       MembershipRole
+  createdBy  String          @map("created_by") @db.Uuid
+  lastUsedAt DateTime?       @map("last_used_at")
+  revokedAt  DateTime?       @map("revoked_at")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator    User            @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@unique([prefix])
+  @@index([tenantId, revokedAt])
+  @@map("tenant_api_keys")
 }
 
 model AuditLog {
@@ -1199,7 +1222,7 @@ model ActionExecution {
   tenantId       String                @map("tenant_id") @db.Uuid
   actionId       String                @map("action_id") @db.Uuid
   requestedBy    String?               @map("requested_by") @db.Uuid
-  /// user | ai | system — who originated the proposal
+  /// user | ai | system | mcp — who originated the proposal
   origin         String                @default("user")
   status         ActionExecutionStatus @default(pending)
   input          Json

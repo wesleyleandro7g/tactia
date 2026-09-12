@@ -132,6 +132,8 @@ export type {
 } from './repositories/action-execution-repository';
 export { KnowledgeDocumentRepository } from './repositories/knowledge-document-repository';
 export { MediaAssetRepository } from './repositories/media-asset-repository';
+export { TenantApiKeyRepository } from './repositories/tenant-api-key-repository';
+export type { CreateTenantApiKeyInput, TenantApiKeyPublic } from './repositories/tenant-api-key-repository';
 export type {
   CreateKnowledgeDocumentInput,
   KnowledgeDocumentRecord,

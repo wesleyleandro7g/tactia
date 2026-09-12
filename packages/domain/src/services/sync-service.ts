@@ -22,6 +22,7 @@ import { AppError, ErrorCode, isAppError, logger, type RequestContext } from '@t
 import {
   canonicalEntityRank,
   CsvConnector,
+  McpConnector,
   normalizeRow,
   normalizeToCanonical,
   PostgresConnector,
@@ -550,6 +551,24 @@ export class SyncService {
           ssl: config['ssl'] === true,
           username: String(credData['username'] ?? ''),
           password: String(credData['password'] ?? ''),
+        },
+        this.deps.rawRecords,
+      );
+    }
+
+    if (ds.type === 'mcp') {
+      let credData: Record<string, unknown> = {};
+      if (ds.credentialId) {
+        const cred = await this.deps.credentials.findById({ tenantId, id: ds.credentialId });
+        if (cred) {
+          credData = JSON.parse(decrypt(cred.encryptedData)) as Record<string, unknown>;
+        }
+      }
+      return new McpConnector(
+        {
+          url: String(config['url'] ?? ''),
+          authorization:
+            typeof credData['authorization'] === 'string' ? credData['authorization'] : undefined,
         },
         this.deps.rawRecords,
       );

@@ -39,6 +39,7 @@ import {
   PlaybookRepository,
   KnowledgeDocumentRepository,
   MediaAssetRepository,
+  TenantApiKeyRepository,
 } from '@tactia/database';
 import {
   ActivityService,
@@ -77,6 +78,7 @@ import {
   SyncService,
   TenantService,
   ThresholdCalibrator,
+  TenantApiKeyService,
   UserService,
 } from '@tactia/domain';
 import { MetricEngine, SnapshotEngine } from '@tactia/intelligence';
@@ -142,6 +144,7 @@ const messageRepository = new MessageRepository(prisma);
 const actionRepository = new ActionRepository(prisma);
 const actionExecutionRepository = new ActionExecutionRepository(prisma);
 const approvalRepository = new ApprovalRepository(prisma);
+const tenantApiKeyRepository = new TenantApiKeyRepository(prisma);
 
 // ---------------------------------------------------------------------------
 // Services
@@ -313,6 +316,8 @@ export const mediaIngestService = new MediaIngestService({
 });
 
 export const credentialService = new CredentialService(credentialRepository);
+
+export const tenantApiKeyService = new TenantApiKeyService(tenantApiKeyRepository, auditLogService);
 
 export const dataSourceService = new DataSourceService(
   dataSourceRepository,

@@ -17,11 +17,13 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.52",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@tactia/domain": "workspace:*",
     "@tactia/intelligence": "workspace:*",
     "@tactia/shared": "workspace:*",
     "ai": "7.0.85",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "3.25.2"
   },
   "devDependencies": {
     "@tactia/database": "workspace:*",

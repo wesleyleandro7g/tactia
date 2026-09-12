@@ -10,6 +10,7 @@ describe('redactSensitive', () => {
       'masked 4111 **** 1111 1111',
       'key sk-abcdefghijklmnopqrstuvwxyz123456',
       'auth Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload',
+      'mcp tactia_live_k4f9c2ab_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     ].join(' | ');
 
     const redacted = redactSensitive(text);
@@ -23,6 +24,7 @@ describe('redactSensitive', () => {
     expect(redacted).not.toContain('4111111111111111');
     expect(redacted).not.toContain('sk-abcdefghijklmnopqrstuvwxyz123456');
     expect(redacted).not.toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9');
+    expect(redacted).not.toContain('tactia_live_k4f9c2ab_');
   });
 
   it('E14: redactSensitive keeps email and phone', () => {

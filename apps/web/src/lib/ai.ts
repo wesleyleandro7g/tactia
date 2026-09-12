@@ -35,7 +35,10 @@ import { createEmbeddingAdapterFromEnv } from '@tactia/ai';
  * *propose* an action, which lands in `awaiting_approval` (spec §44).
  */
 const actionProposer: ActionProposalPort = {
-  propose: (ctx, input) => executionEngine.proposeFromAi(ctx, input),
+  propose: (ctx, input) =>
+    ctx.origin === 'mcp'
+      ? executionEngine.proposeFromMcp(ctx, input)
+      : executionEngine.proposeFromAi(ctx, input),
 };
 
 /**

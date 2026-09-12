@@ -30,6 +30,10 @@ export type RequestContext = {
   userId: string | null;
   role: MembershipRole | null;
   ip?: string | null;
+  /** Present when the caller authenticated with a TenantApiKey (MCP). */
+  apiKeyId?: string | null;
+  apiKeyPrefix?: string | null;
+  apiKeyScopes?: string[];
 };
 
 export const TENANT_COOKIE = 'tactia-tenant-id';

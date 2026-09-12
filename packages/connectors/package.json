@@ -16,6 +16,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@tactia/database": "workspace:*",
     "@tactia/shared": "workspace:*",
     "csv-parse": "^5.6.0",
@@ -23,8 +24,8 @@
   },
   "devDependencies": {
     "@types/pg": "^8.11.14",
+    "eslint": "^9.34.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "eslint": "^9.34.0"
+    "vitest": "^3.2.4"
   }
 }

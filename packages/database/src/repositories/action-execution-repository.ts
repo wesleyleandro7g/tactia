@@ -6,7 +6,7 @@ export type CreateActionExecutionInput = {
   tenantId: string;
   actionId: string;
   requestedBy?: string | null;
-  /** user | ai | system */
+  /** user | ai | system | mcp */
   origin?: string;
   status: ActionExecutionStatus;
   input: unknown;

@@ -114,6 +114,8 @@ export {
   type CreateToolsOptions,
   type ToolDeps,
 } from './tools/index';
+export { handleMcpHttpRequest, MCP_HTTP_ACCEPT, MCP_SERVER_NAME, MCP_SERVER_VERSION } from './mcp/server';
+export type { HandleMcpHttpOptions, McpToolCallAudit } from './mcp/server';
 export type {
   ActionProposal,
   ChatAnswer,

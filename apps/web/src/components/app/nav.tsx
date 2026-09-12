@@ -11,6 +11,7 @@ import {
   FileText,
   Files,
   History,
+  Key,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -44,6 +45,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/settings/memory': History,
   '/settings/playbooks': ListChecks,
   '/settings/documents': Files,
+  '/settings/api-keys': Key,
   '/onboarding': Database,
   '/admin': Shield,
 };

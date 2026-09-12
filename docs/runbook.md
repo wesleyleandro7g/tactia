@@ -262,6 +262,32 @@ curl -X POST https://SEU-HOST/api/v1/intelligence/daily \
 
 Se `JOBS_ENABLED` estiver off, sync e ações continuam **inline** no request.
 
+## 13.1 Agentes externos (MCP)
+
+Clientes MCP (Claude Desktop, outro agente interno) chamam `POST /api/v1/mcp` com uma API key do tenant. Isso executa as **mesmas tools** do chat. Números vêm no JSON `data` + `sources`. Se o cliente MCP **escrever** uma frase com número inventado, a Tactia não intercepta — o guardrail de prosa vale no orchestrator do chat. Ações (`propose_action`) entram na fila de aprovação.
+
+Owner/admin emite a key em `/settings/api-keys` (o secret aparece **uma vez**). Não use `CRON_SECRET` aqui — é segredo de plataforma, não de tenant.
+
+```bash
+# Listar tools (Accept precisa dos dois tipos; o SDK Streamable HTTP exige)
+curl -s https://SEU-HOST/api/v1/mcp \
+  -H "Authorization: Bearer tactia_live_<prefix>_<secret>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+Configuração típica no cliente:
+
+```json
+{
+  "url": "https://<host>/api/v1/mcp",
+  "headers": { "Authorization": "Bearer tactia_live_..." }
+}
+```
+
+Limite: 60 req/min por key. `GET`/`DELETE` na mesma path existem só para o transporte Streamable HTTP (SSE / teardown); o fluxo útil é `POST`.
+
 ## 14. Limitações conhecidas da V0.1
 
 | Limitação | Impacto |

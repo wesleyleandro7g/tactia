@@ -93,7 +93,7 @@ export class ExecutionEngine {
     // Schema validation before anything is persisted (spec §45)
     const input = this.deps.registry.validate(action.type, raw.input);
 
-    const requiresApproval = action.requiresApproval || origin === 'ai';
+    const requiresApproval = action.requiresApproval || origin === 'ai' || origin === 'mcp';
 
     let execution;
     try {
@@ -131,7 +131,7 @@ export class ExecutionEngine {
       action: AuditAction.ACTION_PROPOSED,
       entityType: 'action_execution',
       entityId: execution.id,
-      actorType: origin === 'ai' ? 'ai' : 'user',
+      actorType: origin === 'ai' || origin === 'mcp' ? origin : 'user',
       metadata: {
         actionType: action.type,
         origin,
@@ -155,6 +155,25 @@ export class ExecutionEngine {
     ctx: RequestContext,
     input: { actionType: string; input: unknown; reason?: string | null },
   ) {
+    return this.proposeFromOrigin(ctx, input, 'ai');
+  }
+
+  /**
+   * Entry point used by the MCP adapter. Same motor as AI: never executes,
+   * always parked in `awaiting_approval` (Onda 4).
+   */
+  async proposeFromMcp(
+    ctx: RequestContext,
+    input: { actionType: string; input: unknown; reason?: string | null },
+  ) {
+    return this.proposeFromOrigin(ctx, input, 'mcp');
+  }
+
+  private async proposeFromOrigin(
+    ctx: RequestContext,
+    input: { actionType: string; input: unknown; reason?: string | null },
+    origin: 'ai' | 'mcp',
+  ) {
     const type = input.actionType as ActionType;
     if (!this.deps.registry.has(type)) {
       throw new AppError(
@@ -166,7 +185,7 @@ export class ExecutionEngine {
     const execution = await this.propose(
       ctx,
       { actionType: type, input: input.input, reason: input.reason ?? null },
-      { origin: 'ai' },
+      { origin },
     );
 
     return {

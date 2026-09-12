@@ -7,6 +7,7 @@ import type {
 import { AppError, ErrorCode, paginationArgs, type RequestContext } from '@tactia/shared';
 import {
   CsvConnector,
+  McpConnector,
   PostgresConnector,
   type ConnectionTestResult,
   type DiscoveryResult,
@@ -193,6 +194,19 @@ export class DataSourceService {
         ssl: config['ssl'] === true,
         username: String(credData['username'] ?? ''),
         password: String(credData['password'] ?? ''),
+      });
+    }
+
+    if (ds.type === 'mcp') {
+      let credData: Record<string, unknown> = {};
+      if (ds.credentialId) {
+        const credService = new CredentialService(this.credentials);
+        credData = await credService.getDecryptedData(ctx, ds.credentialId);
+      }
+      return new McpConnector({
+        url: String(config['url'] ?? ''),
+        authorization:
+          typeof credData['authorization'] === 'string' ? credData['authorization'] : undefined,
       });
     }
 

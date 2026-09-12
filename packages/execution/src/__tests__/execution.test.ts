@@ -460,6 +460,34 @@ describe('ExecutionEngine', () => {
     expect(proposedEntry?.actorType).toBe('ai');
   });
 
+  it('E17: propose_action via MCP origin mcp awaiting_approval no task', async () => {
+    await actionRepository.create({
+      tenantId,
+      type: 'create_task',
+      name: 'Criar tarefa',
+      configuration: {},
+      requiresApproval: false,
+    });
+
+    const proposal = await engine.proposeFromMcp(memberCtx, {
+      actionType: 'create_task',
+      input: { title: 'Tarefa sugerida via MCP' },
+      reason: 'Cliente inativo há 40 dias',
+    });
+
+    expect(proposal.status).toBe('awaiting_approval');
+    expect(proposal.requiresApproval).toBe(true);
+    expect(proposal.approvalId).not.toBeNull();
+    expect(await prisma.activity.count({ where: { tenantId, type: 'task' } })).toBe(0);
+
+    const execution = await actionService.getExecution(memberCtx, proposal.id);
+    expect(execution.origin).toBe('mcp');
+
+    const audit = await auditLogRepository.list({ tenantId, skip: 0, take: 50 });
+    const proposedEntry = audit.items.find((entry) => entry.action === 'ACTION_PROPOSED');
+    expect(proposedEntry?.actorType).toBe('mcp');
+  });
+
   it('rejects an unsupported action type coming from the AI', async () => {
     await expect(
       engine.proposeFromAi(memberCtx, { actionType: 'send_whatsapp', input: {} }),

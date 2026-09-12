@@ -65,6 +65,15 @@ export type {
   RunPipelineOptions,
 } from './services/intelligence-pipeline-service';
 export { CredentialService, encrypt, decrypt } from './services/credential-service';
+export { TenantApiKeyService } from './services/tenant-api-key-service';
+export type { VerifiedTenantApiKey } from './services/tenant-api-key-service';
+export {
+  parseTenantApiKeyToken,
+  generateTenantApiKeySecret,
+  TOKEN_PREFIX,
+} from './services/tenant-api-key-crypto';
+export { createApiKeySchema, API_KEY_SCOPES } from './schemas/api-keys';
+export type { ApiKeyScope } from './schemas/api-keys';
 export { DataSourceService } from './services/data-source-service';
 export { SyncService } from './services/sync-service';
 export { ImportService } from './services/import-service';

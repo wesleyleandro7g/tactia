@@ -16,6 +16,8 @@ export type ToolContext = RequestContext & {
   tenantId: string;
   userId: string;
   role: MembershipRole;
+  /** Set by the MCP adapter so `propose_action` records origin `mcp`. */
+  origin?: 'ai' | 'mcp';
 };
 
 /**

@@ -85,4 +85,4 @@ export type ProposeActionInput = {
   reason?: string | null;
 };
 
-export type ExecutionOrigin = 'user' | 'ai' | 'system';
+export type ExecutionOrigin = 'user' | 'ai' | 'system' | 'mcp';

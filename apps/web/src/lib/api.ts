@@ -15,7 +15,7 @@ import {
 import { cookies } from 'next/headers';
 import { auth } from './auth';
 import { enforceRateLimit, type RateLimitPolicy } from './rate-limit';
-import { tenantService, userService } from './services';
+import { tenantService, tenantApiKeyService, userService } from './services';
 
 export function getClientIp(request: Request): string | null {
   return (
@@ -54,7 +54,35 @@ export async function resolveRequestContext(request: Request): Promise<RequestCo
   };
 }
 
-type AuthMode = 'none' | 'user' | 'tenant';
+export async function resolveApiKeyContext(request: Request): Promise<RequestContext> {
+  const requestId = request.headers.get(REQUEST_ID_HEADER) || createId();
+  const ip = getClientIp(request);
+  const header = request.headers.get('authorization');
+  const token = header?.replace(/^Bearer\s+/i, '').trim() ?? '';
+  if (!token) {
+    throw new AppError(ErrorCode.AUTHENTICATION_ERROR, 'Authentication required');
+  }
+
+  const verified = await tenantApiKeyService.verify(token);
+  if (!verified) {
+    throw new AppError(ErrorCode.AUTHENTICATION_ERROR, 'Authentication required');
+  }
+
+  tenantApiKeyService.touchLastUsed(verified.keyId);
+
+  return {
+    requestId,
+    tenantId: verified.tenantId,
+    userId: verified.userId,
+    role: verified.role,
+    ip,
+    apiKeyId: verified.keyId,
+    apiKeyPrefix: verified.prefix,
+    apiKeyScopes: verified.scopes,
+  };
+}
+
+type AuthMode = 'none' | 'user' | 'tenant' | 'api_key';
 
 type Handler = (
   request: Request,
@@ -87,19 +115,23 @@ export function createApiHandler(
     };
 
     try {
-      ctx = await resolveRequestContext(request);
+      if (options.auth === 'api_key') {
+        ctx = await resolveApiKeyContext(request);
+      } else {
+        ctx = await resolveRequestContext(request);
 
-      if (options.auth === 'user' || options.auth === 'tenant') {
-        if (!ctx.userId) {
-          throw new AppError(ErrorCode.AUTHENTICATION_ERROR, 'Authentication required');
+        if (options.auth === 'user' || options.auth === 'tenant') {
+          if (!ctx.userId) {
+            throw new AppError(ErrorCode.AUTHENTICATION_ERROR, 'Authentication required');
+          }
         }
-      }
-      if (options.auth === 'tenant') {
-        if (!ctx.tenantId || !ctx.role) {
-          throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
-        }
-        if (options.roles && !options.roles.includes(ctx.role)) {
-          throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'Insufficient permissions');
+        if (options.auth === 'tenant') {
+          if (!ctx.tenantId || !ctx.role) {
+            throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+          }
+          if (options.roles && !options.roles.includes(ctx.role)) {
+            throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'Insufficient permissions');
+          }
         }
       }
 

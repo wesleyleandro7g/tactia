@@ -211,4 +211,16 @@ Um roteiro de 15 minutos que costuma funcionar:
 - Reimporte periodicamente (`/admin` → **Disparar sync**) ou agende a chamada de
   `POST /api/v1/data-sources/:id/sync`.
 - Acompanhe `/admin/tenants/:id`: sync jobs, contadores, erros e insights.
-- Limites por padrão: 6 syncs/min, 20 mensagens de chat/min por tenant.
+- Limites por padrão: 6 syncs/min, 20 mensagens de chat/min por tenant,
+  60 req/min por API key MCP.
+
+## Agentes externos
+
+Se o cliente quiser o Claude Desktop (ou outro agente interno) falando com os
+dados da empresa, o owner/admin emite uma API key em `/settings/api-keys` e
+aponta o cliente para `POST /api/v1/mcp` com `Authorization: Bearer tactia_live_...`.
+
+São as **mesmas tools** do chat. Números vêm no JSON (`data` + `sources`). A prosa
+que o cliente MCP escrever **não** passa pelo guardrail de números do chat. Uma
+`propose_action` entra na fila de `/approvals` — a Tactia não executa sozinha.
+Não use `CRON_SECRET` nesse header. Detalhe operacional no [runbook](./runbook.md#131-agentes-externos-mcp).

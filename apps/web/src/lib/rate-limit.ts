@@ -48,6 +48,8 @@ export const RATE_LIMITS = {
   execution: { name: 'execution', limit: 60, windowMs: 60_000 },
   /** CSV uploads from the import wizard. */
   upload: { name: 'upload', limit: 20, windowMs: 60_000 },
+  /** External MCP clients — tighter than chat, keyed by API key. */
+  mcp: { name: 'api_key', limit: 60, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 /**
@@ -56,9 +58,14 @@ export const RATE_LIMITS = {
  */
 export function enforceRateLimit(
   policy: RateLimitPolicy,
-  identity: { tenantId?: string | null; userId?: string | null; ip?: string | null },
+  identity: {
+    tenantId?: string | null;
+    userId?: string | null;
+    ip?: string | null;
+    apiKeyId?: string | null;
+  },
 ): void {
-  const subject = identity.tenantId ?? identity.userId ?? identity.ip ?? 'unknown';
+  const subject = identity.apiKeyId ?? identity.tenantId ?? identity.userId ?? identity.ip ?? 'unknown';
   if (consumeRateLimit(`${policy.name}:${subject}`, policy.limit, policy.windowMs)) return;
   throw new AppError(
     ErrorCode.RATE_LIMITED,

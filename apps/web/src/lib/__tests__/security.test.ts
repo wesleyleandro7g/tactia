@@ -30,6 +30,21 @@ describe('rate limiting (spec §49)', () => {
     expect(() => enforceRateLimit(policy, { tenantId: 'tenant-b' })).not.toThrow();
   });
 
+  it('E17: rate limit 61st call RATE_LIMITED', () => {
+    const identity = { apiKeyId: `e17-${Math.random()}` };
+    for (let i = 0; i < RATE_LIMITS.mcp.limit; i += 1) {
+      expect(() => enforceRateLimit(RATE_LIMITS.mcp, identity)).not.toThrow();
+    }
+    try {
+      enforceRateLimit(RATE_LIMITS.mcp, identity);
+      throw new Error('should have been rate limited');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe(ErrorCode.RATE_LIMITED);
+      expect((error as AppError).statusCode).toBe(429);
+    }
+  });
+
   it('falls back to user, then ip, when there is no tenant', () => {
     const policy = { name: `anon-${Math.random()}`, limit: 1, windowMs: 60_000 };
     expect(() => enforceRateLimit(policy, { ip: '10.0.0.1' })).not.toThrow();
@@ -47,7 +62,7 @@ describe('rate limiting (spec §49)', () => {
   });
 
   it('covers the expensive endpoints', () => {
-    expect(Object.keys(RATE_LIMITS).sort()).toEqual(['chat', 'execution', 'pipeline', 'sync', 'upload']);
+    expect(Object.keys(RATE_LIMITS).sort()).toEqual(['chat', 'execution', 'mcp', 'pipeline', 'sync', 'upload']);
     for (const policy of Object.values(RATE_LIMITS)) {
       expect(policy.limit).toBeGreaterThan(0);
       expect(policy.windowMs).toBeGreaterThan(0);
