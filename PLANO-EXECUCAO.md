@@ -1,7 +1,7 @@
 # Tactia Core V0.1 — Plano de Execução
 
 **Base:** [spec.md](spec.md) (v0.1)
-**Formato:** 10 etapas sequenciais (com paralelismo indicado), cada uma projetada para ser executada por um agente autônomo.
+**Formato:** 14 etapas sequenciais (0–13; 10–13 são Insights v2), cada uma projetada para ser executada por um agente autônomo.
 **Regra geral:** cada etapa só é considerada concluída quando seus critérios de aceite passam e o build/testes do monorepo continuam verdes.
 
 ---
@@ -73,6 +73,10 @@ flowchart TD
     E6 --> E8
     E7 --> E8
     E8 --> E9[Etapa 9: Pilot Readiness]
+    E9 --> E10[Etapa 10: Insights v2]
+    E10 --> E11[Etapa 11: Snapshots e jobs]
+    E11 --> E12[Etapa 12: Metas funil memória]
+    E12 --> E13[Etapa 13: Finanças estoque aquisição]
 ```
 
 Paralelismo possível: E4 pode começar junto com E3 (usando dados de seed); E7 pode rodar em paralelo com E6.
@@ -355,3 +359,35 @@ Você vai executar a Etapa N do plano em PLANO-EXECUCAO.md do projeto Tactia.
 4. E6 e E7 em paralelo após E5
 5. E8 após E6+E7
 6. E9 por último
+7. E10 → E11 → E12 → E13 (Insights v2; sequencial)
+
+---
+
+## Etapa 10 — Insights v2 (causa, impacto, drivers)
+
+**Depende de:** Etapa 9. **Doc:** [docs/etapa-10.md](docs/etapa-10.md).
+
+Motor de insights com fingerprint, drivers, score e regras pluggable. Chat
+analítico (explain_change, compare_periods, voz do cliente). UI com impacto
+e “perguntar no chat”.
+
+## Etapa 11 — Snapshots, baseline, forecast e jobs
+
+**Depende de:** Etapa 10. **Doc:** [docs/etapa-11.md](docs/etapa-11.md).
+
+Histórico diário, baseline estatístico, forecast com banda, pg-boss
+(`intelligence.daily` 03:00 TZ do tenant) e briefing semanal validado.
+
+## Etapa 12 — Metas, funil, memória e feedback
+
+**Depende de:** Etapa 11. **Doc:** [docs/etapa-12.md](docs/etapa-12.md).
+
+Goals, LeadStageTransition, BusinessFact, InsightFeedback +
+ThresholdCalibrator, cohorts/RFM/simulate.
+
+## Etapa 13 — Finanças, estoque, aquisição e dimensões
+
+**Depende de:** Etapa 12. **Doc:** [docs/etapa-13.md](docs/etapa-13.md).
+
+Expenses, payments, inventory, campaigns ponta a ponta; lucro/caixa/estoque/CAC;
+breakdowns channel/region; onboarding e seed.
