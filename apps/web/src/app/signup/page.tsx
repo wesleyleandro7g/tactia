@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/alert';
+import { BrandLogo } from '@/components/app/brand-logo';
 import { ThemeToggle } from '@/components/app/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,57 +52,62 @@ export default function SignupPage() {
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
         <ThemeToggle />
       </div>
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Criar empresa</CardTitle>
-          <CardDescription>Configure sua conta e comece a usar a Tactia.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="flex flex-col gap-4">
-            <Field htmlFor="name" label="Seu nome">
-              <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <Field htmlFor="email" label="Email">
-              <Input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </Field>
-            <Field htmlFor="password" label="Senha">
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Field>
-            <Field htmlFor="company" label="Nome da empresa">
-              <Input
-                id="company"
-                required
-                minLength={2}
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-              />
-            </Field>
-            {error ? <Alert tone="danger">{error}</Alert> : null}
-            <Button type="submit" loading={pending} className="w-full">
-              {pending ? 'Criando…' : 'Criar e entrar'}
-            </Button>
-          </form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Já tem conta?{' '}
-            <Link href="/login" className="text-primary hover:underline">
-              Entrar
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+      <div className="flex w-full max-w-md flex-col items-center gap-6">
+        <Link href="/" className="inline-flex">
+          <BrandLogo className="h-10" priority />
+        </Link>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="text-2xl">Criar empresa</CardTitle>
+            <CardDescription>Configure sua conta e comece a usar a Tactia.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onSubmit} className="flex flex-col gap-4">
+              <Field htmlFor="name" label="Seu nome">
+                <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+              <Field htmlFor="email" label="Email">
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              <Field htmlFor="password" label="Senha">
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+              <Field htmlFor="company" label="Nome da empresa">
+                <Input
+                  id="company"
+                  required
+                  minLength={2}
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                />
+              </Field>
+              {error ? <Alert tone="danger">{error}</Alert> : null}
+              <Button type="submit" loading={pending} className="w-full">
+                {pending ? 'Criando…' : 'Criar e entrar'}
+              </Button>
+            </form>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Já tem conta?{' '}
+              <Link href="/login" className="text-primary hover:underline">
+                Entrar
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }

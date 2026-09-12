@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BrandLogo } from '@/components/app/brand-logo';
 import { ThemeToggle } from '@/components/app/theme-toggle';
 import { Button } from '@/components/ui/button';
 
@@ -9,8 +10,8 @@ export default function HomePage() {
         <ThemeToggle />
       </div>
       <div>
-        <p className="text-sm font-medium tracking-wide text-muted-foreground">TACTIA</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
+        <BrandLogo className="h-10" priority />
+        <h1 className="mt-6 text-4xl font-semibold tracking-tight text-foreground">
           Entenda. Decida. Execute.
         </h1>
         <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">

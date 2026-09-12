@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NavLinks, SignOutButton, type NavItem } from '@/components/app/nav';
+import { BrandLogo } from '@/components/app/brand-logo';
 import { ThemeToggle } from '@/components/app/theme-toggle';
 import { TenantSwitcher } from '@/components/app/tenant-switcher';
 import {
@@ -45,8 +46,8 @@ export function AppShell({
 
       <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border">
         <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-          <Link href="/dashboard" className="text-sm font-semibold tracking-wide text-foreground">
-            TACTIA
+          <Link href="/dashboard" className="inline-flex items-center">
+            <BrandLogo className="h-7" priority />
           </Link>
         </SidebarHeader>
 
