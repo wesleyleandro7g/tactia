@@ -1,7 +1,7 @@
 # Tactia Core V0.1 — Plano de Execução
 
 **Base:** [spec.md](spec.md) (v0.1)
-**Formato:** 14 etapas sequenciais (0–13; 10–13 são Insights v2), cada uma projetada para ser executada por um agente autônomo.
+**Formato:** 18 etapas sequenciais (0–17; 10–13 são Insights v2; 14–17 são as Ondas de IA avançada), cada uma projetada para ser executada por um agente autônomo. As Etapas 14–17 têm especificação completa em `docs/onda-*.md` (este arquivo só resume).
 **Regra geral:** cada etapa só é considerada concluída quando seus critérios de aceite passam e o build/testes do monorepo continuam verdes.
 
 ---
@@ -77,6 +77,10 @@ flowchart TD
     E10 --> E11[Etapa 11: Snapshots e jobs]
     E11 --> E12[Etapa 12: Metas funil memória]
     E12 --> E13[Etapa 13: Finanças estoque aquisição]
+    E13 --> E14[Etapa 14: Onda 1 Confiança]
+    E14 --> E15[Etapa 15: Onda 2 Memória]
+    E15 --> E16[Etapa 16: Onda 3 Documentos]
+    E16 --> E17[Etapa 17: Onda 4 MCP]
 ```
 
 Paralelismo possível: E4 pode começar junto com E3 (usando dados de seed); E7 pode rodar em paralelo com E6.
@@ -344,6 +348,8 @@ Você vai executar a Etapa N do plano em PLANO-EXECUCAO.md do projeto Tactia.
 1. Leia PLANO-EXECUCAO.md (seções "Decisões técnicas fixadas", "Convenções
    obrigatórias" e a sua etapa) e as seções da spec.md citadas na etapa.
 2. Leia docs/etapa-*.md das etapas anteriores para entender o que já existe.
+   Etapas 14–17: o escopo detalhado está em docs/onda-1-confianca.md …
+   docs/onda-4-sistema-operacional.md (não neste arquivo).
 3. Implemente exatamente o escopo da etapa. Não antecipe etapas futuras nem
    adicione features fora do escopo (spec seções 5 e 61).
 4. Garanta que pnpm lint, typecheck, test e build passam ao final.
@@ -360,6 +366,8 @@ Você vai executar a Etapa N do plano em PLANO-EXECUCAO.md do projeto Tactia.
 5. E8 após E6+E7
 6. E9 por último
 7. E10 → E11 → E12 → E13 (Insights v2; sequencial)
+8. E14 → E15 → E16 → E17 (Ondas de IA; sequencial — E17 pode começar após E14
+   se só quiser MCP das tools atuais, mas o plano oficial espera E16)
 
 ---
 
@@ -391,3 +399,40 @@ ThresholdCalibrator, cohorts/RFM/simulate.
 
 Expenses, payments, inventory, campaigns ponta a ponta; lucro/caixa/estoque/CAC;
 breakdowns channel/region; onboarding e seed.
+
+---
+
+## Etapa 14 — Onda 1: Confiança (guardrails e evals)
+
+**Depende de:** Etapa 13. **Spec:** [docs/onda-1-confianca.md](docs/onda-1-confianca.md).
+Após implementar: [docs/etapa-14.md](docs/etapa-14.md).
+
+Guardrails de número (`claim_mismatch` reusando o validador do briefing),
+envelope anti-injeção, PII em log, tools filtradas por role, suite
+`packages/ai/src/__evals__/` com MockLLMAdapter. Sem tabela nova.
+
+## Etapa 15 — Onda 2: Memória da empresa
+
+**Depende de:** Etapa 14. **Spec:** [docs/onda-2-memoria.md](docs/onda-2-memoria.md).
+Após implementar: [docs/etapa-15.md](docs/etapa-15.md).
+
+Embedding em BusinessFact + retrieve top-K no contexto; episódios a partir de
+aprovações/execuções; playbooks só de leitura. pgvector, sem auto-execução.
+
+## Etapa 16 — Onda 3: Mundo bagunçado
+
+**Depende de:** Etapa 15. **Spec:** [docs/onda-3-mundo-baguncado.md](docs/onda-3-mundo-baguncado.md).
+Após implementar: [docs/etapa-16.md](docs/etapa-16.md).
+
+ObjectStorage (ainda não existe) → documentos/chunks → multimodal in (visão/STT
+→ Interaction ou RawRecord, nunca Sale sozinha) → busca híbrida de catálogo.
+Chunk não autoriza métrica.
+
+## Etapa 17 — Onda 4: Sistema operacional / MCP
+
+**Depende de:** Etapa 16. **Spec:** [docs/onda-4-sistema-operacional.md](docs/onda-4-sistema-operacional.md).
+Após implementar: [docs/etapa-17.md](docs/etapa-17.md).
+
+TenantApiKey + `POST /api/v1/mcp` sobre o ToolRegistry; `McpConnector` só para
+ingestão. Sem Slack, sem segundo orchestrator, sem `CRON_SECRET` como auth.
+
