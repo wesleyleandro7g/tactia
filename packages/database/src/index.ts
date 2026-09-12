@@ -24,6 +24,8 @@ export type {
   InteractionDirection,
   InteractionIntent,
   InteractionUrgency,
+  EpisodeKind,
+  EpisodeOutcome,
   Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
@@ -44,7 +46,18 @@ export { ExpenseRepository } from './repositories/expense-repository';
 export { PaymentRepository } from './repositories/payment-repository';
 export { InventoryLevelRepository } from './repositories/inventory-level-repository';
 export { CampaignRepository } from './repositories/campaign-repository';
-export { InteractionRepository, EMBEDDING_DIMENSIONS } from './repositories/interaction-repository';
+export {
+  EMBEDDING_DIMENSIONS,
+  FACT_CONTEXT_K,
+  FACT_CONTEXT_MIN_SCORE,
+  EPISODE_SEARCH_LIMIT,
+  PLAYBOOK_CONTEXT_K,
+  EMBED_PENDING_BATCH,
+  toVectorLiteral,
+} from './embeddings';
+export { InteractionRepository } from './repositories/interaction-repository';
+export { EpisodeRepository } from './repositories/episode-repository';
+export { PlaybookRepository } from './repositories/playbook-repository';
 export { CredentialRepository } from './repositories/credential-repository';
 export { DataSourceRepository } from './repositories/data-source-repository';
 export { SyncJobRepository } from './repositories/sync-job-repository';
@@ -72,7 +85,14 @@ export type { CreateSellerInput } from './repositories/seller-repository';
 export type { CreateSaleInput, CreateSaleItemInput } from './repositories/sale-repository';
 export type { CreateActivityInput } from './repositories/activity-repository';
 export type { CreateGoalInput } from './repositories/goal-repository';
-export type { CreateBusinessFactInput } from './repositories/business-fact-repository';
+export type { CreateBusinessFactInput, BusinessFactRecord, BusinessFactSearchHit } from './repositories/business-fact-repository';
+export type { CreateEpisodeInput, EpisodeRecord, EpisodeSearchHit } from './repositories/episode-repository';
+export type {
+  CreatePlaybookInput,
+  UpdatePlaybookInput,
+  PlaybookRecord,
+  PlaybookSearchHit,
+} from './repositories/playbook-repository';
 export type { UpsertInsightFeedbackInput } from './repositories/insight-feedback-repository';
 export type { CreateExpenseInput } from './repositories/expense-repository';
 export type { CreatePaymentInput } from './repositories/payment-repository';

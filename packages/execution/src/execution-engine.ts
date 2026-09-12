@@ -3,13 +3,23 @@ import type {
   ActionRepository,
   ActionType,
   ApprovalRepository,
+  CreateEpisodeInput,
 } from '@tactia/database';
-import { AuditAction, type AuditLogService } from '@tactia/domain';
+import {
+  AuditAction,
+  entityFromActionInput,
+  formatEpisodeText,
+  type AuditLogService,
+} from '@tactia/domain';
 import { assertOwnerOrAdmin, assertRole, assertTenantContext } from '@tactia/domain';
 import { AppError, ErrorCode, createId, isAppError, logger, type RequestContext } from '@tactia/shared';
 import type { ActionRegistry } from './action-registry';
 import { InlineJobQueue } from './job-queue';
 import type { ExecutionOrigin, JobQueue, ProposeActionInput } from './types';
+
+export type EpisodeSink = {
+  record(input: CreateEpisodeInput): Promise<void>;
+};
 
 export type ExecutionEngineDeps = {
   actions: ActionRepository;
@@ -19,6 +29,8 @@ export type ExecutionEngineDeps = {
   auditLogs: AuditLogService;
   /** Defaults to `InlineJobQueue` (spec §46). */
   queue?: JobQueue;
+  /** Optional episodic memory writer (Etapa 15). Absent = no-op. */
+  episodes?: EpisodeSink;
 };
 
 /** Statuses from which an execution may still transition to `running`. */
@@ -196,6 +208,15 @@ export class ExecutionEngine {
       metadata: { approvalId, actionType: approval.actionExecution.action.type },
     });
 
+    await this.recordEpisode({
+      tenantId: ctx.tenantId,
+      execution: approval.actionExecution,
+      kind: 'decision',
+      outcome: 'approved',
+      approvalId,
+      reason: approval.reason,
+    });
+
     await this.enqueue(ctx, approval.actionExecutionId);
     return this.requireExecution(ctx, approval.actionExecutionId);
   }
@@ -228,6 +249,15 @@ export class ExecutionEngine {
       entityType: 'action_execution',
       entityId: approval.actionExecutionId,
       metadata: { approvalId, ...(reason ? { reason } : {}) },
+    });
+
+    await this.recordEpisode({
+      tenantId: ctx.tenantId,
+      execution: approval.actionExecution,
+      kind: 'decision',
+      outcome: 'rejected',
+      approvalId,
+      reason: approval.reason,
     });
 
     return this.requireExecution(ctx, approval.actionExecutionId);
@@ -266,6 +296,15 @@ export class ExecutionEngine {
       entityType: 'action_execution',
       entityId: executionId,
       metadata: reason ? { reason } : undefined,
+    });
+
+    await this.recordEpisode({
+      tenantId: ctx.tenantId,
+      execution,
+      kind: 'decision',
+      outcome: 'cancelled',
+      approvalId: pending?.id ?? null,
+      reason: reason ?? pending?.reason ?? null,
     });
 
     return this.requireExecution(ctx, executionId);
@@ -333,6 +372,14 @@ export class ExecutionEngine {
           metadata: { actionType: execution.action.type, output },
         },
       );
+
+      await this.recordEpisode({
+        tenantId,
+        execution,
+        kind: 'action_outcome',
+        outcome: 'executed',
+        reason: execution.approvals[0]?.reason ?? null,
+      });
     } catch (error) {
       const message = isAppError(error)
         ? `${error.code}: ${error.message}`
@@ -365,6 +412,14 @@ export class ExecutionEngine {
           metadata: { actionType: execution.action.type, error: message },
         },
       );
+
+      await this.recordEpisode({
+        tenantId,
+        execution,
+        kind: 'action_outcome',
+        outcome: 'failed',
+        reason: execution.approvals[0]?.reason ?? null,
+      });
     }
 
     return this.deps.executions.findById({ tenantId, id: executionId });
@@ -398,6 +453,52 @@ export class ExecutionEngine {
     });
 
     return action;
+  }
+
+  private async recordEpisode(input: {
+    tenantId: string;
+    execution: {
+      id: string;
+      origin: string;
+      input: unknown;
+      action: { type: string };
+    };
+    kind: 'decision' | 'action_outcome';
+    outcome: CreateEpisodeInput['outcome'];
+    approvalId?: string | null;
+    reason?: string | null;
+  }) {
+    if (!this.deps.episodes) return;
+    const entity = entityFromActionInput(input.execution.input);
+    try {
+      await this.deps.episodes.record({
+        tenantId: input.tenantId,
+        kind: input.kind,
+        outcome: input.outcome,
+        text: formatEpisodeText({
+          actionType: input.execution.action.type,
+          origin: input.execution.origin,
+          outcome: input.outcome,
+          reason: input.reason,
+          input: input.execution.input,
+        }),
+        actionExecutionId: input.execution.id,
+        approvalId: input.approvalId ?? null,
+        entityType: entity.entityType,
+        entityId: entity.entityId,
+        occurredAt: new Date(),
+      });
+    } catch (error) {
+      logger.warn(
+        {
+          tenant_id: input.tenantId,
+          execution_id: input.execution.id,
+          operation: 'episode_sink',
+          err: error instanceof Error ? error.message : String(error),
+        },
+        'episode sink failed',
+      );
+    }
   }
 
   // -------------------------------------------------------------------------

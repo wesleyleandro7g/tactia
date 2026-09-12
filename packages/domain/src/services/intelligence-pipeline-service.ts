@@ -113,8 +113,6 @@ export class IntelligencePipelineService {
   }
 
   async run(options: RunPipelineOptions): Promise<PipelineResult> {
-    const { tenantId } = options;
-
     // Default period: last 30 days
     const periodTo = options.periodTo ?? new Date();
     const periodFrom =

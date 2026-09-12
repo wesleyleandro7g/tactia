@@ -25,7 +25,7 @@ import { wrapToolOutput, wrapUntrusted } from './untrusted';
 export type ContextSource = {
   build(
     ctx: ToolContext,
-    options?: { period?: { from: Date; to: Date } },
+    options?: { period?: { from: Date; to: Date }; query?: string },
   ): Promise<AiContext>;
 };
 
@@ -294,6 +294,7 @@ export class Orchestrator {
   private async prepare(request: ChatRequest) {
     const context = await this.deps.contextBuilder.build(request.ctx, {
       ...(request.period ? { period: request.period } : {}),
+      query: request.question,
     });
 
     const system = buildSystemPrompt(context, this.deps.tools.names(request.ctx.role));

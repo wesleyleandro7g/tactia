@@ -14,8 +14,11 @@ export default async function FactsSettingsPage() {
         kind: fact.kind,
         text: fact.text,
         source: fact.source,
+        entityType: fact.entityType,
+        entityId: fact.entityId,
         validFrom: fact.validFrom?.toISOString() ?? null,
         validTo: fact.validTo?.toISOString() ?? null,
+        indexed: fact.indexed,
       }))}
     />
   );

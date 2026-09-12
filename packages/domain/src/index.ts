@@ -7,6 +7,27 @@ export { CustomerService } from './services/customer-service';
 export { LeadService } from './services/lead-service';
 export { GoalService } from './services/goal-service';
 export { BusinessFactService } from './services/business-fact-service';
+export { EpisodeService } from './services/episode-service';
+export { PlaybookService } from './services/playbook-service';
+export { formatEpisodeText, entityFromActionInput } from './memory/format-episode-text';
+export type { FormatEpisodeTextInput } from './memory/format-episode-text';
+export {
+  playbookStepSchema,
+  playbookSlugSchema,
+  createPlaybookSchema,
+  updatePlaybookSchema,
+  DEMO_PLAYBOOK_RECLAMACAO_ATRASO,
+  playbookEmbeddingText,
+} from './memory/playbook';
+export type { PlaybookStep } from './memory/playbook';
+export type { TextEmbedder } from './ports/embedder';
+export {
+  FACT_CONTEXT_K,
+  FACT_CONTEXT_MIN_SCORE,
+  EPISODE_SEARCH_LIMIT,
+  PLAYBOOK_CONTEXT_K,
+  EMBEDDING_DIMENSIONS,
+} from '@tactia/database';
 export { ExpenseService } from './services/expense-service';
 export { PaymentService } from './services/payment-service';
 export { InventoryService } from './services/inventory-service';

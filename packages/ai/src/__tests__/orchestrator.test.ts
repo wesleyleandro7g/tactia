@@ -49,6 +49,7 @@ function contextSource(overrides: Partial<AiContext> = {}): ContextSource {
         trailingPeriod: PERIOD,
         goals: [],
         facts: [],
+        playbooks: [],
         briefing: null,
         metrics: [{ key: 'revenue', value: 1000, change: -0.5, direction: 'down' }],
         insights: [

@@ -13,10 +13,12 @@ export const JOBS = {
   daily: 'intelligence.daily',
   weeklyBriefing: 'briefing.weekly',
   sync: 'sync.execute',
+  embedFacts: 'memory.embed_facts',
 } as const;
 
 export type DailyJob = { tenantId: string; now?: string };
 export type WeeklyBriefingJob = { tenantId: string; now?: string };
+export type EmbedFactsJob = { tenantId: string };
 export type SyncJob = {
   tenantId: string;
   syncJobId: string;
@@ -88,6 +90,21 @@ function hourInTz(now: Date, timeZone: string): { hour: number; weekday: number;
   };
 }
 
+export async function runMemoryEmbed(tenantId: string) {
+  const { businessFactService, episodeService, playbookService } = await import('./services');
+  const facts = await businessFactService.embedPending({ tenantId });
+  const episodes = await episodeService.embedPending({ tenantId });
+  const playbooks = await playbookService.embedPending({ tenantId });
+  logger.info({
+    tenant_id: tenantId,
+    operation: 'memory_embed',
+    facts: facts.embedded,
+    episodes: episodes.embedded,
+    playbooks: playbooks.embedded,
+  });
+  return { facts, episodes, playbooks };
+}
+
 export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
   const { intelligencePipelineService, snapshotService } = await import('./services');
   const snapshots = await snapshotService.runForTenant(tenantId, { now });
@@ -97,13 +114,14 @@ export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
     windows: IntelligencePipelineService.dailyWindows(now),
     actorCtx: { tenantId, userId: null },
   });
+  const memory = await runMemoryEmbed(tenantId);
   logger.info({
     tenant_id: tenantId,
     operation: 'intelligence_daily',
     snapshot_days: snapshots.days,
     ...pipeline,
   });
-  return { snapshots, pipeline };
+  return { snapshots, pipeline, memory };
 }
 
 export async function enqueueDailyForDueTenants(now = new Date()) {
@@ -166,6 +184,10 @@ export async function startJobWorkers(): Promise<void> {
       requestId: data.requestId,
       userId: data.userId,
     });
+  });
+
+  await jobQueue.register<EmbedFactsJob>(JOBS.embedFacts, async (data) => {
+    await runMemoryEmbed(data.tenantId);
   });
 
   await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {

@@ -35,6 +35,8 @@ import {
   UserRepository,
   GoalRepository,
   PaymentRepository,
+  EpisodeRepository,
+  PlaybookRepository,
 } from '@tactia/database';
 import {
   ActivityService,
@@ -59,7 +61,9 @@ import {
   LeadService,
   MembershipService,
   MetricService,
+  EpisodeService,
   PaymentService,
+  PlaybookService,
   ProductService,
   RecommendationService,
   SaleService,
@@ -76,7 +80,6 @@ import {
   ApprovalService,
   ConsoleEmailSender,
   ExecutionEngine,
-  PgBossJobQueue,
   createDefaultActionRegistry,
 } from '@tactia/execution';
 import {
@@ -104,6 +107,8 @@ const saleRepository = new SaleRepository(prisma);
 const activityRepository = new ActivityRepository(prisma);
 const goalRepository = new GoalRepository(prisma);
 const businessFactRepository = new BusinessFactRepository(prisma);
+const episodeRepository = new EpisodeRepository(prisma);
+const playbookRepository = new PlaybookRepository(prisma);
 const insightFeedbackRepository = new InsightFeedbackRepository(prisma);
 const tenantSettingsRepository = new TenantSettingsRepository(prisma);
 const expenseRepository = new ExpenseRepository(prisma);
@@ -170,7 +175,6 @@ export const activityService = new ActivityService(
 );
 
 export const goalService = new GoalService(goalRepository);
-export const businessFactService = new BusinessFactService(businessFactRepository);
 export const expenseService = new ExpenseService(expenseRepository);
 export const paymentService = new PaymentService(paymentRepository, saleRepository);
 export const inventoryService = new InventoryService(inventoryLevelRepository, productRepository);
@@ -207,6 +211,10 @@ const embeddingAdapter = createEmbeddingAdapterFromEnv({
   LLM_BASE_URL: process.env.LLM_BASE_URL,
   EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
 });
+
+export const businessFactService = new BusinessFactService(businessFactRepository, embeddingAdapter);
+export const episodeService = new EpisodeService(episodeRepository, embeddingAdapter);
+export const playbookService = new PlaybookService(playbookRepository, auditLogService, embeddingAdapter);
 const interactionClassifier =
   process.env.LLM_PROVIDER === 'mock'
     ? new KeywordInteractionClassifier()
@@ -374,6 +382,11 @@ export const executionEngine = new ExecutionEngine({
   registry: actionRegistry,
   auditLogs: auditLogService,
   queue: getJobQueue() ?? undefined,
+  episodes: {
+    record: async (input) => {
+      await episodeService.record(input);
+    },
+  },
 });
 
 export const actionService = new ActionService(

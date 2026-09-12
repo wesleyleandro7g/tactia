@@ -5,9 +5,11 @@ import type {
   BriefingService,
   BusinessFactService,
   CustomerService,
+  EpisodeService,
   InsightService,
   InteractionService,
   MetricService,
+  PlaybookService,
   ProductService,
   RecommendationService,
   SaleService,
@@ -31,6 +33,8 @@ export type ToolDeps = {
   insights: InsightService;
   briefings?: BriefingService;
   facts?: BusinessFactService;
+  episodes?: EpisodeService;
+  playbooks?: PlaybookService;
   recommendations: RecommendationService;
   interactions: InteractionService;
   embedder?: EmbeddingAdapter | null;

@@ -24,6 +24,12 @@ import { createGetSalesTool } from './get-sales';
 import { createGetSellerPerformanceTool } from './get-seller-performance';
 import { createGetSellersTool } from './get-sellers';
 import { createSearchInteractionsTool } from './search-interactions';
+import {
+  createGetPlaybookTool,
+  createListPlaybooksTool,
+  createSearchBusinessFactsTool,
+  createSearchEpisodesTool,
+} from './memory';
 import { createProposeActionTool, type ActionProposalPort } from './propose-action';
 import {
   createGetAcquisitionTool,
@@ -77,6 +83,12 @@ export { createGetSalesTool } from './get-sales';
 export { createGetSellerPerformanceTool } from './get-seller-performance';
 export { createGetSellersTool } from './get-sellers';
 export { createSearchInteractionsTool } from './search-interactions';
+export {
+  createGetPlaybookTool,
+  createListPlaybooksTool,
+  createSearchBusinessFactsTool,
+  createSearchEpisodesTool,
+} from './memory';
 export {
   createProposeActionTool,
   PROPOSABLE_ACTION_TYPES,
@@ -132,6 +144,10 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
     createGetFunnelTool(deps),
     createRememberFactTool(deps),
     createListBusinessFactsTool(deps),
+    createSearchBusinessFactsTool(deps),
+    createSearchEpisodesTool(deps),
+    createListPlaybooksTool(deps),
+    createGetPlaybookTool(deps),
     createGetCohortsTool(deps),
     createGetRfmTool(deps),
     createSimulateTool(deps),

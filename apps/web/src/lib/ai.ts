@@ -18,6 +18,8 @@ import {
   analyticsService,
   briefingService,
   businessFactService,
+  episodeService,
+  playbookService,
   productService,
   recommendationService,
   saleService,
@@ -50,6 +52,8 @@ export const toolRegistry = new ToolRegistry(
       insights: insightService,
       briefings: briefingService,
       facts: businessFactService,
+      episodes: episodeService,
+      playbooks: playbookService,
       recommendations: recommendationService,
       interactions: interactionService,
       embedder: createEmbeddingAdapterFromEnv({
@@ -85,14 +89,23 @@ export const contextBuilder = new ContextBuilder({
         periodEnd: goal.periodEnd,
       }));
     },
-    facts: async (ctx) => {
-      const { items } = await businessFactService.listActive(ctx);
+    facts: async (ctx, query) => {
+      const items = await businessFactService.forChatContext(ctx, query);
       return items.map((fact) => ({
         id: fact.id,
         kind: fact.kind,
         text: fact.text,
         validFrom: fact.validFrom?.toISOString() ?? null,
         validTo: fact.validTo?.toISOString() ?? null,
+      }));
+    },
+    playbooks: async (ctx, query) => {
+      const items = await playbookService.forChatContext(ctx, query);
+      return items.map((playbook) => ({
+        id: playbook.id,
+        slug: playbook.slug,
+        title: playbook.title,
+        trigger: playbook.trigger,
       }));
     },
     briefing: async (ctx) => {

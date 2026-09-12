@@ -7,9 +7,10 @@ import {
   type InteractionUrgency,
   type PrismaClient,
 } from '../client';
+import { EMBEDDING_DIMENSIONS, toVectorLiteral } from '../embeddings';
 import { asJson } from '../json';
 
-export const EMBEDDING_DIMENSIONS = 1536;
+export { EMBEDDING_DIMENSIONS };
 
 export type CreateInteractionInput = {
   tenantId: string;
@@ -69,16 +70,6 @@ const interactionSelect = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.InteractionSelect;
-
-function toVectorLiteral(values: number[]): string {
-  if (values.length !== EMBEDDING_DIMENSIONS) {
-    throw new Error(`Embedding must have ${EMBEDDING_DIMENSIONS} dimensions`);
-  }
-  if (values.some((value) => !Number.isFinite(value))) {
-    throw new Error('Embedding contains a non-finite value');
-  }
-  return `[${values.join(',')}]`;
-}
 
 export class InteractionRepository {
   constructor(private readonly db: PrismaClient) {}

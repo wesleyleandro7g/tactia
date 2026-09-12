@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type { MetricResult } from '@tactia/intelligence';
 import { defineTool } from '../tool-registry';
 import type { Tool } from '../types';

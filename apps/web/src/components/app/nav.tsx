@@ -9,7 +9,9 @@ import {
   ClipboardCheck,
   Database,
   FileText,
+  History,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   MessageSquare,
   Shield,
@@ -38,6 +40,8 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/approvals': ClipboardCheck,
   '/settings/goals': Target,
   '/settings/facts': BookOpen,
+  '/settings/memory': History,
+  '/settings/playbooks': ListChecks,
   '/onboarding': Database,
   '/admin': Shield,
 };

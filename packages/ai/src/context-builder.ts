@@ -8,10 +8,12 @@ import type { MessageSource, ToolContext } from './types';
 export type ContextProviders = {
   /** Active goals with progress (Etapa 12). */
   goals?: (ctx: ToolContext) => Promise<ContextGoal[]>;
-  /** Business facts declared by the user (Etapa 12). */
-  facts?: (ctx: ToolContext) => Promise<ContextFact[]>;
+  /** Business facts declared by the user (Etapa 12 / 15). Retrieved by query similarity. */
+  facts?: (ctx: ToolContext, query: string) => Promise<ContextFact[]>;
   /** Latest weekly briefing (Etapa 11). */
   briefing?: (ctx: ToolContext) => Promise<ContextBriefing | null>;
+  /** Company playbooks retrieved by query similarity (Etapa 15). */
+  playbooks?: (ctx: ToolContext, query: string) => Promise<ContextPlaybook[]>;
 };
 
 export type ContextBuilderDeps = {
@@ -76,6 +78,13 @@ export type ContextBriefing = {
   headline: string;
 };
 
+export type ContextPlaybook = {
+  id: string;
+  slug: string;
+  title: string;
+  trigger: string;
+};
+
 export type AiContext = {
   company: {
     id: string;
@@ -100,6 +109,7 @@ export type AiContext = {
   insights: ContextInsight[];
   goals: ContextGoal[];
   facts: ContextFact[];
+  playbooks: ContextPlaybook[];
   briefing: ContextBriefing | null;
   /** Evidence for everything above — carried into the answer metadata (spec §43). */
   sources: MessageSource[];
@@ -196,23 +206,28 @@ export class ContextBuilder {
     return results.filter((result): result is MetricResult => result != null);
   }
 
-  async build(ctx: ToolContext, options: { period?: { from: Date; to: Date } } = {}) {
+  async build(
+    ctx: ToolContext,
+    options: { period?: { from: Date; to: Date }; query?: string } = {},
+  ) {
     const now = new Date();
     const period = options.period ?? currentMonthPeriod(now);
     const trailingPeriod = {
       from: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
       to: now,
     };
+    const query = options.query ?? '';
 
     const tenant = await this.deps.tenants.get(ctx, ctx.tenantId);
 
-    const [mtd, trailing, insightPage, goals, facts, briefing] = await Promise.all([
+    const [mtd, trailing, insightPage, goals, facts, briefing, playbooks] = await Promise.all([
       this.metricsFor(ctx, period),
       this.metricsFor(ctx, trailingPeriod),
       this.deps.insights.list(ctx, { status: 'open', page: '1', pageSize: '5', orderBy: 'score' }),
       this.safe(ctx, 'goals', () => this.deps.providers?.goals?.(ctx) ?? Promise.resolve([])),
-      this.safe(ctx, 'facts', () => this.deps.providers?.facts?.(ctx) ?? Promise.resolve([])),
+      this.safe(ctx, 'facts', () => this.deps.providers?.facts?.(ctx, query) ?? Promise.resolve([])),
       this.safe(ctx, 'briefing', () => this.deps.providers?.briefing?.(ctx) ?? Promise.resolve(null)),
+      this.safe(ctx, 'playbooks', () => this.deps.providers?.playbooks?.(ctx, query) ?? Promise.resolve([])),
     ]);
 
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -252,6 +267,7 @@ export class ContextBuilder {
       }),
       goals: goals ?? [],
       facts: facts ?? [],
+      playbooks: playbooks ?? [],
       briefing: briefing ?? null,
       sources: [
         ...mtd.map((result) => sourceFromMetric(result, 'context')),

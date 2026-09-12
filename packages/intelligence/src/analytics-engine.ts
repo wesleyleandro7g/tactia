@@ -472,7 +472,6 @@ export class AnalyticsEngine {
     });
 
     const now = Date.now();
-    const staleMs = staleHours * 60 * 60 * 1000;
     const items = [];
 
     for (const source of sources) {
@@ -1440,8 +1439,7 @@ export class AnalyticsEngine {
     scenario: { recoverCustomers?: number; discountShare?: number; goalId?: string },
     period: MetricPeriod,
   ) {
-    const [segments, health, ticket] = await Promise.all([
-      this.getCustomerSegments(tenantId, period, 50),
+    const [health, ticket] = await Promise.all([
       this.getSalesHealth(tenantId, period),
       this.metrics.calculate('average_ticket', { tenantId, period }),
     ]);

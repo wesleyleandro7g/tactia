@@ -16,7 +16,7 @@ export {
   type PgBossJobQueueOptions,
   type PublishOptions,
 } from './pg-boss-job-queue';
-export { ExecutionEngine, type ExecutionEngineDeps } from './execution-engine';
+export { ExecutionEngine, type ExecutionEngineDeps, type EpisodeSink } from './execution-engine';
 export { ActionService } from './action-service';
 export { ApprovalService } from './approval-service';
 export {

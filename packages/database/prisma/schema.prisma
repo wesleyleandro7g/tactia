@@ -158,6 +158,20 @@ enum ApprovalStatus {
   rejected
 }
 
+enum EpisodeKind {
+  decision
+  action_outcome
+  event
+}
+
+enum EpisodeOutcome {
+  approved
+  rejected
+  executed
+  failed
+  cancelled
+}
+
 enum RecommendationStatus {
   pending
   accepted
@@ -313,6 +327,8 @@ model Tenant {
   actions          Action[]
   actionExecutions ActionExecution[]
   approvals        Approval[]
+  episodes         Episode[]
+  playbooks        Playbook[]
 
   @@unique([slug])
   @@index([status])
@@ -931,6 +947,9 @@ model BusinessFact {
   validTo     DateTime? @map("valid_to")
   source      String    @default("user")
   createdBy   String?   @map("created_by") @db.Uuid
+  /// Written via raw SQL (pgvector). Never selected through Prisma.
+  embedding   Unsupported("vector")?
+  embeddedAt  DateTime? @map("embedded_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   author      User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
@@ -1155,6 +1174,7 @@ model ActionExecution {
   tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   action         Action                @relation(fields: [actionId], references: [id], onDelete: Cascade)
   approvals      Approval[]
+  episodes       Episode[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, status])
@@ -1180,4 +1200,53 @@ model Approval {
   @@index([tenantId, createdAt])
   @@index([actionExecutionId])
   @@map("approvals")
+}
+
+// ---------------------------------------------------------------------------
+// Memory — Episodes e Playbooks (Etapa 15 / Onda 2)
+// ---------------------------------------------------------------------------
+
+model Episode {
+  id                String         @id @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  kind              EpisodeKind
+  outcome           EpisodeOutcome
+  text              String
+  actionExecutionId String?        @map("action_execution_id") @db.Uuid
+  approvalId        String?        @map("approval_id") @db.Uuid
+  entityType        String?        @map("entity_type")
+  entityId          String?        @map("entity_id") @db.Uuid
+  /// Written via raw SQL (pgvector). Never selected through Prisma.
+  embedding         Unsupported("vector")?
+  embeddedAt        DateTime?      @map("embedded_at")
+  occurredAt        DateTime       @map("occurred_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actionExecution   ActionExecution? @relation(fields: [actionExecutionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, actionExecutionId, outcome])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, kind])
+  @@index([tenantId, actionExecutionId])
+  @@map("episodes")
+}
+
+model Playbook {
+  id         String    @id @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  slug       String
+  title      String
+  trigger    String
+  steps      Json
+  enabled    Boolean   @default(true)
+  /// Written via raw SQL (pgvector). Never selected through Prisma.
+  embedding  Unsupported("vector")?
+  embeddedAt DateTime? @map("embedded_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, enabled])
+  @@map("playbooks")
 }

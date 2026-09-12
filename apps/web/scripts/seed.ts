@@ -1,5 +1,6 @@
 import { createId } from '@tactia/shared';
 import { prisma } from '@tactia/database';
+import { DEMO_PLAYBOOK_RECLAMACAO_ATRASO } from '@tactia/domain';
 import { auth } from '../src/lib/auth';
 
 const DEMO_EMAIL = 'owner@demo.tactia';
@@ -612,6 +613,24 @@ async function seedExtendedEntities(tenantId: string) {
   );
 }
 
+async function seedPlaybooks(tenantId: string) {
+  const existing = await prisma.playbook.findUnique({
+    where: { tenantId_slug: { tenantId, slug: DEMO_PLAYBOOK_RECLAMACAO_ATRASO.slug } },
+  });
+  if (existing) return;
+  await prisma.playbook.create({
+    data: {
+      id: createId(),
+      tenantId,
+      slug: DEMO_PLAYBOOK_RECLAMACAO_ATRASO.slug,
+      title: DEMO_PLAYBOOK_RECLAMACAO_ATRASO.title,
+      trigger: DEMO_PLAYBOOK_RECLAMACAO_ATRASO.trigger,
+      steps: DEMO_PLAYBOOK_RECLAMACAO_ATRASO.steps,
+      enabled: true,
+    },
+  });
+}
+
 async function main() {
   const { tenant } = await ensureIdentity();
   console.log(`Identity ready: ${DEMO_EMAIL} / password123 (${tenant.name})`);
@@ -619,6 +638,7 @@ async function main() {
   await seedCurrentMonthSales(tenant.id);
   await seedActions(tenant.id);
   await seedExtendedEntities(tenant.id);
+  await seedPlaybooks(tenant.id);
   const customerRows = await prisma.customer.findMany({
     where: { tenantId: tenant.id },
     select: { id: true },

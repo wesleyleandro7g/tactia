@@ -8,6 +8,7 @@ export {
   type ContextGoal,
   type ContextFact,
   type ContextBriefing,
+  type ContextPlaybook,
   type ContextInsight,
   type ContextMetric,
 } from './context-builder';
@@ -71,6 +72,10 @@ export {
   createGetFunnelTool,
   createRememberFactTool,
   createListBusinessFactsTool,
+  createSearchBusinessFactsTool,
+  createSearchEpisodesTool,
+  createListPlaybooksTool,
+  createGetPlaybookTool,
   createGetCohortsTool,
   createGetRfmTool,
   createSimulateTool,

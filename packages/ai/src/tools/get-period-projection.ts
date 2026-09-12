@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { defineTool } from '../tool-registry';
 import type { Tool } from '../types';
 import { periodInputSchema, resolvePeriod, sourceFromMetric, type ToolDeps } from './shared';

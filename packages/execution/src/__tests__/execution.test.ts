@@ -20,6 +20,7 @@ import {
   ApprovalRepository,
   AuditLogRepository,
   CustomerRepository,
+  EpisodeRepository,
   LeadRepository,
   MembershipRepository,
   prisma,
@@ -27,7 +28,7 @@ import {
   TenantRepository,
   UserRepository,
 } from '@tactia/database';
-import { AuditLogService } from '@tactia/domain';
+import { AuditLogService, EpisodeService } from '@tactia/domain';
 import { ErrorCode, createId, type RequestContext } from '@tactia/shared';
 import { ActionRegistry } from '../action-registry';
 import { ActionService } from '../action-service';
@@ -35,7 +36,7 @@ import { ApprovalService } from '../approval-service';
 import { createTaskAction } from '../actions/create-task';
 import { sendEmailAction } from '../actions/send-email';
 import { MemoryEmailSender } from '../email-sender';
-import { ExecutionEngine } from '../execution-engine';
+import { ExecutionEngine, type EpisodeSink } from '../execution-engine';
 
 const TEST_SLUGS = ['exec-co', 'exec-other-co'];
 
@@ -44,6 +45,12 @@ const users = new UserRepository(prisma);
 const memberships = new MembershipRepository(prisma);
 const auditLogRepository = new AuditLogRepository(prisma);
 const auditLogs = new AuditLogService(auditLogRepository);
+const episodeService = new EpisodeService(new EpisodeRepository(prisma));
+const episodeSink: EpisodeSink = {
+  record: async (input) => {
+    await episodeService.record(input);
+  },
+};
 
 const actionRepository = new ActionRepository(prisma);
 const executionRepository = new ActionExecutionRepository(prisma);
@@ -68,13 +75,14 @@ function buildRegistry(sender: MemoryEmailSender) {
   ]);
 }
 
-function buildEngine(sender: MemoryEmailSender = emailSender) {
+function buildEngine(sender: MemoryEmailSender = emailSender, episodes?: EpisodeSink) {
   return new ExecutionEngine({
     actions: actionRepository,
     executions: executionRepository,
     approvals: approvalRepository,
     registry: buildRegistry(sender),
     auditLogs,
+    ...(episodes ? { episodes } : {}),
   });
 }
 
@@ -104,6 +112,7 @@ async function cleanUp() {
   const ids = rows.map((row) => row.id);
   if (ids.length === 0) return;
 
+  await prisma.episode.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.approval.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.actionExecution.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.action.deleteMany({ where: { tenantId: { in: ids } } });
@@ -136,6 +145,7 @@ async function createUser(name: string) {
 async function resetExecutions() {
   const rows = await prisma.tenant.findMany({ where: { slug: { in: TEST_SLUGS } } });
   const ids = rows.map((row) => row.id);
+  await prisma.episode.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.approval.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.actionExecution.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.activity.deleteMany({ where: { tenantId: { in: ids } } });
@@ -569,5 +579,99 @@ describe('ActionService', () => {
 
     const completed = await actionService.listExecutions(memberCtx, { status: 'completed' });
     expect(completed.total).toBe(0);
+  });
+});
+
+describe('E15 episodic memory', () => {
+  const memoryEngine = buildEngine(emailSender, episodeSink);
+  const memoryApprovals = new ApprovalService(approvalRepository, memoryEngine);
+
+  it('E15: approve writes episode outcome approved with deterministic text', async () => {
+    const proposed = await memoryEngine.propose(memberCtx, {
+      actionType: 'create_task',
+      input: { title: 'Ligar para o Cliente Alfa', customerId },
+      reason: 'Cliente pediu retorno',
+    });
+    await memoryApprovals.approve(ownerCtx, proposed.approvals[0]!.id, { reason: 'ok' });
+
+    const episodes = await prisma.episode.findMany({
+      where: { tenantId, actionExecutionId: proposed.id, outcome: 'approved' },
+    });
+    expect(episodes).toHaveLength(1);
+    expect(episodes[0]?.kind).toBe('decision');
+    expect(episodes[0]?.text).toContain('Proposta create_task');
+    expect(episodes[0]?.text).toContain('approved');
+    expect(episodes[0]?.text).toContain('Cliente pediu retorno');
+    expect(episodes[0]?.text).toContain('Tarefa: Ligar para o Cliente Alfa');
+  });
+
+  it('E15: reject writes episode outcome rejected', async () => {
+    const proposed = await memoryEngine.propose(memberCtx, {
+      actionType: 'create_task',
+      input: { title: 'Tarefa que não deve rodar' },
+      reason: 'Tentativa de desconto',
+    });
+    await memoryApprovals.reject(ownerCtx, proposed.approvals[0]!.id, {
+      reason: 'Não faz sentido agora',
+    });
+
+    const episodes = await prisma.episode.findMany({
+      where: { tenantId, actionExecutionId: proposed.id, outcome: 'rejected' },
+    });
+    expect(episodes).toHaveLength(1);
+    expect(episodes[0]?.kind).toBe('decision');
+    expect(episodes[0]?.text).toContain('rejected');
+  });
+
+  it('E15: run success writes episode executed', async () => {
+    await actionRepository.create({
+      tenantId,
+      type: 'create_task',
+      name: 'Criar tarefa',
+      configuration: {},
+      requiresApproval: false,
+    });
+    const execution = await memoryEngine.propose(memberCtx, {
+      actionType: 'create_task',
+      input: { title: 'Executa uma vez' },
+    });
+    expect(execution.status).toBe('completed');
+
+    const first = await prisma.episode.count({
+      where: { tenantId, actionExecutionId: execution.id, outcome: 'executed' },
+    });
+    expect(first).toBe(1);
+
+    await episodeSink.record({
+      tenantId,
+      kind: 'action_outcome',
+      outcome: 'executed',
+      text: 'duplicata',
+      actionExecutionId: execution.id,
+      occurredAt: new Date(),
+    });
+    expect(
+      await prisma.episode.count({
+        where: { tenantId, actionExecutionId: execution.id, outcome: 'executed' },
+      }),
+    ).toBe(1);
+  });
+
+  it('E15: episode sink failure does not fail approve', async () => {
+    const throwing: EpisodeSink = {
+      async record() {
+        throw new Error('sink down');
+      },
+    };
+    const fragile = buildEngine(emailSender, throwing);
+    const proposed = await fragile.propose(memberCtx, {
+      actionType: 'create_task',
+      input: { title: 'Aprovar mesmo com sink quebrado' },
+    });
+    const executed = await new ApprovalService(approvalRepository, fragile).approve(
+      ownerCtx,
+      proposed.approvals[0]!.id,
+    );
+    expect(executed.status).toBe('completed');
   });
 });

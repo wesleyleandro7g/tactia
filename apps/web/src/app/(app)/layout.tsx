@@ -11,6 +11,8 @@ const BASE_NAV: NavItem[] = [
   { href: '/approvals', label: 'Aprovações' },
   { href: '/settings/goals', label: 'Metas' },
   { href: '/settings/facts', label: 'Fatos' },
+  { href: '/settings/memory', label: 'Memória' },
+  { href: '/settings/playbooks', label: 'Playbooks' },
   { href: '/onboarding', label: 'Dados' },
 ];
 

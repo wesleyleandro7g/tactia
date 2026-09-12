@@ -49,7 +49,7 @@ export function createRememberFactTool(deps: ToolDeps): Tool {
     inputSchema: z.object({
       kind: z.enum(['fact', 'event', 'preference']).default('fact'),
       text: z.string().min(3).max(4000),
-      entityType: z.string().optional(),
+      entityType: z.enum(['seller', 'product', 'customer']).optional(),
       entityId: z.string().uuid().optional(),
     }),
     async execute(ctx, input): Promise<{
@@ -69,7 +69,7 @@ export function createRememberFactTool(deps: ToolDeps): Tool {
 export function createListBusinessFactsTool(deps: ToolDeps): Tool {
   return defineTool({
     name: 'list_business_facts',
-    description: 'Lista fatos/eventos ativos do negócio.',
+    description: 'Lista completa dos fatos ativos; para uma pergunta pontual prefira search_business_facts.',
     inputSchema: z.object({}),
     async execute(ctx): Promise<{
       data: { items: unknown[] };

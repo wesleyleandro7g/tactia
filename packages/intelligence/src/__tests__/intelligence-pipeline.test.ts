@@ -204,6 +204,27 @@ describe('RuleEngine', () => {
     const drop = events.find((e) => e.ruleKey === 'revenue_drop');
     expect(drop).toBeUndefined();
   });
+
+  it('E15: rule isSuppressed still honors entity-linked fact', () => {
+    const sellerId = createId();
+    const context = ruleEngine.buildContext({
+      tenantId,
+      period: { from: periodFrom, to: periodTo },
+      db: prisma,
+      thresholds: DEFAULT_THRESHOLDS,
+      facts: [
+        {
+          kind: 'event',
+          text: 'Ana saiu de licença',
+          entityType: 'seller',
+          entityId: sellerId,
+        },
+      ],
+    });
+    expect(context.isSuppressed('seller', sellerId)).toBe(true);
+    expect(context.isSuppressed('seller', createId())).toBe(false);
+    expect(context.isSuppressed('product', sellerId)).toBe(false);
+  });
 });
 
 describe('InsightEngine — deduplication', () => {
