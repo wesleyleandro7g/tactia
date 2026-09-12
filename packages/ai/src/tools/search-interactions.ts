@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineTool } from '../tool-registry';
+import { sanitizeInjection } from '../untrusted';
 import type { MessageSource, Tool } from '../types';
 import {
   periodInputSchema,
@@ -20,7 +21,7 @@ const inputSchema = periodInputSchema.extend({
 });
 
 function excerpt(body: string, max = 240): string {
-  const trimmed = body.trim();
+  const trimmed = sanitizeInjection(body.trim());
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
 }
 

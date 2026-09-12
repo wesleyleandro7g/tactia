@@ -43,6 +43,7 @@ export function createGetFunnelTool(deps: ToolDeps): Tool {
 export function createRememberFactTool(deps: ToolDeps): Tool {
   return defineTool({
     name: 'remember_fact',
+    minRole: 'member',
     description:
       'Grava um fato/evento/preferência do negócio informado pelo usuário. Nunca executa ação.',
     inputSchema: z.object({

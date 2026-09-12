@@ -13,7 +13,19 @@ export const logger = pino({
       }
     : {}),
   redact: {
-    paths: ['password', 'encrypted_data', 'encryptedData', 'ENCRYPTION_KEY', 'req.headers.cookie'],
+    paths: [
+      'password',
+      'encrypted_data',
+      'encryptedData',
+      'ENCRYPTION_KEY',
+      'req.headers.cookie',
+      'content',
+      'body',
+      'question',
+      '*.content',
+      '*.body',
+      '*.question',
+    ],
     censor: '[redacted]',
   },
 });

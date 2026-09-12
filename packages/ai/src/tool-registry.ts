@@ -1,5 +1,6 @@
 import { ZodError, type z } from 'zod';
-import { AppError, ErrorCode, logger } from '@tactia/shared';
+import { hasMinRole } from '@tactia/domain';
+import { AppError, ErrorCode, logger, type MembershipRole } from '@tactia/shared';
 import type { LLMToolDefinition, Tool, ToolContext, ToolResult } from './types';
 
 /**
@@ -11,12 +12,14 @@ export function defineTool<TSchema extends z.ZodTypeAny, TData>(definition: {
   name: string;
   description: string;
   inputSchema: TSchema;
+  minRole?: MembershipRole;
   execute: (context: ToolContext, input: z.infer<TSchema>) => Promise<ToolResult<TData>>;
 }): Tool {
   return {
     name: definition.name,
     description: definition.description,
     inputSchema: definition.inputSchema,
+    ...(definition.minRole ? { minRole: definition.minRole } : {}),
     async execute(context: ToolContext, input: unknown) {
       const parsed = definition.inputSchema.parse(input ?? {}) as z.infer<TSchema>;
       return definition.execute(context, parsed);
@@ -60,25 +63,42 @@ export class ToolRegistry {
     return [...this.tools.values()];
   }
 
-  names(): string[] {
-    return [...this.tools.keys()];
+  /** When `role` is omitted, every registered tool is visible (legacy tests). */
+  names(role?: MembershipRole): string[] {
+    return this.visible(role).map((tool) => tool.name);
   }
 
-  /** Tool definitions handed to the LLM adapter. */
-  definitions(): LLMToolDefinition[] {
-    return this.list().map((tool) => ({
+  /**
+   * Tool definitions handed to the LLM adapter.
+   * When `role` is omitted, behaviour matches the pre-role registry (all tools).
+   */
+  definitions(role?: MembershipRole): LLMToolDefinition[] {
+    return this.visible(role).map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
     }));
   }
 
+  private visible(role?: MembershipRole): Tool[] {
+    if (!role) return this.list();
+    return this.list().filter((tool) => hasMinRole(role, tool.minRole ?? 'viewer'));
+  }
+
   /**
    * Validate + execute a tool call.
-   * Invalid input becomes `VALIDATION_ERROR`; unknown tool becomes `NOT_FOUND`.
+   * Invalid input becomes `VALIDATION_ERROR`; unknown tool becomes `NOT_FOUND`;
+   * a tool above the caller's role becomes `AUTHORIZATION_ERROR`.
    */
   async execute(name: string, context: ToolContext, input: unknown): Promise<ToolResult> {
     const tool = this.get(name);
+    const minRole = tool.minRole ?? 'viewer';
+    if (context.role && !hasMinRole(context.role, minRole)) {
+      throw new AppError(
+        ErrorCode.AUTHORIZATION_ERROR,
+        `Tool '${name}' requires role ${minRole}`,
+      );
+    }
     const started = Date.now();
 
     try {

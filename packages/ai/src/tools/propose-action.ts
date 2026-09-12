@@ -45,6 +45,7 @@ const inputSchema = z.object({
 export function createProposeActionTool(proposer: ActionProposalPort): Tool {
   return defineTool({
     name: 'propose_action',
+    minRole: 'member',
     description:
       'Propõe uma ação estruturada para aprovação humana: criar tarefa (create_task) ou ' +
       'enviar e-mail (send_email). A ação NÃO é executada por você — ela fica pendente de ' +

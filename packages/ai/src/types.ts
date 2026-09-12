@@ -61,6 +61,8 @@ export type Tool = {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: z.ZodTypeAny;
+  /** Lowest membership that may see/call this tool. Default: viewer. */
+  readonly minRole?: MembershipRole;
   execute(context: ToolContext, input: unknown): Promise<ToolResult>;
 };
 
@@ -152,7 +154,7 @@ export type ChatAnswer = {
   model: string;
   usage?: LLMUsage;
   /** Set when a safety guardrail changed the answer (spec §43). */
-  guardrail?: 'unsourced_numbers' | 'max_iterations';
+  guardrail?: 'unsourced_numbers' | 'max_iterations' | 'claim_mismatch';
 };
 
 export type ChatStreamEvent =

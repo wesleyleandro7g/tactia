@@ -1,61 +1,13 @@
 import type { ChatAnswer, ChatTurn } from '@tactia/ai';
+import { logChatTurn } from '@tactia/ai';
 import { sendMessageSchema } from '@tactia/domain';
-import { AppError, ErrorCode, isAppError, logger, type RequestContext } from '@tactia/shared';
+import { AppError, ErrorCode, isAppError } from '@tactia/shared';
 import { answerMetadata, getOrchestrator, toToolContext } from '@/lib/ai';
 import { createApiHandler, readJson } from '@/lib/api';
 import { RATE_LIMITS } from '@/lib/rate-limit';
 import { conversationService } from '@/lib/services';
 
 const HISTORY_TURNS = 12;
-
-/**
- * Chat observability (spec §47). The streaming response returns before the
- * generation finishes, so `createApiHandler` cannot measure it: the turn is
- * logged here, with the same field names used by sync and action execution.
- */
-function logChatTurn(
-  ctx: RequestContext,
-  data: {
-    conversationId: string;
-    startedAt: number;
-    mode: 'sync' | 'stream';
-    answer?: ChatAnswer | null;
-    error?: unknown;
-  },
-) {
-  const base = {
-    request_id: ctx.requestId,
-    tenant_id: ctx.tenantId,
-    user_id: ctx.userId,
-    operation: 'chat',
-    conversation_id: data.conversationId,
-    mode: data.mode,
-    duration_ms: Date.now() - data.startedAt,
-  };
-
-  if (data.error) {
-    const appError = isAppError(data.error)
-      ? data.error
-      : new AppError(ErrorCode.AI_ERROR, 'Falha ao gerar a resposta');
-    logger.error({
-      ...base,
-      status: appError.statusCode,
-      error: appError.code,
-      message: appError.message,
-    });
-    return;
-  }
-
-  logger.info({
-    ...base,
-    status: 200,
-    provider: data.answer?.provider,
-    model: data.answer?.model,
-    tool_calls: data.answer?.toolCalls.length ?? 0,
-    sources: data.answer?.sources.length ?? 0,
-    ...(data.answer?.guardrail ? { guardrail: data.answer.guardrail } : {}),
-  });
-}
 
 /**
  * GET /api/v1/conversations/:id/messages

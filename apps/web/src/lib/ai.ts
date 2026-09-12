@@ -8,7 +8,7 @@ import {
   type ChatAnswer,
   type ToolContext,
 } from '@tactia/ai';
-import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
+import { AppError, ErrorCode, redactSensitiveDeep, type RequestContext } from '@tactia/shared';
 import {
   customerService,
   executionEngine,
@@ -148,7 +148,7 @@ export function answerMetadata(answer: ChatAnswer) {
     ...(answer.followUps.length > 0 ? { followUps: answer.followUps } : {}),
     toolCalls: answer.toolCalls.map((call) => ({
       name: call.name,
-      input: call.input,
+      input: redactSensitiveDeep(call.input),
       durationMs: call.durationMs,
       ...(call.error ? { error: call.error } : {}),
     })),

@@ -15,11 +15,14 @@ export { buildSystemPrompt, FOLLOW_UPS_HEADING } from './system-prompt';
 export {
   Orchestrator,
   extractFollowUps,
+  CLAIM_MISMATCH_FALLBACK,
   type ChatRequest,
   type ContextSource,
   type OrchestratorConfig,
   type OrchestratorDeps,
 } from './orchestrator';
+export { logChatTurn } from './observability';
+export { wrapUntrusted, sanitizeInjection, wrapToolOutput } from './untrusted';
 export { VercelLLMAdapter, type VercelLLMAdapterConfig } from './adapters/vercel-llm-adapter';
 export {
   MockLLMAdapter,

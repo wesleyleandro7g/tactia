@@ -9,6 +9,11 @@ import {
   formatInteger,
 } from '@tactia/intelligence';
 import { assertTenantContext } from '../authz';
+import {
+  allowProseSmallInts,
+  collectAllowedFromValues,
+  unsourcedNumbers as findUnsourcedNumbers,
+} from '../ai-safety/numbers';
 
 export type BriefingNarrator = {
   narrate(input: { system: string; user: string }): Promise<{ text: string; model: string }>;
@@ -22,73 +27,32 @@ export type BriefingFactSet = {
   projection?: { expected: string; low: string; high: string; method: string };
 };
 
-/** Tokens like "1.234", "R$ 12.500", "15%", "42". */
-const NUMBER_TOKEN =
-  /(?:R\$\s*)?-?\d{1,3}(?:\.\d{3})*(?:,\d+)?%?|(?:R\$\s*)?-?\d+(?:,\d+)?%?/g;
-
-export function extractNumberTokens(text: string): string[] {
-  return text.match(NUMBER_TOKEN) ?? [];
-}
-
-/** Canonical digit string, ignoring thousand separators and currency. Percent kept as integer points. */
-export function canonicalizeNumber(token: string): string {
-  const raw = token.replace(/R\$\s*/g, '').trim();
-  const isPercent = raw.endsWith('%');
-  const body = raw.replace(/%$/, '').replace(/\./g, '').replace(',', '.');
-  const value = Number(body);
-  if (!Number.isFinite(value)) return '';
-  if (isPercent) return `p:${Math.round(value)}`;
-  return `n:${Math.round(value)}`;
-}
-
 export function collectAllowedNumbers(facts: BriefingFactSet): Set<string> {
-  const allowed = new Set<string>();
-  const add = (value: number, extra?: string[]) => {
-    allowed.add(`n:${Math.round(value)}`);
-    if (extra) for (const token of extra) {
-      const key = canonicalizeNumber(token);
-      if (key) allowed.add(key);
-    }
-  };
+  const values: number[] = [];
+  const formatted: string[] = [];
 
   for (const metric of facts.metrics) {
-    add(metric.value, [metric.formatted, formatInteger(metric.value)]);
+    values.push(metric.value);
+    formatted.push(metric.formatted, formatInteger(metric.value));
     if (metric.change != null) {
-      allowed.add(`p:${Math.round(Math.abs(metric.change) * 100)}`);
-      add(Math.abs(metric.change) * 100);
+      values.push(Math.abs(metric.change) * 100);
+      formatted.push(`${Math.round(Math.abs(metric.change) * 100)}%`);
     }
   }
   for (const insight of facts.insights) {
     for (const text of [insight.title, insight.impact, insight.drivers]) {
-      if (!text) continue;
-      for (const token of extractNumberTokens(text)) {
-        const key = canonicalizeNumber(token);
-        if (key) allowed.add(key);
-      }
+      if (text) formatted.push(text);
     }
   }
   if (facts.projection) {
-    for (const text of [facts.projection.expected, facts.projection.low, facts.projection.high]) {
-      for (const token of extractNumberTokens(text)) {
-        const key = canonicalizeNumber(token);
-        if (key) allowed.add(key);
-      }
-    }
+    formatted.push(facts.projection.expected, facts.projection.low, facts.projection.high);
   }
-  // Small integers that appear as counts in prose (dias, insights).
-  for (let n = 0; n <= 31; n++) allowed.add(`n:${n}`);
-  return allowed;
+
+  return allowProseSmallInts(collectAllowedFromValues(values, formatted));
 }
 
 export function unsourcedNumbers(content: string, facts: BriefingFactSet): string[] {
-  const allowed = collectAllowedNumbers(facts);
-  const offenders: string[] = [];
-  for (const token of extractNumberTokens(content)) {
-    const key = canonicalizeNumber(token);
-    if (!key) continue;
-    if (!allowed.has(key)) offenders.push(token);
-  }
-  return [...new Set(offenders)];
+  return findUnsourcedNumbers(content, collectAllowedNumbers(facts));
 }
 
 function fallbackNarrative(facts: BriefingFactSet): string {

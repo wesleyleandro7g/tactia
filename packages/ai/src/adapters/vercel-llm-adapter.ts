@@ -50,7 +50,10 @@ function toModelMessages(messages: LLMMessage[]): ModelMessage[] {
           type: 'tool-result',
           toolCallId: message.toolCallId,
           toolName: message.toolName,
-          output: { type: 'json', value: JSON.parse(JSON.stringify(message.output ?? null)) },
+          output:
+            typeof message.output === 'string'
+              ? { type: 'text', value: message.output }
+              : { type: 'json', value: JSON.parse(JSON.stringify(message.output ?? null)) },
         },
       ],
     };

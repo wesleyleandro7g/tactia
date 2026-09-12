@@ -1,4 +1,5 @@
-import { AppError, logger } from '@tactia/shared';
+import { buildClaimAllowlist, unsourcedNumbers } from '@tactia/domain';
+import { AppError, logger, redactSensitive, redactSensitiveDeep } from '@tactia/shared';
 import type { AiContext } from './context-builder';
 import { buildSystemPrompt, FOLLOW_UPS_HEADING } from './system-prompt';
 import type { ToolRegistry } from './tool-registry';
@@ -15,6 +16,7 @@ import type {
   MessageSource,
   ToolContext,
 } from './types';
+import { wrapToolOutput, wrapUntrusted } from './untrusted';
 
 /**
  * Minimal contract the orchestrator needs from the context builder — keeps it
@@ -53,6 +55,10 @@ export type ChatRequest = {
 const UNSOURCED_FALLBACK =
   'Não consegui confirmar esses números com os dados da empresa, então prefiro não responder ' +
   'com valores. Tente reformular a pergunta indicando o período desejado.';
+
+export const CLAIM_MISMATCH_FALLBACK =
+  'Não consegui cruzar todos os números desta resposta com as evidências internas.\n' +
+  'Reformule a pergunta ou peça um período específico.';
 
 const EMPTY_FALLBACK =
   'Não consegui formular uma resposta para essa pergunta. Tente reformulá-la com mais detalhes.';
@@ -115,6 +121,14 @@ function sumUsage(a: LLMUsage | undefined, b: LLMUsage | undefined): LLMUsage | 
   };
 }
 
+function redactToolCalls(toolCalls: ExecutedToolCall[]): ExecutedToolCall[] {
+  return toolCalls.map((call) => ({
+    ...call,
+    input: redactSensitiveDeep(call.input),
+    ...(call.error ? { error: redactSensitive(call.error) } : {}),
+  }));
+}
+
 /**
  * Orchestrator (spec §41).
  *
@@ -143,17 +157,18 @@ export class Orchestrator {
     const executed: ExecutedToolCall[] = [];
     const proposals: ActionProposal[] = [];
     let usage: LLMUsage | undefined;
+    const tools = this.deps.tools.definitions(request.ctx.role);
 
     for (let round = 0; round < this.maxIterations; round += 1) {
       const completion = await this.deps.llm.complete({
         system,
         messages,
-        tools: this.deps.tools.definitions(),
+        tools,
       });
       usage = sumUsage(usage, completion.usage);
 
       if (completion.toolCalls.length === 0) {
-        return this.finalize(completion.text, sources, executed, proposals, usage);
+        return this.finalize(completion.text, sources, executed, proposals, usage, context);
       }
 
       messages.push({
@@ -183,7 +198,7 @@ export class Orchestrator {
     // Tool budget exhausted: force a final answer with the data already gathered.
     const forced = await this.deps.llm.complete({ system, messages });
     usage = sumUsage(usage, forced.usage);
-    return this.finalize(forced.text, sources, executed, proposals, usage, 'max_iterations');
+    return this.finalize(forced.text, sources, executed, proposals, usage, context, 'max_iterations');
   }
 
   /**
@@ -196,9 +211,10 @@ export class Orchestrator {
     const executed: ExecutedToolCall[] = [];
     const proposals: ActionProposal[] = [];
     let usage: LLMUsage | undefined;
+    const tools = this.deps.tools.definitions(request.ctx.role);
 
     for (let round = 0; round < this.maxIterations; round += 1) {
-      const request$ = { system, messages, tools: this.deps.tools.definitions() };
+      const request$ = { system, messages, tools };
 
       let text = '';
       const toolCalls: LLMToolCall[] = [];
@@ -228,7 +244,7 @@ export class Orchestrator {
       if (toolCalls.length === 0) {
         yield {
           type: 'done',
-          answer: this.finalize(text, sources, executed, proposals, usage),
+          answer: this.finalize(text, sources, executed, proposals, usage, context),
         };
         return;
       }
@@ -269,7 +285,7 @@ export class Orchestrator {
     if (forced.text) yield { type: 'text', delta: forced.text };
     yield {
       type: 'done',
-      answer: this.finalize(forced.text, sources, executed, proposals, usage, 'max_iterations'),
+      answer: this.finalize(forced.text, sources, executed, proposals, usage, context, 'max_iterations'),
     };
   }
 
@@ -280,16 +296,16 @@ export class Orchestrator {
       ...(request.period ? { period: request.period } : {}),
     });
 
-    const system = buildSystemPrompt(context, this.deps.tools.names());
+    const system = buildSystemPrompt(context, this.deps.tools.names(request.ctx.role));
     const history = (request.history ?? []).slice(-this.historyLimit);
 
     const messages: LLMMessage[] = [
       ...history.map((turn): LLMMessage =>
         turn.role === 'user'
-          ? { role: 'user', content: turn.content }
+          ? { role: 'user', content: wrapUntrusted(turn.content, 'user') }
           : { role: 'assistant', content: turn.content },
       ),
-      { role: 'user', content: request.question },
+      { role: 'user', content: wrapUntrusted(request.question, 'user') },
     ];
 
     return { context, system, messages };
@@ -303,7 +319,7 @@ export class Orchestrator {
     try {
       const result = await this.deps.tools.execute(toolCall.name, ctx, toolCall.input);
       return {
-        output: result.data,
+        output: wrapToolOutput(result.data, toolCall.name),
         executed: {
           name: toolCall.name,
           input: toolCall.input,
@@ -326,7 +342,7 @@ export class Orchestrator {
         'tool execution failed',
       );
       return {
-        output: { error: message },
+        output: wrapToolOutput({ error: message }, toolCall.name),
         executed: {
           name: toolCall.name,
           input: toolCall.input,
@@ -344,6 +360,7 @@ export class Orchestrator {
     toolCalls: ExecutedToolCall[],
     proposals: ActionProposal[],
     usage: LLMUsage | undefined,
+    context: AiContext,
     guardrail?: ChatAnswer['guardrail'],
   ): ChatAnswer {
     const deduped = dedupeSources(sources);
@@ -358,6 +375,22 @@ export class Orchestrator {
       content = UNSOURCED_FALLBACK;
       followUps = [];
       flag = 'unsourced_numbers';
+    } else if (this.enforceSources) {
+      const allowlist = buildClaimAllowlist(
+        [...context.metrics, ...context.trailing30],
+        deduped,
+      );
+      const offenders = unsourcedNumbers(content, allowlist);
+      if (offenders.length > 0) {
+        logger.warn({
+          operation: 'ai_guardrail',
+          reason: 'claim_mismatch',
+          offenders: offenders.map((token) => redactSensitive(token)),
+        });
+        content = CLAIM_MISMATCH_FALLBACK;
+        followUps = [];
+        flag = 'claim_mismatch';
+      }
     }
     if (!content) content = EMPTY_FALLBACK;
 
@@ -365,7 +398,7 @@ export class Orchestrator {
       content,
       followUps,
       sources: deduped,
-      toolCalls,
+      toolCalls: redactToolCalls(toolCalls),
       proposals,
       provider: this.deps.llm.provider,
       model: this.deps.llm.model,

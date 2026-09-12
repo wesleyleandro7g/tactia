@@ -140,6 +140,7 @@ describe('Orchestrator', () => {
     const toolMessage = second.messages.find((message) => message.role === 'tool');
     expect(toolMessage).toBeDefined();
     expect(JSON.stringify(toolMessage)).toContain('1500');
+    expect(JSON.stringify(toolMessage)).toContain('<untrusted origin=');
 
     // The system prompt carries the structured context (spec §41)
     expect(second.system).toContain('Demo Ltda');
@@ -149,7 +150,7 @@ describe('Orchestrator', () => {
     expect(second.tools?.map((tool) => tool.name)).toContain('get_revenue');
   });
 
-  it('never sends unsourced numbers to the user', async () => {
+  it('E14: unsourced_numbers when digit and no sources', async () => {
     const llm = new MockLLMAdapter({
       script: [{ text: 'A receita foi de R$ 999.999,00.' }],
     });
@@ -167,7 +168,7 @@ describe('Orchestrator', () => {
     expect(answer.sources).toHaveLength(0);
   });
 
-  it('keeps text answers without numbers untouched', async () => {
+  it('E14: text without digits untouched', async () => {
     const llm = new MockLLMAdapter({ script: [{ text: 'Sem dados suficientes para responder.' }] });
     const orchestrator = new Orchestrator({
       llm,
@@ -238,7 +239,7 @@ describe('Orchestrator', () => {
     ).rejects.toMatchObject({ code: ErrorCode.AI_ERROR });
   });
 
-  it('stops the tool loop at maxIterations and still answers', async () => {
+  it('E14: max_iterations still set', async () => {
     const llm = new MockLLMAdapter({
       script: [
         { toolCalls: [{ name: 'get_revenue' }] },
@@ -280,8 +281,15 @@ describe('Orchestrator', () => {
 
     const messages = llm.requests[0]!.messages;
     expect(messages).toHaveLength(3); // 2 history + current question
-    expect(messages[0]).toEqual({ role: 'user', content: 'terceira' });
-    expect(messages[2]).toEqual({ role: 'user', content: 'E agora?' });
+    const first = messages[0];
+    const last = messages[2];
+    if (first?.role !== 'user' || last?.role !== 'user') {
+      throw new Error('expected user messages');
+    }
+    expect(first.content).toContain('<untrusted origin="user">');
+    expect(first.content).toContain('terceira');
+    expect(messages[1]).toEqual({ role: 'assistant', content: 'quarta' });
+    expect(last.content).toContain('E agora?');
   });
 
   it('streams tool activity, text deltas and a final done event', async () => {

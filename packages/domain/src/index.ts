@@ -41,10 +41,16 @@ export { MetricService } from './services/metric-service';
 export { AnalyticsService } from './services/analytics-service';
 export { SnapshotService } from './services/snapshot-service';
 export {
-  BriefingService,
   extractNumberTokens,
   canonicalizeNumber,
+  collectAllowedFromValues,
   unsourcedNumbers,
+  buildClaimAllowlist,
+  PROSE_SMALL_INT_MAX,
+} from './ai-safety/numbers';
+export {
+  BriefingService,
+  collectAllowedNumbers,
   type BriefingNarrator,
   type BriefingFactSet,
 } from './services/briefing-service';

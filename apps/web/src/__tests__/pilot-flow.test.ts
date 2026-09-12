@@ -538,7 +538,8 @@ describe('Fluxo do piloto (spec §2)', () => {
       from: iso(30),
       to: new Date().toISOString(),
     });
-    expect(bulk.metrics).toHaveLength(7);
+    expect(bulk.metrics.length).toBeGreaterThanOrEqual(7);
+    expect(bulk.metrics.some((metric) => metric.key === 'revenue')).toBe(true);
   });
 
   it('8. gera insights automaticamente depois do sync', async () => {

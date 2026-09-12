@@ -1,6 +1,6 @@
 # Etapa 14 — Confiança (Onda 1)
 
-**Status:** planejada (pré-implementação)
+**Status:** concluída
 **Onda:** 1 — Confiança
 **Depende de:** [Etapa 13](./etapa-13.md)
 **Spec:** seções 3.4, 34, 41–45, 47, 48, 58
