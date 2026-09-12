@@ -242,12 +242,31 @@ Antes de pedir ajuda, colete:
 4. `GET /api/v1/audit-logs` do período.
 5. `docker compose ps` e `docker inspect <container> --format '{{.State.Health}}'`.
 
-## 13. Limitações conhecidas da V0.1
+## 13. Jobs (pg-boss)
+
+Com `JOBS_ENABLED=true` o `instrumentation.ts` sobe o worker. O tick horário
+`intelligence.tick` enfileira `intelligence.daily` às **03:00 no fuso do tenant**.
+Segundas também geram `briefing.weekly`.
+
+Fallback sem fila: `POST /api/v1/intelligence/daily` com
+`Authorization: Bearer $CRON_SECRET` (ou header `x-cron-secret`).
+
+```bash
+# O worker está vivo?
+docker compose -f docker/docker-compose.prod.yml logs web | grep intelligence.tick
+
+# Rodar o ciclo diário na hora (cron externo)
+curl -X POST https://SEU-HOST/api/v1/intelligence/daily \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Se `JOBS_ENABLED` estiver off, sync e ações continuam **inline** no request.
+
+## 14. Limitações conhecidas da V0.1
 
 | Limitação | Impacto |
 |---|---|
-| Sync e execução rodam **inline** no request | Import muito grande pode estourar o timeout do proxy; quebre o arquivo |
+| Sync e execução rodam **inline** no request quando `JOBS_ENABLED=false` | Import muito grande pode estourar o timeout do proxy; quebre o arquivo ou ligue a fila |
 | Rate limit **in-memory** | Vale por processo; com mais de uma instância o limite efetivo é multiplicado |
 | Sem retry de execução falha | Reproponha manualmente |
 | E-mail só no driver `console` | Nenhum e-mail sai de verdade |
-| Sem agendamento de sync | Dispare manualmente ou por cron externo chamando a API |

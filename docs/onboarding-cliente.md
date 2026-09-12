@@ -42,11 +42,17 @@ origem pode ser qualquer um — você escolhe o destino no passo de colunas):
 
 | Entidade | Campos de destino |
 |---|---|
-| `customer` | `external_id`*, `name`*, `email`, `phone`, `document` |
-| `product` | `external_id`*, `name`*, `sku`, `category`, `price`, `cost` |
+| `customer` | `external_id`*, `name`*, `email`, `phone`, `document`, `segment`, `city`, `state`, `acquisition_source` |
+| `product` | `external_id`*, `name`*, `sku`, `category`, `supplier`, `price`, `cost` |
 | `seller` | `external_id`*, `name`*, `email` |
-| `sale` | `external_id`*, `customer_external_id`*, `sold_at`*, `total_amount`, `seller_external_id`, `product_external_id`, `quantity`, `unit_price`, `discount_amount`, `currency`, `status` |
+| `lead` | `external_id`*, `name`*, `email`, `phone`, `source`, `status`, `score`, `customer_external_id`, `seller_external_id` |
+| `sale` | `external_id`*, `customer_external_id`*, `sold_at`*, `total_amount`, `seller_external_id`, `product_external_id`, `quantity`, `unit_price`, `discount_amount`, `currency`, `status`, `payment_method`, `channel`, `region` |
 | `interaction` | `external_id`*, `body`*, `occurred_at`*, `channel`, `direction`, `subject`, `customer_external_id`, `customer_email`, `customer_phone` |
+| `activity` | `external_id`*, `type`*, `occurred_at`*, `lead_external_id`, `customer_external_id`, `seller_external_id` |
+| `expense` | `external_id`*, `category`*, `amount`*, `occurred_at`*, `description`, `supplier`, `recurring` |
+| `payment` | `external_id`*, `sale_external_id`*, `amount`*, `due_at`*, `paid_at`, `method`, `status` |
+| `inventory_level` | `external_id`*, `product_external_id`*, `quantity`*, `recorded_at`*, `min_quantity` |
+| `campaign` | `external_id`*, `name`*, `source`*, `spend`*, `starts_at`*, `ends_at` |
 
 \* obrigatórios. Sem `external_id` a linha é descartada (não há como fazer upsert
 idempotente). Uma venda sem cliente resolvível também é descartada — e o motivo
@@ -99,10 +105,20 @@ Você cai em `/onboarding` automaticamente. Escolha **Arquivo CSV** (arraste ou
 clique para enviar) ou **PostgreSQL** (host, porta, banco, usuário, senha).
 Diga de que entidade o arquivo é (clientes, produtos, vendedores, vendas…).
 
-Importante para CSV: **um arquivo por entidade** (clientes, produtos,
-vendedores, vendas). Referências entre entidades são resolvidas primeiro dentro
-da mesma fonte e, se não encontradas, no tenant inteiro — então as vendas
-encontram os clientes mesmo estando em outra fonte.
+Importante para CSV: **um arquivo por entidade**. Referências entre entidades
+são resolvidas primeiro dentro da mesma fonte e, se não encontradas, no tenant
+inteiro — então as vendas encontram os clientes mesmo estando em outra fonte.
+
+Ordem canônica (o normalizer já aplica):
+
+```text
+customer → product → seller → lead → sale → payment → activity →
+expense → inventory_level → campaign → interaction
+```
+
+Depois da importação, cadastre metas em `/settings/goals` e fatos do negócio em
+`/settings/facts` (ex.: “o vendedor X saiu em março”). Sem metas o chat ainda
+funciona; com metas ele passa a falar de ritmo e gap.
 
 ## 4. Conferir a leitura
 
@@ -172,8 +188,10 @@ O pipeline determinístico roda **automaticamente depois de cada importação**.
 Para rodar de novo sob demanda, use **Rodar análise** no dashboard.
 
 Espere ver, quando os dados justificarem: queda ou crescimento de receita,
-produto em alta/baixa, leads e clientes inativos, vendedor fora da média. Cada
-insight traz a evidência (métrica + período) e uma recomendação.
+produto em alta/baixa, leads e clientes inativos, vendedor fora da média,
+meta atrasada, gargalo de funil, despesas, estoque e CAC. Cada insight traz
+impacto em R$, as principais causas e uma recomendação. Use o polegar no card
+para calibrar o limiar da regra.
 
 ---
 

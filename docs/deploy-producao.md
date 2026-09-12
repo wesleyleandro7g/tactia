@@ -251,10 +251,10 @@ as credenciais restauradas ficam ilegíveis.
 
 | Limitação | Impacto |
 |---|---|
-| Sync e execução rodam **inline** no request | Import muito grande pode estourar o timeout do proxy; quebre o arquivo |
+| Sync e execução rodam **inline** no request (se `JOBS_ENABLED` estiver off) | Import muito grande pode estourar o timeout do proxy; ative jobs ou quebre o arquivo |
 | CSV por caminho no servidor | Sem upload pela interface; use `docker compose cp` |
 | E-mail só no driver `console` | Nenhum e-mail sai de verdade |
-| Sem agendamento de sync | Dispare manualmente ou por cron externo chamando a API |
+| Sem agendamento de sync | Com `JOBS_ENABLED=true` o pipeline diário roda às 03:00 no fuso do tenant; fallback: `POST /api/v1/intelligence/daily` com `CRON_SECRET` |
 | Rate limit **in-memory** | Vale por processo; com mais de uma instância o limite efetivo é multiplicado |
 | Sem retry de execução falha | Reproponha manualmente |
 
