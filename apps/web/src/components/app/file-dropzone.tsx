@@ -122,7 +122,7 @@ export function FileDropzone({
           'rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors duration-200',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
           !ready && !dragging && !shownError && 'border-border bg-card hover:border-muted hover:bg-card-hover',
-          dragging && 'border-accent bg-accent-soft',
+          dragging && 'border-primary bg-accent-soft',
           ready && !shownError && 'border-success/50 bg-success-soft',
           shownError && 'border-danger/50 bg-danger-soft',
           locked && 'cursor-not-allowed opacity-70',
@@ -156,7 +156,7 @@ export function FileDropzone({
               aria-hidden="true"
               className={cn(
                 'flex h-12 w-12 items-center justify-center rounded-xl border text-lg',
-                dragging ? 'border-accent text-accent' : 'border-border text-muted-foreground',
+                dragging ? 'border-primary text-primary' : 'border-border text-muted-foreground',
               )}
             >
               ↓

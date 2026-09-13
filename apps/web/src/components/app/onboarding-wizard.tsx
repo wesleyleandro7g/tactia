@@ -10,6 +10,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { Field, Input, Select } from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/feedback';
 import { FileDropzone } from '@/components/app/file-dropzone';
+import { PageHeader } from '@/components/app/page-header';
 import { WizardStepper, type WizardStep } from '@/components/app/wizard-stepper';
 import { errorMessage, formatCurrency, formatInteger } from '@/lib/format';
 import {
@@ -379,15 +380,11 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Dados</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Trazer seus dados</h1>
-          <p className="max-w-xl text-sm text-muted-foreground">
-            Importe um arquivo por vez. Ordem recomendada: clientes, produtos, vendedores e, por
-            último, vendas.
-          </p>
-        </div>
+      <header className="flex flex-col gap-4">
+        <PageHeader
+          title="Trazer seus dados"
+          description="Importe um arquivo por vez. Ordem recomendada: clientes, produtos, vendedores e, por último, vendas."
+        />
         <WizardStepper steps={visibleSteps} current={Math.max(stepperCurrent, 0)} errorAt={stepperErrorAt} />
       </header>
 
@@ -453,8 +450,8 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                     onClick={() => setSourceType(option.id)}
                     className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                       selected
-                        ? 'border-accent/50 bg-accent-soft'
-                        : 'border-border bg-bg hover:border-muted hover:bg-card-hover'
+                        ? 'border-primary/40 bg-accent-soft'
+                        : 'border-border bg-background hover:border-muted hover:bg-card-hover'
                     }`}
                   >
                     <span className="block text-sm font-medium">{option.title}</span>
@@ -710,7 +707,7 @@ export function OnboardingWizard({ initial }: { initial: OnboardingState }) {
                   aria-label="Progresso da importação"
                   className="h-1.5 overflow-hidden rounded-full bg-border"
                 >
-                  <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
+                  <div className="h-full w-1/3 animate-pulse rounded-full bg-brand" />
                 </div>
               </div>
             ) : null}

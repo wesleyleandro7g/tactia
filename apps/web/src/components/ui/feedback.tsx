@@ -36,7 +36,7 @@ export type EmptyStateProps = {
 
 export function EmptyState({ title, description, action, className }: EmptyStateProps) {
   return (
-    <Empty className={cn('border border-dashed border-border px-6 py-10', className)}>
+    <Empty className={cn('border border-dashed border-primary/20 bg-accent-soft/30 px-6 py-10', className)}>
       <EmptyHeader>
         <EmptyTitle className="text-base font-medium">{title}</EmptyTitle>
         {description ? <EmptyDescription>{description}</EmptyDescription> : null}

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
 import { Alert } from '@/components/ui/alert';
+import { PageHeader } from '@/components/app/page-header';
 import { formatDateTime, formatInteger } from '@/lib/format';
 import { listTenantsOverview } from '@/lib/admin';
 import { isOperator } from '@/lib/operator';
@@ -22,13 +23,10 @@ export default async function AdminPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Admin interno</h1>
-        <p className="text-sm text-muted-foreground">
-          Visão cross-tenant para diagnóstico. Toda ação daqui fica registrada no audit log do
-          tenant afetado.
-        </p>
-      </header>
+      <PageHeader
+        title="Admin interno"
+        description="Visão cross-tenant para diagnóstico. Toda ação daqui fica registrada no audit log do tenant afetado."
+      />
 
       <Alert tone="warning" title="Acesso privilegiado">
         Liberado por <code>TACTIA_OPERATOR_EMAILS</code>. Use apenas para operar e diagnosticar.
@@ -42,7 +40,7 @@ export default async function AdminPage() {
             key: 'name',
             header: 'Empresa',
             render: (row: (typeof tenants)[number]) => (
-              <Link href={`/admin/tenants/${row.id}`} className="text-accent">
+              <Link href={`/admin/tenants/${row.id}`} className="text-primary hover:underline">
                 {row.name}
               </Link>
             ),

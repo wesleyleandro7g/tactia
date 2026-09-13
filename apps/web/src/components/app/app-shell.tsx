@@ -19,7 +19,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Separator } from '@/components/ui/separator';
 
 export function AppShell({
   nav,
@@ -75,7 +74,9 @@ export function AppShell({
           <SidebarTrigger className="lg:hidden" />
           <div className="min-w-0 flex-1">
             {!isChat ? (
-              <p className="truncate text-sm text-muted-foreground">Inteligência operacional</p>
+              <p className="truncate font-display text-sm italic text-muted-foreground">
+                Inteligência operacional
+              </p>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
@@ -90,15 +91,13 @@ export function AppShell({
           </div>
         </header>
 
-        <Separator className="hidden lg:block" />
-
         <main
           id="conteudo"
           tabIndex={-1}
           className={
             isChat
               ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-              : 'mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col overflow-y-auto px-5 py-8 lg:px-8'
+              : 'mx-auto flex w-full max-w-6xl min-h-0 flex-1 animate-page-enter flex-col overflow-y-auto px-5 py-8 lg:px-8'
           }
         >
           {children}

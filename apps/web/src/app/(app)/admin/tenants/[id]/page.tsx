@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { OperatorActionButton } from '@/components/app/operator-action-button';
+import { PageHeader } from '@/components/app/page-header';
 import { Badge, severityTone, statusTone } from '@/components/ui/badge';
 import { Card, CardLabel } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
@@ -23,19 +24,24 @@ export default async function AdminTenantPage({ params }: { params: Promise<{ id
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-1">
-        <Link href="/admin" className="text-sm text-accent">
+      <div className="flex flex-col gap-2">
+        <Link href="/admin" className="text-sm text-primary hover:underline">
           ← Todos os tenants
         </Link>
-        <h1 className="text-2xl font-semibold">{tenant.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {tenant.slug} · {tenant.currency} · {tenant.timezone} ·{' '}
-          <Badge tone={statusTone(tenant.status)}>{tenant.status}</Badge>
-        </p>
-      </header>
+        <PageHeader
+          compact
+          title={tenant.name}
+          description={
+            <>
+              {tenant.slug} · {tenant.currency} · {tenant.timezone} ·{' '}
+              <Badge tone={statusTone(tenant.status)}>{tenant.status}</Badge>
+            </>
+          }
+        />
+      </div>
 
       <section aria-labelledby="users" className="flex flex-col gap-3">
-        <h2 id="users" className="text-lg font-medium">
+        <h2 id="users" className="font-display text-xl tracking-tight">
           Usuários
         </h2>
         <DataTable
@@ -56,7 +62,7 @@ export default async function AdminTenantPage({ params }: { params: Promise<{ id
       </section>
 
       <section aria-labelledby="sources" className="flex flex-col gap-3">
-        <h2 id="sources" className="text-lg font-medium">
+        <h2 id="sources" className="font-display text-xl tracking-tight">
           Fontes de dados
         </h2>
         <DataTable
@@ -98,7 +104,7 @@ export default async function AdminTenantPage({ params }: { params: Promise<{ id
       </section>
 
       <section aria-labelledby="jobs" className="flex flex-col gap-3">
-        <h2 id="jobs" className="text-lg font-medium">
+        <h2 id="jobs" className="font-display text-xl tracking-tight">
           Sync jobs
         </h2>
         <DataTable
@@ -139,7 +145,7 @@ export default async function AdminTenantPage({ params }: { params: Promise<{ id
       </section>
 
       <section aria-labelledby="imports" className="flex flex-col gap-3">
-        <h2 id="imports" className="text-lg font-medium">
+        <h2 id="imports" className="font-display text-xl tracking-tight">
           Imports
         </h2>
         <DataTable
@@ -186,7 +192,7 @@ export default async function AdminTenantPage({ params }: { params: Promise<{ id
       </section>
 
       <section aria-labelledby="admin-insights" className="flex flex-col gap-3">
-        <h2 id="admin-insights" className="text-lg font-medium">
+        <h2 id="admin-insights" className="font-display text-xl tracking-tight">
           Insights recentes
         </h2>
         {insights.length === 0 ? (

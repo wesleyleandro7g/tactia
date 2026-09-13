@@ -6,6 +6,7 @@ import { MetricCard } from '@/components/app/metric-card';
 import { RecommendationList, type RecommendationView } from '@/components/app/recommendation-list';
 import { RunPipelineButton } from '@/components/app/run-pipeline-button';
 import { TrendChart } from '@/components/app/trend-chart';
+import { PageHeader } from '@/components/app/page-header';
 import { Alert } from '@/components/ui/alert';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/feedback';
@@ -90,7 +91,7 @@ export default async function DashboardPage({
   if (salesTotal.total === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader period={period} />
+        <DashboardHeader period={period} />
         <EmptyState
           title="Nenhum dado importado ainda"
           description="Conecte uma fonte de dados para a Tactia calcular métricas, detectar anomalias e sugerir ações."
@@ -123,7 +124,7 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader period={period} />
+      <DashboardHeader period={period} />
       <BriefingCard briefing={latestBriefing} />
 
       {bulk === null ? (
@@ -167,7 +168,7 @@ export default async function DashboardPage({
       </section>
 
       <section aria-labelledby="trends" className="flex flex-col gap-4">
-        <h2 id="trends" className="text-lg font-medium text-foreground">
+        <h2 id="trends" className="font-display text-xl tracking-tight text-foreground">
           Tendências
         </h2>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -189,7 +190,7 @@ export default async function DashboardPage({
       <section aria-labelledby="insights" className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="insights" className="text-lg font-medium">
+            <h2 id="insights" className="font-display text-xl tracking-tight">
               Insights
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -202,7 +203,7 @@ export default async function DashboardPage({
       </section>
 
       <section aria-labelledby="recommendations" className="flex flex-col gap-4">
-        <h2 id="recommendations" className="text-lg font-medium">
+        <h2 id="recommendations" className="font-display text-xl tracking-tight">
           Recomendações pendentes
         </h2>
         <RecommendationList recommendations={recommendations} />
@@ -211,29 +212,27 @@ export default async function DashboardPage({
   );
 }
 
-function PageHeader({ period }: { period: { from: Date; to: Date } }) {
+function DashboardHeader({ period }: { period: { from: Date; to: Date } }) {
   return (
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Período: {formatPeriod({ from: period.from, to: period.to })}
-        </p>
-      </div>
-      <nav aria-label="Período" className="flex gap-2">
-        {RANGE_PRESETS.map((preset) => (
-          <Link
-            key={preset.label}
-            href={presetHref(preset.days)}
-            className={cn(
-              'rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground',
-              'hover:border-primary/40 hover:bg-accent-soft hover:text-primary',
-            )}
-          >
-            {preset.label}
-          </Link>
-        ))}
-      </nav>
-    </header>
+    <PageHeader
+      title="Dashboard"
+      description={`Período: ${formatPeriod({ from: period.from, to: period.to })}`}
+      actions={
+        <nav aria-label="Período" className="flex gap-2">
+          {RANGE_PRESETS.map((preset) => (
+            <Link
+              key={preset.label}
+              href={presetHref(preset.days)}
+              className={cn(
+                'rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors duration-200',
+                'hover:border-primary/40 hover:bg-accent-soft hover:text-primary',
+              )}
+            >
+              {preset.label}
+            </Link>
+          ))}
+        </nav>
+      }
+    />
   );
 }

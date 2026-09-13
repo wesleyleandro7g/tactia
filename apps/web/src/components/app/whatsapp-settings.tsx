@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/feedback';
 import { Field, FormInput, Select } from '@/components/ui/field';
 import { errorMessage, formatDateTime } from '@/lib/format';
+import { PageHeader } from '@/components/app/page-header';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,13 +133,10 @@ export function WhatsappSettings({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">WhatsApp</h1>
-        <p className="text-sm text-muted-foreground">
-          Cadastre os números autorizados a falar com o assistente da Tactia no WhatsApp. Cada
-          número fica ligado a um usuário desta empresa e usa o mesmo contexto do chat web.
-        </p>
-      </header>
+      <PageHeader
+        title="WhatsApp"
+        description="Cadastre os números autorizados a falar com o assistente da Tactia no WhatsApp. Cada número fica ligado a um usuário desta empresa e usa o mesmo contexto do chat web."
+      />
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

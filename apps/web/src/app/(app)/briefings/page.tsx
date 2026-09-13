@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ChatMessageContent } from '@/components/app/chat-message-content';
 import { GenerateBriefingButton } from '@/components/app/generate-briefing-button';
+import { PageHeader } from '@/components/app/page-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/feedback';
 import { formatDate } from '@/lib/format';
@@ -15,16 +16,11 @@ export default async function BriefingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Briefings</h1>
-          <p className="text-sm text-muted-foreground">
-            Resumo semanal gerado a partir dos números da empresa. Cada valor do texto existe nos
-            fatos calculados — o modelo não inventa.
-          </p>
-        </div>
-        <GenerateBriefingButton />
-      </header>
+      <PageHeader
+        title="Briefings"
+        description="Resumo semanal gerado a partir dos números da empresa. Cada valor do texto existe nos fatos calculados — o modelo não inventa."
+        actions={<GenerateBriefingButton />}
+      />
 
       {briefings.length === 0 ? (
         <EmptyState
@@ -36,11 +32,13 @@ export default async function BriefingsPage() {
           {briefings.map((briefing) => (
             <li key={briefing.id}>
               <Card className="p-5">
-                <p className="mb-3 text-xs text-muted-foreground">
+                <p className="mb-3 text-[0.7rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   {formatDate(briefing.periodFrom)} a {formatDate(briefing.periodTo)} · gerado em{' '}
                   {formatDate(briefing.createdAt)} · {briefing.model}
                 </p>
-                <ChatMessageContent content={briefing.content} variant="assistant" />
+                <div className="text-sm leading-relaxed">
+                  <ChatMessageContent content={briefing.content} variant="assistant" />
+                </div>
               </Card>
             </li>
           ))}

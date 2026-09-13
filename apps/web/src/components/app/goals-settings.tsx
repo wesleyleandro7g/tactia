@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { EmptyState } from '@/components/ui/feedback';
 import { Field, FormInput, Select } from '@/components/ui/field';
+import { PageHeader } from '@/components/app/page-header';
 import { errorMessage, formatCurrency, formatInteger, metricLabel } from '@/lib/format';
 
 type GoalRow = {
@@ -89,12 +90,10 @@ export function GoalsSettings({ goals }: { goals: GoalRow[] }) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Metas</h1>
-        <p className="text-sm text-muted-foreground">
-          A Tactia compara o realizado com o ritmo necessário e avisa quando a meta está atrasada.
-        </p>
-      </header>
+      <PageHeader
+        title="Metas"
+        description="A Tactia compara o realizado com o ritmo necessário e avisa quando a meta está atrasada."
+      />
 
       <Card className="p-5">
         <form
@@ -155,23 +154,46 @@ export function GoalsSettings({ goals }: { goals: GoalRow[] }) {
         <ul className="flex flex-col gap-3">
           {goals.map((goal) => (
             <li key={goal.id}>
-              <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div>
-                  <p className="font-medium">
-                    {metricLabel(goal.metricKey)} · {formatValue(goal.metricKey, goal.target)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatValue(goal.metricKey, goal.achieved)} atingidos (
-                    {Math.round(goal.progress * 100)}%)
-                    {goal.onTrack == null ? '' : goal.onTrack ? ' · no ritmo' : ' · abaixo do ritmo'}
-                    {goal.requiredDailyPace != null
-                      ? ` · precisa de ${formatValue(goal.metricKey, goal.requiredDailyPace)}/dia`
-                      : ''}
-                  </p>
+              <Card className="flex flex-col gap-3 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">
+                      {metricLabel(goal.metricKey)} · {formatValue(goal.metricKey, goal.target)}
+                    </p>
+                    <p
+                      className={
+                        goal.onTrack === false
+                          ? 'text-xs text-danger'
+                          : goal.onTrack
+                            ? 'text-xs text-success'
+                            : 'text-xs text-muted-foreground'
+                      }
+                    >
+                      {formatValue(goal.metricKey, goal.achieved)} atingidos (
+                      {Math.round(goal.progress * 100)}%)
+                      {goal.onTrack == null ? '' : goal.onTrack ? ' · no ritmo' : ' · abaixo do ritmo'}
+                      {goal.requiredDailyPace != null
+                        ? ` · precisa de ${formatValue(goal.metricKey, goal.requiredDailyPace)}/dia`
+                        : ''}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" disabled={pending} onClick={() => void remove(goal.id)}>
+                    Remover
+                  </Button>
                 </div>
-                <Button variant="ghost" size="sm" disabled={pending} onClick={() => void remove(goal.id)}>
-                  Remover
-                </Button>
+                <div
+                  className="h-1.5 overflow-hidden rounded-full bg-muted"
+                  role="progressbar"
+                  aria-valuenow={Math.round(Math.min(goal.progress, 1) * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Progresso de ${metricLabel(goal.metricKey)}`}
+                >
+                  <div
+                    className="h-full rounded-full bg-brand transition-[width] duration-300"
+                    style={{ width: `${Math.min(Math.max(goal.progress, 0), 1) * 100}%` }}
+                  />
+                </div>
               </Card>
             </li>
           ))}

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { hasMinRole } from '@tactia/domain';
 import { ApprovalQueue, type ApprovalView } from '@/components/app/approval-queue';
+import { PageHeader } from '@/components/app/page-header';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
 import { cn } from '@/lib/cn';
@@ -55,34 +56,34 @@ export default async function ApprovalsPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Aprovações</h1>
-          <p className="text-sm text-muted-foreground">
-            Nenhuma ação é executada sem uma decisão humana registrada.
-          </p>
-        </div>
-        <nav aria-label="Filtrar por status" className="flex gap-2">
-          {STATUS_FILTERS.map((filter) => (
-            <Link
-              key={filter.value}
-              href={`/approvals?status=${filter.value}`}
-              aria-current={status === filter.value ? 'page' : undefined}
-              className={cn(
-                'rounded-lg border border-border px-3 py-1.5 text-xs',
-                status === filter.value ? 'bg-accent-soft text-accent' : 'text-muted-foreground hover:bg-card',
-              )}
-            >
-              {filter.label}
-            </Link>
-          ))}
-        </nav>
-      </header>
+      <PageHeader
+        title="Aprovações"
+        description="Nenhuma ação é executada sem uma decisão humana registrada."
+        actions={
+          <nav aria-label="Filtrar por status" className="flex gap-2">
+            {STATUS_FILTERS.map((filter) => (
+              <Link
+                key={filter.value}
+                href={`/approvals?status=${filter.value}`}
+                aria-current={status === filter.value ? 'page' : undefined}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200',
+                  status === filter.value
+                    ? 'border-primary/30 bg-accent-soft text-primary'
+                    : 'border-border text-muted-foreground hover:bg-card',
+                )}
+              >
+                {filter.label}
+              </Link>
+            ))}
+          </nav>
+        }
+      />
 
       <ApprovalQueue approvals={approvals} canDecide={hasMinRole(ctx.role, 'admin')} />
 
       <section aria-labelledby="executions" className="flex flex-col gap-3">
-        <h2 id="executions" className="text-lg font-medium">
+        <h2 id="executions" className="font-display text-xl tracking-tight">
           Execuções recentes
         </h2>
         <DataTable

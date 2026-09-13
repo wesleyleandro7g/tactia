@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/app/page-header';
 
 type EpisodeRow = {
   id: string;
@@ -27,12 +28,10 @@ const OUTCOME_LABELS: Record<string, string> = {
 export function MemorySettings({ episodes }: { episodes: EpisodeRow[] }) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Memória da empresa</h1>
-        <p className="text-sm text-muted-foreground">
-          Decisões e resultados de ações já aprovadas, rejeitadas ou executadas. Somente leitura.
-        </p>
-      </header>
+      <PageHeader
+        title="Memória da empresa"
+        description="Decisões e resultados de ações já aprovadas, rejeitadas ou executadas. Somente leitura."
+      />
 
       {episodes.length === 0 ? (
         <EmptyState

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/feedback';
 import { Field, FormInput, Select } from '@/components/ui/field';
+import { PageHeader } from '@/components/app/page-header';
 import { detectUploadKind } from '@/lib/upload-mimes';
 import { errorMessage } from '@/lib/format';
 
@@ -115,13 +116,10 @@ export function DocumentsSettings({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Documentos</h1>
-        <p className="text-sm text-muted-foreground">
-          Políticas, contratos, prints e áudios. O assistente busca o texto; números de receita e
-          estoque continuam vindo das ferramentas determinísticas.
-        </p>
-      </header>
+      <PageHeader
+        title="Documentos"
+        description="Políticas, contratos, prints e áudios. O assistente busca o texto; números de receita e estoque continuam vindo das ferramentas determinísticas."
+      />
 
       {canWrite ? (
         <Card className="flex flex-col gap-4 p-5">

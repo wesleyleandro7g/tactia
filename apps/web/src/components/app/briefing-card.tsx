@@ -18,7 +18,7 @@ export function BriefingCard({
     <section aria-labelledby="briefing" className="flex flex-col gap-3">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 id="briefing" className="text-lg font-medium">
+          <h2 id="briefing" className="font-display text-xl tracking-tight">
             Briefing da semana
           </h2>
           <p className="text-sm text-muted-foreground">

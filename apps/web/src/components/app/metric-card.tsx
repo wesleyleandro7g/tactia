@@ -38,12 +38,12 @@ export function MetricCard({
       role="article"
       aria-labelledby={id}
       className={cn(
-        'flex flex-col gap-1',
-        emphasis && 'border-primary/40 bg-accent-soft',
+        'flex flex-col gap-2 p-5',
+        emphasis && 'border-primary/35 bg-accent-soft',
       )}
     >
       <CardLabel id={id}>{label}</CardLabel>
-      <p className="tabular text-2xl font-semibold text-foreground">{value}</p>
+      <p className="tabular font-display text-3xl tracking-tight text-foreground">{value}</p>
       {direction !== 'none' && deltaFraction !== undefined ? (
         <p className={cn('flex items-center gap-1 text-xs', tone)}>
           <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />

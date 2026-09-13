@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  MessageCircle,
   MessageSquare,
   Shield,
   Target,
@@ -46,6 +47,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/settings/playbooks': ListChecks,
   '/settings/documents': Files,
   '/settings/api-keys': Key,
+  '/settings/whatsapp': MessageCircle,
   '/onboarding': Database,
   '/admin': Shield,
 };

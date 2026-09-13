@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { EmptyState } from '@/components/ui/feedback';
 import { Field, FormInput, FormTextarea, Select } from '@/components/ui/field';
+import { PageHeader } from '@/components/app/page-header';
 import { errorMessage } from '@/lib/format';
 
 type FactRow = {
@@ -85,13 +86,10 @@ export function FactsSettings({ facts }: { facts: FactRow[] }) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Fatos do negócio</h1>
-        <p className="text-sm text-muted-foreground">
-          Eventos e preferências que a Tactia deve considerar (ex.: “o vendedor João saiu em março”).
-          Também dá para gravar pelo chat.
-        </p>
-      </header>
+      <PageHeader
+        title="Fatos do negócio"
+        description='Eventos e preferências que a Tactia deve considerar (ex.: “o vendedor João saiu em março”). Também dá para gravar pelo chat.'
+      />
 
       <Card className="p-5">
         <form

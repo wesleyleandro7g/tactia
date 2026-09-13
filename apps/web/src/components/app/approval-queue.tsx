@@ -178,7 +178,6 @@ export function ApprovalQueue({
                     <div className="flex gap-2">
                       <Button
                         size="sm"
-                        variant="success"
                         loading={busy}
                         onClick={() => void decide(approval, 'approve')}
                       >

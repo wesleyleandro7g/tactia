@@ -5,121 +5,120 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* shadcn semantic — white theme */
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #2563eb;
+  /* Warm Command — papel quente */
+  --background: #f7f3ee;
+  --foreground: #131212;
+  --card: #fffcfa;
+  --card-foreground: #131212;
+  --popover: #fffcfa;
+  --popover-foreground: #131212;
+  --primary: #e24a00;
   --primary-foreground: #ffffff;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f5;
-  /* zinc-600 ≈ 7:1 em branco — AA confortável em text-sm/xs */
-  --muted-foreground: #52525b;
-  /* Marca Tactia: accent = azul (links, bordas, gráficos); hover neutro fica em muted */
-  --accent: #2563eb;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
-  --border: #d4d4d8;
-  --input: #d4d4d8;
-  --ring: #2563eb;
+  --secondary: #efe8e1;
+  --secondary-foreground: #131212;
+  --muted: #efe8e1;
+  --muted-foreground: #5c554f;
+  --accent: #efe8e1;
+  --accent-foreground: #131212;
+  --destructive: #b91c1c;
+  --border: #e4dbd3;
+  --input: #e4dbd3;
+  --ring: #e24a00;
   --radius: 0.625rem;
 
-  /* Tactia aliases (backward compat) */
+  --brand-from: #fe2204;
+  --brand-to: #fe7200;
+  --brand-gradient: linear-gradient(90deg, rgba(254, 34, 4, 0.996) 0%, #fe7200 100%);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+
   --bg: var(--background);
   --fg: var(--foreground);
-  --card-hover: #f4f4f5;
-  --fg-subtle: #52525b;
+  --card-hover: #f3ece6;
+  --fg-subtle: #5c554f;
   --accent-fg: var(--accent-foreground);
-  --accent-soft: rgba(37, 99, 235, 0.08);
+  --accent-soft: rgba(226, 74, 0, 0.1);
   --success: #15803d;
   --success-soft: rgba(21, 128, 61, 0.12);
   --warning: #b45309;
   --warning-soft: rgba(180, 83, 9, 0.12);
   --danger: #b91c1c;
   --danger-soft: rgba(185, 28, 28, 0.12);
-  --info: #2563eb;
-  --info-soft: rgba(37, 99, 235, 0.08);
+  --info: #c45c26;
+  --info-soft: rgba(196, 92, 38, 0.12);
 
-  /* Sidebar */
-  --sidebar: #f9f9f9;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #2563eb;
+  --sidebar: #f3eee8;
+  --sidebar-foreground: #131212;
+  --sidebar-primary: #e24a00;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f4f4f5;
-  --sidebar-accent-foreground: #18181b;
-  --sidebar-border: #e4e4e7;
-  --sidebar-ring: #2563eb;
+  --sidebar-accent: #efe8e1;
+  --sidebar-accent-foreground: #131212;
+  --sidebar-border: #e4dbd3;
+  --sidebar-ring: #e24a00;
 
-  /* Charts */
-  --chart-1: #2563eb;
+  --chart-1: #fe7200;
   --chart-2: #15803d;
-  --chart-3: #b45309;
-  --chart-4: #7e22ce;
+  --chart-3: #d97706;
+  --chart-4: #c45c26;
   --chart-5: #b91c1c;
 }
 
-/*
- * Dark — neutros no estilo Vercel/Geist (preto puro, cinzas frios, bordas #333).
- * Primary/accent mantêm o azul da marca Tactia.
- */
 .dark {
   color-scheme: dark;
 
-  --background: #000000;
-  --foreground: #ededed;
-  --card: #0a0a0a;
-  --card-foreground: #ededed;
-  --popover: #0a0a0a;
-  --popover-foreground: #ededed;
-  --primary: #0070f3;
-  --primary-foreground: #ffffff;
-  --secondary: #111111;
-  --secondary-foreground: #ededed;
-  --muted: #111111;
-  --muted-foreground: #a1a1a1;
-  --accent: #0070f3;
-  --accent-foreground: #ffffff;
+  --background: #131212;
+  --foreground: #f4efea;
+  --card: #1c1b1a;
+  --card-foreground: #f4efea;
+  --popover: #1c1b1a;
+  --popover-foreground: #f4efea;
+  --primary: #ff7a1a;
+  --primary-foreground: #131212;
+  --secondary: #221f1e;
+  --secondary-foreground: #f4efea;
+  --muted: #221f1e;
+  --muted-foreground: #a89f98;
+  --accent: #221f1e;
+  --accent-foreground: #f4efea;
   --destructive: #e5484d;
-  --border: #333333;
-  --input: #333333;
-  --ring: #0070f3;
+  --border: #2e2c2b;
+  --input: #2e2c2b;
+  --ring: #ff7a1a;
 
   --bg: var(--background);
   --fg: var(--foreground);
-  --card-hover: #171717;
-  --fg-subtle: #a1a1a1;
+  --card-hover: #242220;
+  --fg-subtle: #a89f98;
   --accent-fg: var(--accent-foreground);
-  --accent-soft: rgba(0, 112, 243, 0.16);
+  --accent-soft: rgba(255, 122, 26, 0.16);
   --success: #3ecf8e;
   --success-soft: rgba(62, 207, 142, 0.14);
   --warning: #f5a623;
   --warning-soft: rgba(245, 166, 35, 0.14);
   --danger: #e5484d;
   --danger-soft: rgba(229, 72, 77, 0.16);
-  --info: #0070f3;
-  --info-soft: rgba(0, 112, 243, 0.16);
+  --info: #e8956a;
+  --info-soft: rgba(232, 149, 106, 0.16);
 
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #ededed;
-  --sidebar-primary: #0070f3;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #171717;
-  --sidebar-accent-foreground: #ededed;
-  --sidebar-border: #262626;
-  --sidebar-ring: #0070f3;
+  --sidebar: #181716;
+  --sidebar-foreground: #f4efea;
+  --sidebar-primary: #ff7a1a;
+  --sidebar-primary-foreground: #131212;
+  --sidebar-accent: #221f1e;
+  --sidebar-accent-foreground: #f4efea;
+  --sidebar-border: #2e2c2b;
+  --sidebar-ring: #ff7a1a;
 
-  --chart-1: #0070f3;
+  --chart-1: #fe7200;
   --chart-2: #3ecf8e;
   --chart-3: #f5a623;
-  --chart-4: #8b5cf6;
+  --chart-4: #e8956a;
   --chart-5: #e5484d;
 }
 
 @theme inline {
+  --font-sans: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
   --color-bg: var(--bg);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
@@ -138,6 +137,8 @@
   --color-danger-soft: var(--danger-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --color-brand-from: var(--brand-from);
+  --color-brand-to: var(--brand-to);
   --color-ring: var(--ring);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -172,6 +173,33 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --animate-page-enter: page-enter 0.28s var(--ease-smooth) both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility bg-brand {
+  background-image: linear-gradient(90deg, rgba(254, 34, 4, 0.996) 0%, #fe7200 100%);
+}
+
+@utility text-brand {
+  background-image: linear-gradient(90deg, rgba(254, 34, 4, 0.996) 0%, #fe7200 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+@utility bg-grain {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 /* Foco sempre visível — nunca remover sem substituto (WCAG 2.4.7) */
@@ -180,7 +208,6 @@
   outline-offset: 2px;
 }
 
-/* Números em tabelas e cards alinham por dígito */
 .tabular {
   font-variant-numeric: tabular-nums;
 }
@@ -200,19 +227,13 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family: ui-sans-serif, system-ui, sans-serif;
+    @apply bg-background font-sans text-foreground antialiased;
   }
   html {
     @apply font-sans;
   }
 }
 
-/*
- * `--color-muted` é o fundo neutro (bg-muted). `text-muted` no app Tactia
- * significa texto secundário — apontar para muted-foreground evita cinza
- * quase branco (#f4f4f5) sobre fundo branco.
- */
 @utility text-muted {
   color: var(--muted-foreground);
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/feedback';
 import { Field, FormInput, FormTextarea } from '@/components/ui/field';
+import { PageHeader } from '@/components/app/page-header';
 import { errorMessage } from '@/lib/format';
 
 type PlaybookStep = { ordinal: number; text: string; actionType?: 'create_task' | 'send_email' };
@@ -83,12 +84,10 @@ export function PlaybooksSettings({ playbooks }: { playbooks: PlaybookRow[] }) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Playbooks</h1>
-        <p className="text-sm text-muted-foreground">
-          Procedimentos que a Tactia narra no chat. O assistente nunca executa um playbook sozinho.
-        </p>
-      </header>
+      <PageHeader
+        title="Playbooks"
+        description="Procedimentos que a Tactia narra no chat. O assistente nunca executa um playbook sozinho."
+      />
 
       <Card className="p-5">
         <form

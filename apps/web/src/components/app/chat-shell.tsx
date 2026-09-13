@@ -31,7 +31,7 @@ export function ChatShell({
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-background">
       <aside
-        className="hidden h-full min-h-0 w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-muted/30 lg:flex"
+        className="hidden h-full min-h-0 w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar lg:flex"
         aria-label="Histórico de conversas"
       >
         <ConversationList
@@ -66,7 +66,7 @@ export function ChatShell({
             <Menu className="size-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-medium">{headerTitle}</h1>
+            <h1 className="truncate font-display text-base tracking-tight">{headerTitle}</h1>
           </div>
         </header>
 

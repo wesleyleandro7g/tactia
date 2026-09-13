@@ -103,7 +103,7 @@ export function RecommendationList({ recommendations }: { recommendations: Recom
                   <div className="mt-3 flex gap-2">
                     <Button
                       size="sm"
-                      variant="success"
+                      variant="default"
                       loading={busy}
                       onClick={() => void decide(recommendation, 'accepted')}
                       aria-label={`Aceitar recomendação ${recommendation.title}`}

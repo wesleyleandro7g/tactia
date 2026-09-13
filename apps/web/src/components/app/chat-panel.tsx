@@ -454,7 +454,7 @@ export function ChatPanel({
           }}
           className="mx-auto max-w-3xl"
         >
-          <div className="relative flex items-end gap-2 rounded-3xl border border-input bg-background p-2 shadow-sm transition-colors focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
+          <div className="relative flex items-end gap-2 rounded-3xl border border-input bg-card p-2 shadow-none transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-ring/40">
             <label htmlFor="chat-input" className="sr-only">
               Sua pergunta
             </label>
@@ -518,7 +518,7 @@ function EmptyState({
       >
         <Zap className="size-6 text-primary" />
       </div>
-      <h2 className="text-2xl font-semibold tracking-tight">Como posso ajudar?</h2>
+      <h2 className="font-display text-3xl tracking-tight">Como posso ajudar?</h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         Pergunte sobre vendas, clientes ou insights. Cada número vem dos dados da sua empresa, com
         fonte citada.
@@ -557,7 +557,7 @@ function MessageRow({
     return (
       <div className="flex justify-end">
         <div
-          className="max-w-[85%] rounded-3xl rounded-br-md bg-muted px-4 py-3 text-sm leading-relaxed"
+          className="max-w-[85%] rounded-3xl rounded-br-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground"
           aria-live={message.id === 'streaming' ? 'polite' : undefined}
         >
           <ChatMessageContent content={message.content} variant="user" />

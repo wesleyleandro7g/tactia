@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/feedback';
 import { Field, FormInput } from '@/components/ui/field';
 import { errorMessage, formatDateTime } from '@/lib/format';
+import { PageHeader } from '@/components/app/page-header';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,14 +102,10 @@ export function ApiKeysSettings({ keys }: { keys: ApiKeyRow[] }) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">API keys</h1>
-        <p className="text-sm text-muted-foreground">
-          Emita uma chave para clientes MCP (Claude Desktop ou outro agente). Ela executa as mesmas
-          tools do chat, com o tenant congelado na chave. Copie o secret na hora — ele não volta a
-          aparecer.
-        </p>
-      </header>
+      <PageHeader
+        title="API keys"
+        description="Emita uma chave para clientes MCP (Claude Desktop ou outro agente). Ela executa as mesmas tools do chat, com o tenant congelado na chave. Copie o secret na hora — ele não volta a aparecer."
+      />
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

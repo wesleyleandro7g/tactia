@@ -56,8 +56,8 @@ export function ConversationList({
                       className={cn(
                         'block rounded-lg px-3 py-2.5 text-sm transition-colors',
                         active
-                          ? 'bg-background font-medium text-foreground shadow-sm ring-1 ring-border'
-                          : 'text-muted-foreground hover:bg-background/80 hover:text-foreground',
+                          ? 'bg-accent-soft font-medium text-primary'
+                          : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground',
                       )}
                     >
                       <span className="line-clamp-2 leading-snug">{conversation.title}</span>
