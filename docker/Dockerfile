@@ -41,9 +41,11 @@ RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
     pnpm --filter @tactia/web build
 
 # ---------------------------------------------------------------------------
-# migrator — `prisma migrate deploy` (usado pelo serviço `migrate` do compose)
+# migrator — `prisma migrate deploy` (sem o bundle Next; só deps + schema)
 # ---------------------------------------------------------------------------
-FROM builder AS migrator
+FROM deps AS migrator
+COPY packages/database/prisma packages/database/prisma
+COPY packages/database/package.json packages/database/package.json
 WORKDIR /repo/packages/database
 CMD ["pnpm", "migrate:deploy"]
 

@@ -23,19 +23,22 @@ services:
       retries: 20
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2023-03-20T20-16-18Z
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    # Imagens recentes exigem x86-64-v2; nesta VPS (KVM sem SSSE3/SSE4.2)
+    # usamos release antiga + entrypoint direto no binário Go.
+    entrypoint: ['minio']
+    command: ['server', '/data', '--console-address', ':9001']
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:?defina S3_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?defina S3_SECRET_KEY}
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
-      interval: 10s
+      test: ['CMD', 'minio', '--version']
+      interval: 30s
       timeout: 5s
-      retries: 5
+      retries: 3
 
   # Aplica as migrations e sai. O web só sobe depois que este serviço termina.
   migrate:
@@ -69,6 +72,9 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      LLM_VISION_MODEL: ${LLM_VISION_MODEL:-}
+      STT_MODEL: ${STT_MODEL:-whisper-1}
+      OBJECT_STORAGE: ${OBJECT_STORAGE:-}
       S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
