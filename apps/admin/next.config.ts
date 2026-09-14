@@ -1,9 +1,5 @@
 import path from 'path';
-import { loadEnvConfig } from '@next/env';
 import type { NextConfig } from 'next';
-
-const repoRoot = path.join(import.meta.dirname, '../..');
-loadEnvConfig(repoRoot);
 
 const nextConfig: NextConfig = {
   transpilePackages: [
@@ -14,7 +10,9 @@ const nextConfig: NextConfig = {
     '@tactia/execution',
   ],
   serverExternalPackages: ['pino', 'pino-pretty', '@prisma/client'],
+  // Docker image (docker/Dockerfile): ships only the traced files.
   output: 'standalone',
+  // Monorepo: trace from the repo root so workspace packages are included.
   outputFileTracingRoot: path.join(import.meta.dirname, '../../'),
 };
 
