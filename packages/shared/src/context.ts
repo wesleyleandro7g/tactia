@@ -24,12 +24,21 @@ export const TenantStatus = {
 
 export type TenantStatus = (typeof TenantStatus)[keyof typeof TenantStatus];
 
+export const OperatorStatus = {
+  active: 'active',
+  disabled: 'disabled',
+} as const;
+
+export type OperatorStatus = (typeof OperatorStatus)[keyof typeof OperatorStatus];
+
 export type RequestContext = {
   requestId: string;
   tenantId: string | null;
   userId: string | null;
   role: MembershipRole | null;
   ip?: string | null;
+  /** Present when the caller is a backoffice operator (apps/admin). */
+  operatorId?: string | null;
   /** Present when the caller authenticated with a TenantApiKey (MCP). */
   apiKeyId?: string | null;
   apiKeyPrefix?: string | null;

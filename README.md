@@ -5,7 +5,8 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 ## Stack (V0.1)
 
 - pnpm workspaces + Turborepo
-- Next.js (App Router) em `apps/web` — UI e `/api/v1/*`
+- Next.js (App Router) em `apps/web` — UI e `/api/v1/*` do produto
+- Next.js em `apps/admin` (porta 3001) — backoffice Tactia Ops
 - PostgreSQL 16 + Prisma
 - Better Auth (email/senha), desacoplado do domínio via `external_auth_id`
 - Vercel AI SDK atrás de um `LLMAdapter` próprio (provider e modelo via env)
@@ -20,7 +21,8 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 | `/onboarding` | Wizard empresa → arquivo (upload/CSV ou Postgres) → colunas → conferir → importação |
 | `/chat` | Conversa com a Tactia com streaming, fonte de cada número e proposta de ação |
 | `/approvals` | Fila de aprovações e execuções recentes |
-| `/admin` | Painel interno do operador (allowlist `TACTIA_OPERATOR_EMAILS`) |
+
+Backoffice (`apps/admin`, http://localhost:3001): login de operador, empresas, usuários, sync e audit. Identidade separada do app dos clientes.
 
 ## Setup
 
@@ -28,7 +30,8 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 cp .env.example .env
 # preencha BETTER_AUTH_SECRET (mín. 32 chars) e ENCRYPTION_KEY (64 hex)
 # para o chat: LLM_API_KEY (ou LLM_PROVIDER=mock)
-# para o painel /admin: TACTIA_OPERATOR_EMAILS=seu@email
+# para o backoffice: ADMIN_AUTH_SECRET (mín. 32 chars) e TACTIA_BOOTSTRAP_OPERATOR_*
+# depois: pnpm --filter @tactia/admin seed
 
 PostgreSQL local usa a porta **5433** (5432 costuma estar ocupada). MinIO: 9000.
 pnpm install
@@ -39,6 +42,9 @@ pnpm dev
 ```
 
 App: http://localhost:3000
+Ops: http://localhost:3001
+
+O Next do Ops lê `apps/admin/.env.local` (não o `.env` da raiz). Copie `DATABASE_URL`, `ENCRYPTION_KEY` e as variáveis `ADMIN_*`.
 
 ## Scripts
 
@@ -70,9 +76,9 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -
 curl -s http://localhost:3000/api/v1/health   # {"data":{"status":"ok","database":"up"}}
 ```
 
-Sobe `postgres` → `migrate` (`prisma migrate deploy`) → `web` (Next standalone,
-usuário não-root). Só o web publica porta; coloque um proxy com TLS na frente.
-Guia completo: [docs/deploy-producao.md](docs/deploy-producao.md).
+Sobe `postgres` → `migrate` (`prisma migrate deploy`) → `web` (Next standalone)
+e `admin` (Tactia Ops). Publique as portas 3000 (produto) e 3001 (backoffice)
+atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy-producao.md).
 
 ## Operação
 

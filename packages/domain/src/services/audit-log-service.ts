@@ -55,14 +55,18 @@ export const AuditAction = {
   WHATSAPP_NUMBER_CREATED: 'WHATSAPP_NUMBER_CREATED',
   WHATSAPP_NUMBER_UPDATED: 'WHATSAPP_NUMBER_UPDATED',
   WHATSAPP_NUMBER_DISABLED: 'WHATSAPP_NUMBER_DISABLED',
+  TENANT_UPDATED: 'TENANT_UPDATED',
+  TENANT_SUSPENDED: 'TENANT_SUSPENDED',
+  TENANT_REACTIVATED: 'TENANT_REACTIVATED',
+  PASSWORD_RESET: 'PASSWORD_RESET',
 } as const;
 
 export class AuditLogService {
   constructor(private readonly auditLogs: AuditLogRepository) {}
 
   async record(
-    ctx: Pick<RequestContext, 'tenantId' | 'userId' | 'ip'>,
-    input: Omit<CreateAuditLogInput, 'tenantId' | 'userId' | 'ip' | 'actorType'> & {
+    ctx: Pick<RequestContext, 'tenantId' | 'userId' | 'ip' | 'operatorId'>,
+    input: Omit<CreateAuditLogInput, 'tenantId' | 'userId' | 'operatorId' | 'ip' | 'actorType'> & {
       actorType?: string;
     },
   ) {
@@ -70,8 +74,9 @@ export class AuditLogService {
     return this.auditLogs.create({
       tenantId: ctx.tenantId,
       userId: ctx.userId,
+      operatorId: ctx.operatorId ?? null,
       ip: ctx.ip,
-      actorType: input.actorType ?? 'user',
+      actorType: input.actorType ?? (ctx.operatorId ? 'operator' : 'user'),
       action: input.action,
       entityType: input.entityType,
       entityId: input.entityId,

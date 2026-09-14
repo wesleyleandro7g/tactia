@@ -33,6 +33,7 @@ export type {
   Metric,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
+export { OperatorRepository } from './repositories/operator-repository';
 export { UserRepository } from './repositories/user-repository';
 export { MembershipRepository } from './repositories/membership-repository';
 export { AuditLogRepository } from './repositories/audit-log-repository';
@@ -80,7 +81,8 @@ export { MessageRepository } from './repositories/message-repository';
 export { ActionRepository } from './repositories/action-repository';
 export { ActionExecutionRepository } from './repositories/action-execution-repository';
 export { ApprovalRepository } from './repositories/approval-repository';
-export type { CreateTenantInput } from './repositories/tenant-repository';
+export type { CreateTenantInput, BackofficeTenantListQuery } from './repositories/tenant-repository';
+export type { CreateOperatorInput, OperatorRecord } from './repositories/operator-repository';
 export type { CreateUserInput } from './repositories/user-repository';
 export type { CreateMembershipInput } from './repositories/membership-repository';
 export type { CreateAuditLogInput } from './repositories/audit-log-repository';

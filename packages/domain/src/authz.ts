@@ -15,6 +15,14 @@ export function assertAuthenticated(ctx: RequestContext): asserts ctx is Request
   }
 }
 
+export function assertOperator(ctx: RequestContext): asserts ctx is RequestContext & {
+  operatorId: string;
+} {
+  if (!ctx.operatorId) {
+    throw new AppError(ErrorCode.AUTHENTICATION_ERROR, 'Authentication required');
+  }
+}
+
 export function assertTenantContext(ctx: RequestContext): asserts ctx is RequestContext & {
   userId: string;
   tenantId: string;

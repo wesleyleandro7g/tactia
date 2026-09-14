@@ -1,6 +1,6 @@
 /**
  * Testes dos helpers puros da UI (Etapa 8).
- * Formatação pt-BR, geometria do gráfico e o gate do painel de operador.
+ * Formatação pt-BR e geometria do gráfico.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -16,7 +16,6 @@ import {
   metricLabel,
   resolveRangeParam,
 } from '../format';
-import { isOperatorEmail, operatorEmails } from '../operator';
 
 describe('format', () => {
   it('formata moeda em BRL', () => {
@@ -116,19 +115,3 @@ describe('buildChartGeometry', () => {
   });
 });
 
-describe('gate do operador', () => {
-  it('sem allowlist configurada, ninguém é operador', () => {
-    expect(operatorEmails({})).toEqual([]);
-    expect(isOperatorEmail('founder@tactia.com', {})).toBe(false);
-    expect(isOperatorEmail('founder@tactia.com', { TACTIA_OPERATOR_EMAILS: '' })).toBe(false);
-  });
-
-  it('compara ignorando caixa e espaços', () => {
-    const env = { TACTIA_OPERATOR_EMAILS: ' Founder@Tactia.com , ops@tactia.com ' };
-    expect(operatorEmails(env)).toEqual(['founder@tactia.com', 'ops@tactia.com']);
-    expect(isOperatorEmail('FOUNDER@tactia.com', env)).toBe(true);
-    expect(isOperatorEmail('ops@tactia.com', env)).toBe(true);
-    expect(isOperatorEmail('cliente@empresa.com', env)).toBe(false);
-    expect(isOperatorEmail(null, env)).toBe(false);
-  });
-});

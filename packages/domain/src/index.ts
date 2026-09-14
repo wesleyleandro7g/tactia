@@ -1,6 +1,8 @@
-export { assertAuthenticated, assertTenantContext, assertRole, assertOwnerOrAdmin, hasMinRole } from './authz';
+export { assertAuthenticated, assertTenantContext, assertRole, assertOwnerOrAdmin, assertOperator, hasMinRole } from './authz';
 export { AuditLogService, AuditAction } from './services/audit-log-service';
 export { TenantService } from './services/tenant-service';
+export { OperatorService } from './services/operator-service';
+export { BackofficeService } from './services/backoffice-service';
 export { UserService } from './services/user-service';
 export { MembershipService } from './services/membership-service';
 export { CustomerService } from './services/customer-service';
@@ -114,6 +116,11 @@ export {
   updateUserSchema,
   createMembershipSchema,
   updateMembershipSchema,
+  provisionTenantSchema,
+  operatorUpdateTenantSchema,
+  operatorCreateSchema,
+  backofficeListTenantsQuerySchema,
+  resetPasswordSchema,
 } from './schemas/identity';
 export {
   createCustomerSchema,

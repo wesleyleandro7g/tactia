@@ -40,6 +40,9 @@ const authProvider: AuthProvider = {
     });
     return { externalAuthId: auth.id };
   },
+  async setPassword() {
+    // Tests create credentials without hashing.
+  },
 };
 
 const userService = new UserService(users, memberships, auditLogs, authProvider);

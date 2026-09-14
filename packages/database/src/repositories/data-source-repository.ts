@@ -35,6 +35,10 @@ export class DataSourceRepository {
     });
   }
 
+  async findOwned({ tenantId, id }: { tenantId: string; id: string }) {
+    return this.db.dataSource.findFirst({ where: { id, tenantId } });
+  }
+
   async list({
     tenantId,
     skip,

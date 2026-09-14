@@ -105,7 +105,13 @@ export class SyncService {
   constructor(private readonly deps: SyncServiceDeps) {}
 
   async startSync(ctx: RequestContext, dataSourceId: string) {
-    assertTenantContext(ctx);
+    if (ctx.operatorId) {
+      if (!ctx.tenantId) {
+        throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+      }
+    } else {
+      assertTenantContext(ctx);
+    }
     const tenantId = ctx.tenantId!;
     const ds = await this.deps.dataSources.findById({ tenantId, id: dataSourceId });
     if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');

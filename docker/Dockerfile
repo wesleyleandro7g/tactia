@@ -1,6 +1,7 @@
-# Tactia — imagem de produção do apps/web (Next.js standalone).
+# Tactia — imagem de produção (Next.js standalone).
 # Build a partir da raiz do repositório:
 #   docker build -f docker/Dockerfile -t tactia-web .
+#   docker build -f docker/Dockerfile --build-arg APP_PACKAGE=@tactia/admin --build-arg APP_DIR=apps/admin --build-arg APP_PORT=3001 -t tactia-admin .
 #
 # Stages:
 #   runner   (default) → serve o Next.js
@@ -16,6 +17,7 @@ WORKDIR /repo
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/
+COPY apps/admin/package.json apps/admin/
 COPY packages/ai/package.json packages/ai/
 COPY packages/connectors/package.json packages/connectors/
 COPY packages/database/package.json packages/database/
@@ -30,6 +32,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # builder — Prisma client + next build (standalone)
 # ---------------------------------------------------------------------------
 FROM base AS builder
+ARG APP_PACKAGE=@tactia/web
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /repo/ ./
 COPY . .
@@ -38,7 +41,8 @@ RUN pnpm --filter @tactia/database generate
 # imagem): o build não conecta no banco, mas os módulos exigem as variáveis.
 RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
     BETTER_AUTH_SECRET=placeholder-de-build-com-32-caracteres \
-    pnpm --filter @tactia/web build
+    ADMIN_AUTH_SECRET=placeholder-de-build-com-32-caracteres \
+    pnpm --filter ${APP_PACKAGE} build
 
 # ---------------------------------------------------------------------------
 # migrator — `prisma migrate deploy` (sem o bundle Next; só deps + schema)
@@ -53,12 +57,15 @@ CMD ["pnpm", "migrate:deploy"]
 # runner — só o necessário para servir
 # ---------------------------------------------------------------------------
 FROM node:22-alpine AS runner
+ARG APP_DIR=apps/web
+ARG APP_PORT=3000
 RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=${APP_PORT}
 ENV HOSTNAME=0.0.0.0
+ENV APP_SERVER=${APP_DIR}/server.js
 # O bundle do Next perde o caminho relativo do query engine do Prisma; apontar
 # explicitamente é o escape hatch documentado (não é segredo, é um caminho).
 ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/packages/database/src/generated/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
@@ -66,11 +73,11 @@ ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/packages/database/src/generated/client/libq
 RUN addgroup -g 1001 -S nodejs && adduser -S tactia -u 1001
 RUN mkdir -p /data/uploads && chown tactia:nodejs /data/uploads
 
-COPY --from=builder --chown=tactia:nodejs /repo/apps/web/.next/standalone ./
-COPY --from=builder --chown=tactia:nodejs /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=tactia:nodejs /repo/${APP_DIR}/.next/standalone ./
+COPY --from=builder --chown=tactia:nodejs /repo/${APP_DIR}/.next/static ./${APP_DIR}/.next/static
 
 USER tactia
-EXPOSE 3000
+EXPOSE ${APP_PORT}
 
 # `next start` não é usado no modo standalone.
-CMD ["node", "apps/web/server.js"]
+CMD ["sh", "-c", "node $APP_SERVER"]

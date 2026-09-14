@@ -127,4 +127,18 @@ describe('E17 TenantApiKey', () => {
     const listed = await service.list(otherCtx);
     expect(listed.some((item) => item.id === created.id)).toBe(false);
   });
+
+  it('verify returns null when the tenant is suspended', async () => {
+    const created = await service.create(ownerCtx, { name: 'suspended-tenant' });
+    expect(await service.verify(created.secret)).not.toBeNull();
+    await prisma.tenant.update({
+      where: { id: ownerCtx.tenantId! },
+      data: { status: 'suspended' },
+    });
+    expect(await service.verify(created.secret)).toBeNull();
+    await prisma.tenant.update({
+      where: { id: ownerCtx.tenantId! },
+      data: { status: 'active' },
+    });
+  });
 });

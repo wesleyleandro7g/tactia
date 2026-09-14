@@ -31,6 +31,12 @@ export class MembershipRepository {
     });
   }
 
+  async countActiveOwners(tenantId: string) {
+    return this.db.membership.count({
+      where: { tenantId, role: 'owner', status: 'active', deletedAt: null },
+    });
+  }
+
   async findByUserAndTenant({ tenantId, userId }: { tenantId: string; userId: string }) {
     return this.db.membership.findFirst({
       where: {

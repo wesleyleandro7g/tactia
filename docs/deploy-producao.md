@@ -1,7 +1,8 @@
 # Deploy em produção
 
 Guia para colocar a Tactia no ar em um servidor com Docker Compose. O stack mínimo
-sobe **PostgreSQL**, **MinIO** e o **Next.js** (modo standalone) em um único host.
+sobe **PostgreSQL**, **MinIO**, o **app dos clientes** e o **Tactia Ops** (backoffice)
+em um único host.
 
 > Depois do deploy, siga [onboarding-cliente.md](./onboarding-cliente.md) para o
 > primeiro cliente. Para diagnóstico e operação do dia a dia, veja [runbook.md](./runbook.md).
@@ -14,7 +15,7 @@ sobe **PostgreSQL**, **MinIO** e o **Next.js** (modo standalone) em um único ho
 |---|---|
 | Servidor | Linux com Docker e Docker Compose |
 | Domínio | Ex.: `tactia.suaempresa.com` |
-| TLS | Proxy na frente (Caddy, nginx ou ALB) — o compose só expõe a porta 3000 |
+| TLS | Proxy na frente (Caddy, nginx ou ALB) — o compose expõe 3000 (produto) e 3001 (ops) |
 | Chave de LLM | Opcional para o resto do sistema; obrigatória para o `/chat` |
 
 ---
@@ -40,6 +41,11 @@ DATABASE_URL=postgresql://tactia:<senha-forte>@postgres:5432/tactia
 BETTER_AUTH_URL=https://tactia.suaempresa.com
 NEXT_PUBLIC_APP_URL=https://tactia.suaempresa.com
 
+# Backoffice (Tactia Ops)
+ADMIN_AUTH_SECRET=<mínimo 32 caracteres aleatórios, diferente do BETTER_AUTH_SECRET>
+ADMIN_AUTH_URL=https://ops.suaempresa.com
+NEXT_PUBLIC_ADMIN_URL=https://ops.suaempresa.com
+
 # Segredos (gere valores únicos — veja abaixo)
 BETTER_AUTH_SECRET=<mínimo 32 caracteres aleatórios>
 ENCRYPTION_KEY=<64 caracteres hex = 32 bytes>
@@ -59,8 +65,10 @@ S3_BUCKET=tactia
 S3_REGION=us-east-1
 S3_FORCE_PATH_STYLE=true
 
-# Operadores internos (acesso ao /admin)
-TACTIA_OPERATOR_EMAILS=voce@empresa.com
+# Operadores internos: seed do primeiro login no Ops
+TACTIA_BOOTSTRAP_OPERATOR_EMAIL=voce@empresa.com
+TACTIA_BOOTSTRAP_OPERATOR_PASSWORD=<senha-forte>
+TACTIA_BOOTSTRAP_OPERATOR_NAME=Operador
 
 # WhatsApp via Evolution API (opcional). Sem isso o cadastro em
 # /settings/whatsapp funciona, mas o bot não responde no WhatsApp.
@@ -70,13 +78,14 @@ EVOLUTION_INSTANCE=tactia
 # EVOLUTION_WEBHOOK_SECRET=
 
 WEB_PORT=3000
+ADMIN_PORT=3001
 LOG_LEVEL=info
 ```
 
 ### Gerar segredos
 
 ```bash
-# BETTER_AUTH_SECRET (mínimo 32 caracteres)
+# BETTER_AUTH_SECRET e ADMIN_AUTH_SECRET (mínimo 32 caracteres, valores distintos)
 openssl rand -base64 32
 
 # ENCRYPTION_KEY (64 hex = 32 bytes)
@@ -89,7 +98,7 @@ openssl rand -hex 32
 | `BETTER_AUTH_SECRET` (≥32 chars) | Sessões inválidas; ninguém entra |
 | `DATABASE_URL` | `health` responde 503, aplicação inutilizável |
 | `LLM_API_KEY` | Apenas o chat fica indisponível |
-| `TACTIA_OPERATOR_EMAILS` | Vazio = `/admin` responde 404 para todos |
+| `ADMIN_AUTH_SECRET` (≥32 chars) | Sessões do backoffice inválidas |
 | `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Cadastro de números funciona; o webhook ignora mensagens |
 
 > **Guarde `ENCRYPTION_KEY` em local seguro.** Trocá-la invalida todas as
@@ -110,7 +119,7 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -
 Ordem de subida:
 
 ```text
-postgres (healthy) → migrate (prisma migrate deploy) → web (Next.js)
+postgres (healthy) → migrate (prisma migrate deploy) → web + admin
 ```
 
 O serviço `migrate` aplica as migrations e sai. O `web` só sobe depois que ele
@@ -153,14 +162,19 @@ docker run --rm --entrypoint sh tactia-web -c 'find / -maxdepth 4 -name ".env" 2
 
 ## 5. Colocar TLS na frente
 
-O compose publica só a porta **3000**. Em produção, coloque um proxy com HTTPS
-na frente do web. Postgres e MinIO ficam na rede interna do compose.
+O compose publica as portas **3000** (produto) e **3001** (Tactia Ops). Em
+produção, coloque um proxy com HTTPS na frente. Postgres e MinIO ficam na
+rede interna do compose.
 
 ### Caddy
 
 ```text
 tactia.suaempresa.com {
     reverse_proxy localhost:3000
+}
+
+ops.suaempresa.com {
+    reverse_proxy localhost:3001
 }
 ```
 
@@ -183,22 +197,43 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
+
+server {
+    listen 443 ssl;
+    server_name ops.suaempresa.com;
+
+    ssl_certificate     /etc/letsencrypt/live/ops.suaempresa.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ops.suaempresa.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
-Depois de configurar TLS, confirme que `BETTER_AUTH_URL` e `NEXT_PUBLIC_APP_URL`
-usam `https://` e reinicie o container `web` se necessário.
+Depois de configurar TLS, confirme que `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL`
+e `ADMIN_AUTH_URL` / `NEXT_PUBLIC_ADMIN_URL` usam `https://` e reinicie os
+containers `web` e `admin` se necessário.
 
 ---
 
 ## 6. Primeiro cliente
 
-1. Acesse `https://tactia.suaempresa.com/signup` e crie a conta do owner.
-2. Siga o wizard em `/onboarding` (arquivo → colunas → conferir → importar).
-3. Para CSV: arraste o arquivo na tela ou clique para escolher. Os uploads
+1. Crie o primeiro operador: `TACTIA_BOOTSTRAP_OPERATOR_EMAIL` +
+   `TACTIA_BOOTSTRAP_OPERATOR_PASSWORD` e rode `pnpm --filter @tactia/admin seed`
+   (ou o equivalente no container). Entre em `https://ops.suaempresa.com`.
+2. No Ops, **Nova empresa** com o owner do cliente. O owner entra em
+   `https://tactia.suaempresa.com/login`.
+3. Siga o wizard em `/onboarding` (arquivo → colunas → conferir → importar).
+4. Para CSV: arraste o arquivo na tela ou clique para escolher. Os uploads
    ficam no volume `uploads_data` (`UPLOAD_DIR=/data/uploads`).
-
-4. Valide em `/dashboard`, teste o `/chat` e confira `/approvals`.
-5. (Opcional) Chat no WhatsApp: owner/admin cadastra números em `/settings/whatsapp`.
+5. Valide em `/dashboard`, teste o `/chat` e confira `/approvals`.
+6. (Opcional) Chat no WhatsApp: owner/admin cadastra números em `/settings/whatsapp`.
    Na Evolution, aponte o webhook da instância para
    `https://tactia.suaempresa.com/api/v1/webhooks/evolution` com o evento
    `MESSAGES_UPSERT`. Header `apikey` = `EVOLUTION_WEBHOOK_SECRET` ou `EVOLUTION_API_KEY`.

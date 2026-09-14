@@ -1,6 +1,7 @@
 import { createId } from '@tactia/shared';
 import { prisma } from '@tactia/database';
 import { DEMO_PLAYBOOK_RECLAMACAO_ATRASO } from '@tactia/domain';
+import { createLocalAccountIssuer } from 'better-auth/db';
 import { auth } from '../src/lib/auth';
 
 const DEMO_EMAIL = 'owner@demo.tactia';
@@ -56,7 +57,7 @@ async function ensureIdentity() {
   await prisma.authAccount.create({
     data: {
       id: createId(),
-      issuer: process.env.NODE_ENV === 'production' ? 'credential' : 'local:credential',
+      issuer: createLocalAccountIssuer('credential'),
       accountId: authUserId,
       providerId: 'credential',
       userId: authUserId,

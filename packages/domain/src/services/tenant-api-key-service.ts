@@ -98,6 +98,7 @@ export class TenantApiKeyService {
     const storedHash = row && !row.revokedAt ? row.hash : null;
     const ok = await verifyApiKeySecret(token, storedHash);
     if (!ok || !row || row.revokedAt) return null;
+    if (row.tenant.status !== 'active') return null;
     return {
       keyId: row.id,
       tenantId: row.tenantId,

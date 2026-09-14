@@ -17,7 +17,6 @@ import {
   LogOut,
   MessageCircle,
   MessageSquare,
-  Shield,
   Target,
 } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
@@ -49,7 +48,6 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/settings/api-keys': Key,
   '/settings/whatsapp': MessageCircle,
   '/onboarding': Database,
-  '/admin': Shield,
 };
 
 /** Marca o item ativo com aria-current e destaca visualmente. */

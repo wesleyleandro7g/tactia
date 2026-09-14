@@ -7,6 +7,7 @@ export {
   MembershipRole,
   MembershipStatus,
   TenantStatus,
+  OperatorStatus,
   TENANT_COOKIE,
   REQUEST_ID_HEADER,
   type RequestContext,

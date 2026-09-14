@@ -14,6 +14,11 @@ enum TenantStatus {
   deleted
 }
 
+enum OperatorStatus {
+  active
+  disabled
+}
+
 enum MembershipRole {
   owner
   admin
@@ -312,6 +317,94 @@ model AuthVerification {
 }
 
 // ---------------------------------------------------------------------------
+// Operator identity (backoffice). Separate Better Auth tables so a client
+// credential can never become an operator session and vice versa.
+// ---------------------------------------------------------------------------
+
+model OperatorAuthUser {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      OperatorAuthSession[]
+  accounts      OperatorAuthAccount[]
+  domainOperator Operator?
+
+  @@unique([email])
+  @@map("operator_auth_users")
+}
+
+model OperatorAuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      OperatorAuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("operator_auth_sessions")
+}
+
+model OperatorAuthAccount {
+  id                    String    @id
+  issuer                String    @default("credential")
+  accountId             String
+  providerId            String
+  userId                String
+  user                  OperatorAuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([issuer, accountId])
+  @@index([userId])
+  @@map("operator_auth_accounts")
+}
+
+model OperatorAuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("operator_auth_verifications")
+}
+
+model Operator {
+  id             String         @id @db.Uuid
+  externalAuthId String         @unique @map("external_auth_id")
+  name           String
+  email          String
+  status         OperatorStatus @default(active)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  authUser       OperatorAuthUser @relation(fields: [externalAuthId], references: [id], onDelete: Restrict)
+  auditLogs      AuditLog[]
+
+  @@unique([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("operators")
+}
+
+// ---------------------------------------------------------------------------
 // Domain identity
 // ---------------------------------------------------------------------------
 
@@ -462,6 +555,7 @@ model AuditLog {
   id         String   @id @db.Uuid
   tenantId   String   @map("tenant_id") @db.Uuid
   userId     String?  @map("user_id") @db.Uuid
+  operatorId String?  @map("operator_id") @db.Uuid
   actorType  String   @map("actor_type")
   action     String
   entityType String   @map("entity_type")
@@ -471,11 +565,13 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  operator   Operator? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([tenantId, action])
   @@index([tenantId, entityType, entityId])
   @@index([userId])
+  @@index([operatorId])
   @@map("audit_logs")
 }
 

@@ -4,4 +4,5 @@ export type AuthProvider = {
     name: string;
     password: string;
   }): Promise<{ externalAuthId: string }>;
+  setPassword(externalAuthId: string, password: string): Promise<void>;
 };

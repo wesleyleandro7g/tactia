@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
-import { assertOwnerOrAdmin, assertRole, hasMinRole } from '../authz';
+import { assertOperator, assertOwnerOrAdmin, assertRole, hasMinRole } from '../authz';
 
 function ctx(role: RequestContext['role']): RequestContext {
   return {
@@ -31,5 +31,18 @@ describe('authorization', () => {
   it('allows owner to pass role gates', () => {
     expect(() => assertRole(ctx('owner'), 'viewer')).not.toThrow();
     expect(() => assertOwnerOrAdmin(ctx('owner'))).not.toThrow();
+  });
+
+  it('requires operatorId for operator actions', () => {
+    expect(() => assertOperator(ctx('owner'))).toThrow(AppError);
+    expect(() =>
+      assertOperator({
+        requestId: 'req_ops',
+        tenantId: null,
+        userId: null,
+        role: null,
+        operatorId: 'op_a',
+      }),
+    ).not.toThrow();
   });
 });

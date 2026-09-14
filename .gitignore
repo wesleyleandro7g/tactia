@@ -12,6 +12,7 @@ coverage
 .DS_Store
 packages/database/src/generated
 apps/web/next-env.d.ts
+apps/admin/next-env.d.ts
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 *.playwright-mcp 

@@ -20,7 +20,7 @@ Tenha em mãos:
 | E-mail do owner | Primeiro usuário, com papel `owner` |
 | A fonte de dados | CSV exportado ou credenciais de um PostgreSQL de leitura |
 | `LLM_API_KEY` configurada no ambiente | Sem ela o `/chat` fica indisponível (o resto funciona) |
-| Seu e-mail em `TACTIA_OPERATOR_EMAILS` | Dá acesso ao painel `/admin` para diagnóstico |
+| Seu acesso ao Tactia Ops (`apps/admin`) | Provisionar a empresa, usuários e diagnosticar sync |
 
 Checagem rápida do ambiente:
 
@@ -80,11 +80,17 @@ momento de conectar. Nenhuma rota devolve a senha.
 
 ## 1. Criar a conta do owner
 
-Abra `https://SEU-HOST/signup` e crie a conta com o e-mail do cliente
-(ou crie você e transfira depois). O signup já pede o nome da empresa e cria o
-`Tenant` com você como `owner`.
+Abra o Tactia Ops (`https://ops.SEU-HOST` ou `http://localhost:3001`) e use
+**Nova empresa**. Informe o nome da empresa e o owner (nome, e-mail, senha
+provisória). Isso cria o `Tenant` e o usuário `owner` no app dos clientes.
 
-Grava `TENANT_CREATED`, `USER_CREATED` e `MEMBERSHIP_CREATED` no audit log.
+Grava `TENANT_CREATED`, `USER_CREATED` e `MEMBERSHIP_CREATED` no audit log
+com `actorType: 'operator'`.
+
+O cliente entra em `https://SEU-HOST/login` com o e-mail/senha do owner — não
+no backoffice.
+
+Também é possível o próprio cliente criar a empresa em `/signup`.
 
 ## 2. Convidar o resto do time
 
@@ -208,9 +214,9 @@ Um roteiro de 15 minutos que costuma funcionar:
 
 ## Depois do onboarding
 
-- Reimporte periodicamente (`/admin` → **Disparar sync**) ou agende a chamada de
-  `POST /api/v1/data-sources/:id/sync`.
-- Acompanhe `/admin/tenants/:id`: sync jobs, contadores, erros e insights.
+- Reimporte periodicamente (Tactia Ops → ficha da empresa → **Disparar sync**)
+  ou agende `POST /api/v1/data-sources/:id/sync` no app do cliente.
+- Acompanhe a ficha da empresa no Ops: sync jobs, contadores, erros e insights.
 - Limites por padrão: 6 syncs/min, 20 mensagens de chat/min por tenant,
   60 req/min por API key MCP.
 

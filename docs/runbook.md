@@ -62,8 +62,8 @@ com um dos códigos da spec §48 (mais `RATE_LIMITED`). O detalhe técnico fica 
 
 ## 3. Sync falhou
 
-**Onde olhar:** `/admin/tenants/:id` → tabela **Sync jobs** (status, contadores,
-erro) ou:
+**Onde olhar:** Tactia Ops → ficha da empresa → tabela **Sync jobs** (status,
+contadores, erro) ou, no app do cliente:
 
 ```bash
 curl -s -b cookies.txt "https://SEU-HOST/api/v1/sync-jobs?pageSize=10" | jq \
@@ -85,13 +85,13 @@ O campo `error` vem no formato `CÓDIGO: mensagem`:
 **Reexecutar** (seguro, idempotente):
 
 ```bash
-# como operador, atravessando tenant (grava audit log com actorType=operator)
-curl -X POST https://SEU-HOST/api/v1/admin/sync -b cookies.txt \
+# no Tactia Ops (grava audit log com actorType=operator)
+curl -X POST https://OPS-HOST/api/v1/tenants/<TENANT>/sync -b cookies-ops.txt \
   -H 'Content-Type: application/json' \
-  -d '{"tenantId":"<TENANT>","dataSourceId":"<FONTE>"}'
+  -d '{"dataSourceId":"<FONTE>"}'
 ```
 
-Ou `/admin/tenants/:id` → **Disparar sync**.
+Ou na ficha da empresa no Ops → **Disparar sync**.
 
 ## 4. Importou, mas os dados não apareceram
 
@@ -126,9 +126,9 @@ o período do dashboard (`?from=&to=`).
 ## 5. Reprocessar um import
 
 ```bash
-curl -X POST https://SEU-HOST/api/v1/admin/reprocess-import -b cookies.txt \
+curl -X POST https://OPS-HOST/api/v1/tenants/<TENANT>/reprocess-import -b cookies-ops.txt \
   -H 'Content-Type: application/json' \
-  -d '{"tenantId":"<TENANT>","importId":"<IMPORT>"}'
+  -d '{"importId":"<IMPORT>"}'
 ```
 
 Reexecuta o sync da fonte que originou o import. Os `RawRecord` originais são
@@ -154,7 +154,7 @@ O chat nunca executa nada: uma proposta de ação sempre cai em `/approvals`.
 | `BETTER_AUTH_SECRET` (≥32 chars) | Sessões inválidas; ninguém entra |
 | `DATABASE_URL` | `health` 503, aplicação inutilizável |
 | `LLM_API_KEY` | Apenas o chat fica indisponível |
-| `TACTIA_OPERATOR_EMAILS` | Vazio = `/admin` responde 404 para todos |
+| `ADMIN_AUTH_SECRET` (≥32 chars) | Sessões do backoffice inválidas |
 | `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Webhook do WhatsApp não processa |
 
 **Trocar `ENCRYPTION_KEY` invalida todas as credenciais existentes** (AES-GCM
@@ -225,8 +225,9 @@ Um usuário só alcança o tenant do próprio cookie `tactia-tenant-id`, validad
 contra o membership a cada requisição. Recurso de outro tenant responde
 `NOT_FOUND` (não 403, para não revelar existência).
 
-O único caminho cross-tenant são as rotas `/api/v1/admin/*`, restritas à allowlist
-e sempre auditadas com `actorType: 'operator'`:
+O único caminho cross-tenant é o app `apps/admin` (Tactia Ops). As rotas
+`/api/v1/tenants*` do Ops exigem sessão de operador (`operator_auth_*`) e
+gravam audit log com `actorType: 'operator'` e `operatorId`:
 
 ```bash
 curl -s -b cookies.txt "https://SEU-HOST/api/v1/audit-logs?pageSize=50" | jq \

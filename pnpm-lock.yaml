@@ -24,6 +24,82 @@ importers:
         specifier: ^8.41.0
         version: 8.68.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
 
+  apps/admin:
+    dependencies:
+      '@tactia/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@tactia/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@tactia/execution':
+        specifier: workspace:*
+        version: link:../../packages/execution
+      '@tactia/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      better-auth:
+        specifier: ^1.3.34
+        version: 1.7.1(@prisma/client@6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3))(next@16.3.3(@babel/core@7.29.7)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(prisma@6.19.3(typescript@5.9.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      class-variance-authority:
+        specifier: 0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: 2.1.1
+        version: 2.1.1
+      lucide-react:
+        specifier: 0.37.0
+        version: 0.37.0(prop-types@15.8.1)(react@19.2.8)
+      next:
+        specifier: ^16.2.0
+        version: 16.3.3(@babel/core@7.29.7)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.1.1
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.1.1
+        version: 19.2.8(react@19.2.8)
+      tailwind-merge:
+        specifier: 3.6.0
+        version: 3.6.0
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.1.12
+        version: 4.3.3
+      '@types/node':
+        specifier: ^24.3.0
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19.1.12
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.8
+        version: 19.2.5(@types/react@19.2.18)
+      eslint:
+        specifier: ^9.34.0
+        version: 9.39.5(jiti@2.7.0)
+      eslint-config-next:
+        specifier: ^16.2.0
+        version: 16.3.3(@typescript-eslint/parser@8.68.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      tailwindcss:
+        specifier: ^4.1.12
+        version: 4.3.3
+      tsx:
+        specifier: ^4.20.5
+        version: 4.23.12
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
   apps/web:
     dependencies:
       '@base-ui/react':

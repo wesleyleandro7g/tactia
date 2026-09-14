@@ -1,7 +1,10 @@
 import type { AuthProvider } from '@tactia/domain';
 import { createId } from '@tactia/shared';
 import { prisma } from '@tactia/database';
+import { createLocalAccountIssuer } from 'better-auth/db';
 import { auth } from './auth';
+
+const CREDENTIAL_ISSUER = createLocalAccountIssuer('credential');
 
 export const betterAuthProvider: AuthProvider = {
   async createCredentialsUser(input) {
@@ -12,14 +15,14 @@ export const betterAuthProvider: AuthProvider = {
       data: {
         id,
         name: input.name,
-        email: input.email,
+        email: input.email.toLowerCase(),
         emailVerified: true,
       },
     });
     await prisma.authAccount.create({
       data: {
         id: createId(),
-        issuer: 'credential',
+        issuer: CREDENTIAL_ISSUER,
         accountId: id,
         providerId: 'credential',
         userId: id,
@@ -27,5 +30,26 @@ export const betterAuthProvider: AuthProvider = {
       },
     });
     return { externalAuthId: id };
+  },
+
+  async setPassword(externalAuthId, password) {
+    const ctx = await auth.$context;
+    const hash = await ctx.password.hash(password);
+    const updated = await prisma.authAccount.updateMany({
+      where: { userId: externalAuthId, providerId: 'credential' },
+      data: { password: hash },
+    });
+    if (updated.count === 0) {
+      await prisma.authAccount.create({
+        data: {
+          id: createId(),
+          issuer: CREDENTIAL_ISSUER,
+          accountId: externalAuthId,
+          providerId: 'credential',
+          userId: externalAuthId,
+          password: hash,
+        },
+      });
+    }
   },
 };

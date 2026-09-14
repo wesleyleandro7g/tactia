@@ -136,6 +136,9 @@ const authProvider = {
     });
     return { externalAuthId: id };
   },
+  async setPassword() {
+    // Tests create credentials without hashing.
+  },
 };
 
 const tenantService = new TenantService(tenantRepository, membershipRepository, auditLogService);

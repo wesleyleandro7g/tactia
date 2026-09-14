@@ -5,6 +5,7 @@ import { asJson } from '../json';
 export type CreateAuditLogInput = {
   tenantId: string;
   userId?: string | null;
+  operatorId?: string | null;
   actorType: string;
   action: string;
   entityType: string;
@@ -22,6 +23,7 @@ export class AuditLogRepository {
         id: createId(),
         tenantId: input.tenantId,
         userId: input.userId ?? null,
+        operatorId: input.operatorId ?? null,
         actorType: input.actorType,
         action: input.action,
         entityType: input.entityType,

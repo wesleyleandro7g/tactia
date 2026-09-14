@@ -62,7 +62,10 @@ export class TenantApiKeyRepository {
   }
 
   async findByPrefix(prefix: string) {
-    return this.db.tenantApiKey.findUnique({ where: { prefix } });
+    return this.db.tenantApiKey.findUnique({
+      where: { prefix },
+      include: { tenant: { select: { status: true } } },
+    });
   }
 
   async revoke({ tenantId, id }: { tenantId: string; id: string }) {
