@@ -104,13 +104,18 @@ export default async function InfographicsPreviewPage({
               </div>
               <Badge tone={item.error ? 'danger' : 'neutral'}>{theme}</Badge>
             </div>
-            <div className="bg-muted/40 p-4">
+            <div
+              className={cn(
+                'relative p-5',
+                theme === 'dark' ? 'bg-[#0c0b0b]' : 'bg-[linear-gradient(160deg,#efe8e1_0%,#f7f3ee_55%,#f3ece6_100%)]',
+              )}
+            >
               {item.dataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={item.dataUrl}
                   alt={`Prévia ${item.label} (${theme})`}
-                  className="mx-auto h-auto w-full max-w-md rounded-md border border-border bg-background shadow-sm"
+                  className="mx-auto h-auto w-full max-w-md rounded-lg border border-border/80 bg-background shadow-[0_24px_48px_-28px_rgba(0,0,0,0.55)]"
                 />
               ) : (
                 <p className="font-mono text-xs text-danger">{item.error ?? 'Falha ao gerar.'}</p>

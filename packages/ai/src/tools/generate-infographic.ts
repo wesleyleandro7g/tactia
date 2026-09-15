@@ -29,8 +29,12 @@ export function createGenerateInfographicTool(store: InfographicStore): Tool {
   return defineTool({
     name: 'generate_infographic',
     description:
-      'Gera um infográfico PNG com a marca Tactia. Templates: kpi_snapshot (1–4 KPIs com label/value/delta), ' +
-      'comparison (left/right + metricLabel), ranking (items top N), insight_card (highlight + bullets). ' +
+      'Gera um infográfico PNG com a marca Tactia. Templates: ' +
+      'kpi_snapshot (1–4 KPIs), comparison (left/right + metricLabel), ranking (top N), ' +
+      'insight_card (highlight + bullets), pie_chart (fatias/composição 2–6), ' +
+      'line_chart (série temporal 3–12 pontos com numeric), ' +
+      'period_comparison (várias métricas left vs right com labels de período), ' +
+      'bar_chart (barras categóricas 2–8 com numeric). ' +
       'Use SOMENTE quando o usuário pedir imagem/infográfico/visual OU quando a resposta tiver ' +
       '3+ números/comparações que ganham clareza em um quadro. NÃO use em respostas curtas de 1 número. ' +
       'Os valores devem vir de ferramentas anteriores — nunca invente. Após gerar, mencione o visual na resposta.',

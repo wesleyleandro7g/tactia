@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  INFOGRAPHIC_TEMPLATES,
   demoInfographicSpec,
   renderInfographic,
   type InfographicTemplate,
@@ -10,7 +11,7 @@ import { createApiHandler, searchParamsRecord } from '@/lib/api';
 export const runtime = 'nodejs';
 
 const querySchema = z.object({
-  template: z.enum(['kpi_snapshot', 'comparison', 'ranking', 'insight_card']),
+  template: z.enum(INFOGRAPHIC_TEMPLATES as [InfographicTemplate, ...InfographicTemplate[]]),
   theme: z.enum(['light', 'dark']).default('light'),
 });
 
@@ -23,12 +24,12 @@ export const GET = createApiHandler({ auth: 'operator' }, async (request) => {
   if (!parsed.success) {
     throw new AppError(
       ErrorCode.VALIDATION_ERROR,
-      'Informe template (kpi_snapshot|comparison|ranking|insight_card) e theme opcional (light|dark).',
+      `Informe template (${INFOGRAPHIC_TEMPLATES.join('|')}) e theme opcional (light|dark).`,
     );
   }
 
   const rendered = await renderInfographic(
-    demoInfographicSpec(parsed.data.template as InfographicTemplate, parsed.data.theme),
+    demoInfographicSpec(parsed.data.template, parsed.data.theme),
   );
 
   return new Response(new Uint8Array(rendered.png), {

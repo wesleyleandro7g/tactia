@@ -604,21 +604,35 @@ function MessageRow({
       />
 
       {message.attachments && message.attachments.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-4 flex flex-col gap-3">
           {message.attachments.map((attachment) => (
             <figure
               key={attachment.id}
-              className="overflow-hidden rounded-2xl border border-border bg-card"
+              className="max-w-md overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_12px_40px_-24px_rgba(19,18,18,0.45)] ring-1 ring-black/[0.03]"
             >
+              <div className="h-1 w-full bg-brand" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={attachment.url}
                 alt={attachment.title}
-                className="h-auto w-full max-w-md object-cover"
+                className="h-auto w-full object-cover"
                 loading="lazy"
               />
-              <figcaption className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-                {attachment.title}
+              <figcaption className="flex items-center justify-between gap-3 border-t border-border/80 bg-secondary/40 px-3.5 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                    Infográfico
+                  </p>
+                  <p className="truncate text-xs font-medium text-foreground">{attachment.title}</p>
+                </div>
+                <a
+                  href={attachment.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                >
+                  Abrir
+                </a>
               </figcaption>
             </figure>
           ))}

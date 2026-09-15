@@ -120,7 +120,7 @@ const TOOL_GUIDE: Record<string, string> = {
   get_acquisition: 'CAC e ROI por origem/campanha.',
   propose_action: 'propor tarefa ou e-mail para aprovação humana.',
   generate_infographic:
-    'gera um infográfico PNG (KPI, comparação, ranking ou insight). Use só se o usuário pedir visual/imagem/infográfico OU se a resposta tiver 3+ números/comparações que se beneficiem de um quadro. Não use em respostas curtas.',
+    'gera um infográfico PNG (KPI, comparação, ranking, insight, pizza, linha, períodos ou barras). Use só se o usuário pedir visual/imagem/infográfico OU se a resposta tiver 3+ números/comparações que se beneficiem de um quadro. Não use em respostas curtas.',
 };
 
 /**

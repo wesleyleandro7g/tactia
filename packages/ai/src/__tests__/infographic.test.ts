@@ -96,6 +96,68 @@ describe('infographic renderer', () => {
     expect(result.png.byteLength).toBeGreaterThan(5_000);
   });
 
+  it.each([
+    [
+      'pie_chart',
+      {
+        template: 'pie_chart' as const,
+        title: 'Mix',
+        payload: {
+          items: [
+            { label: 'A', value: '40%', share: 0.4 },
+            { label: 'B', value: '60%', share: 0.6 },
+          ],
+        },
+      },
+    ],
+    [
+      'line_chart',
+      {
+        template: 'line_chart' as const,
+        title: 'Tendência',
+        payload: {
+          points: [
+            { label: 'S1', value: '10', numeric: 10 },
+            { label: 'S2', value: '14', numeric: 14 },
+            { label: 'S3', value: '12', numeric: 12 },
+          ],
+        },
+      },
+    ],
+    [
+      'period_comparison',
+      {
+        template: 'period_comparison' as const,
+        title: 'Períodos',
+        payload: {
+          leftLabel: 'Jan',
+          rightLabel: 'Dez',
+          metrics: [
+            { label: 'Receita', left: '100', right: '90', delta: 0.11 },
+            { label: 'Pedidos', left: '50', right: '48', delta: 0.04 },
+          ],
+        },
+      },
+    ],
+    [
+      'bar_chart',
+      {
+        template: 'bar_chart' as const,
+        title: 'Barras',
+        payload: {
+          items: [
+            { label: 'A', value: '40', numeric: 40 },
+            { label: 'B', value: '25', numeric: 25 },
+          ],
+        },
+      },
+    ],
+  ])('renders %s as a non-empty PNG', async (_name, spec) => {
+    const result = await renderInfographic(spec);
+    expect(result.png.subarray(0, 4).equals(PNG_MAGIC)).toBe(true);
+    expect(result.png.byteLength).toBeGreaterThan(5_000);
+  });
+
   it('rejects invalid payload for template', () => {
     expect(() =>
       infographicSpecSchema.parse({
