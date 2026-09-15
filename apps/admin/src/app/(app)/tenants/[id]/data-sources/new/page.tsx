@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ConnectDataSourceForm } from '@/components/app/connect-data-source-form';
+import { SourceKindPicker } from '@/components/app/source-kind-picker';
 import { PageHeader } from '@/components/app/page-header';
 import { requireOperator } from '@/lib/server-context';
 import { backofficeService } from '@/lib/services';
@@ -22,10 +22,10 @@ export default async function NewDataSourcePage({ params }: { params: Promise<{ 
         <PageHeader
           className="mt-2"
           title="Nova fonte de dados"
-          description="Registre de onde vêm os dados desta empresa. Conectores (CSV, PostgreSQL, MCP) podem ser testados e sincronizados; as demais fontes ficam registradas até o conector existir."
+          description="Escolha o tipo de fonte. Cada conector tem uma tela própria de configuração."
         />
       </div>
-      <ConnectDataSourceForm tenantId={id} />
+      <SourceKindPicker tenantId={id} />
     </div>
   );
 }
