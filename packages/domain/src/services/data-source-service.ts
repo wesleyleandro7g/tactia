@@ -8,13 +8,20 @@ import { AppError, ErrorCode, paginationArgs, type RequestContext } from '@tacti
 import {
   CsvConnector,
   McpConnector,
-  PostgresConnector,
+  sqlConnectorFromSource,
   type ConnectionTestResult,
   type DiscoveryResult,
+  type DiscoveryResource,
   type RawRow,
 } from '@tactia/connectors';
 import { assertCanManageConnections, assertTenantScope } from '../authz';
-import { createDataSourceSchema, updateDataSourceSchema, createMappingSchema, updateMappingSchema } from '../schemas/data-platform';
+import {
+  createDataSourceSchema,
+  createMappingSchema,
+  probeDataSourceSchema,
+  updateDataSourceSchema,
+  updateMappingSchema,
+} from '../schemas/data-platform';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import { CredentialService } from './credential-service';
 import { listQuerySchema } from '../schemas/business';
@@ -119,6 +126,32 @@ export class DataSourceService {
     return connector.fetch(resource, { limit });
   }
 
+  async probeConnection(
+    ctx: RequestContext,
+    raw: unknown,
+  ): Promise<ConnectionTestResult & { resources?: DiscoveryResource[] }> {
+    assertCanManageConnections(ctx);
+    const input = probeDataSourceSchema.parse(raw);
+    const connector = sqlConnectorFromSource({
+      type: 'database',
+      configuration: { dialect: input.dialect, ...input.configuration },
+      credentials: input.credentials,
+    });
+    if (!connector) {
+      throw new AppError(ErrorCode.CONNECTOR_ERROR, 'Unsupported SQL dialect');
+    }
+    const test = await connector.testConnection();
+    if (!test.success) {
+      return { success: false, message: test.message };
+    }
+    const discovery = await connector.discover();
+    return {
+      success: true,
+      message: 'Conexão bem-sucedida',
+      resources: discovery.resources,
+    };
+  }
+
   // Mapping CRUD
 
   async listMappings(ctx: RequestContext, dataSourceId: string, query: Record<string, string | undefined>) {
@@ -181,22 +214,17 @@ export class DataSourceService {
       return new CsvConnector({ filePath: String(config['filePath'] ?? '') });
     }
 
-    if (ds.type === 'postgres') {
-      let credData: Record<string, unknown> = {};
-      if (ds.credentialId) {
-        const credService = new CredentialService(this.credentials);
-        credData = await credService.getDecryptedData(ctx, ds.credentialId);
-      }
-      return new PostgresConnector({
-        host: String(config['host'] ?? 'localhost'),
-        port: Number(config['port'] ?? 5432),
-        database: String(config['database'] ?? ''),
-        schema: config['schema'] ? String(config['schema']) : undefined,
-        ssl: config['ssl'] === true,
-        username: String(credData['username'] ?? ''),
-        password: String(credData['password'] ?? ''),
-      });
-    }
+    const sql = sqlConnectorFromSource({
+      type: ds.type,
+      configuration: ds.configuration,
+      credentials:
+        ds.type === 'database' || ds.type === 'postgres' || ds.type === 'mysql'
+          ? ds.credentialId
+            ? await new CredentialService(this.credentials).getDecryptedData(ctx, ds.credentialId)
+            : {}
+          : {},
+    });
+    if (sql) return sql;
 
     if (ds.type === 'mcp') {
       let credData: Record<string, unknown> = {};

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { DataSourceManagePanel } from '@/components/app/data-source-manage-panel';
 import { PageHeader } from '@/components/app/page-header';
 import { Badge, statusTone } from '@/components/ui/badge';
-import { getSourceKind } from '@tactia/domain';
+import { sourceKindDisplayLabel } from '@tactia/domain';
 import { formatDateTime } from '@/lib/format';
 import { requireOperator } from '@/lib/server-context';
 import { backofficeService } from '@/lib/services';
@@ -23,7 +23,10 @@ export default async function DataSourceDetailPage({
   ]);
   if (!tenant || !source) notFound();
 
-  const kind = getSourceKind(source.dataSource.type);
+  const kindLabel = sourceKindDisplayLabel(
+    source.dataSource.type,
+    source.dataSource.configuration,
+  );
   const lastSync = source.dataSource.lastSyncAt
     ? formatDateTime(source.dataSource.lastSyncAt)
     : 'nunca';
@@ -39,7 +42,7 @@ export default async function DataSourceDetailPage({
           title={source.dataSource.name}
           description={
             <>
-              {kind?.label ?? source.dataSource.type} ·{' '}
+              {kindLabel} ·{' '}
               <Badge tone={statusTone(source.dataSource.status)}>{source.dataSource.status}</Badge> ·
               último sync {lastSync}
             </>

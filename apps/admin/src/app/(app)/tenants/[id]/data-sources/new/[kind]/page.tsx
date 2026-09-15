@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getSourceKind } from '@tactia/domain/data-sources/catalog';
 import { ConnectSourceWizard } from '@/components/app/connect-source-wizard';
+import { DatabaseConnectWizard } from '@/components/app/database-connect-wizard';
 import { connectorScreenCopy } from '@/components/app/connector-steps';
 import { PageHeader } from '@/components/app/page-header';
 import { requireOperator } from '@/lib/server-context';
@@ -13,6 +14,9 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps) {
   const { kind: kindId } = await params;
+  if (kindId === 'postgres') {
+    return { title: 'Banco de dados · Nova fonte · Tactia Ops' };
+  }
   const kind = getSourceKind(kindId);
   return {
     title: kind?.selectable ? `${kind.label} · Nova fonte · Tactia Ops` : 'Nova fonte · Tactia Ops',
@@ -21,6 +25,9 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function NewDataSourceKindPage({ params }: PageProps) {
   const { id, kind: kindId } = await params;
+  if (kindId === 'postgres') {
+    redirect(`/tenants/${id}/data-sources/new/database`);
+  }
   const kind = getSourceKind(kindId);
   if (!kind || !kind.selectable) notFound();
 
@@ -41,7 +48,11 @@ export default async function NewDataSourceKindPage({ params }: PageProps) {
         </Link>
         <PageHeader className="mt-2" title={copy.title} description={copy.description} />
       </div>
-      <ConnectSourceWizard tenantId={id} kind={kind} />
+      {kind.id === 'database' ? (
+        <DatabaseConnectWizard tenantId={id} kind={kind} />
+      ) : (
+        <ConnectSourceWizard tenantId={id} kind={kind} />
+      )}
     </div>
   );
 }

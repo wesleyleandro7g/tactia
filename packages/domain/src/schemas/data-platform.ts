@@ -54,3 +54,18 @@ export const previewQuerySchema = z.object({
   resource: z.string().min(1).default('data'),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+export const probeDataSourceSchema = z.object({
+  dialect: z.enum(['postgres', 'mysql']),
+  configuration: z.object({
+    host: z.string().min(1),
+    port: z.coerce.number().int().positive().optional(),
+    database: z.string().min(1),
+    schema: z.string().optional(),
+    ssl: z.boolean().optional(),
+  }),
+  credentials: z.object({
+    username: z.string().min(1),
+    password: z.string().min(1),
+  }),
+});

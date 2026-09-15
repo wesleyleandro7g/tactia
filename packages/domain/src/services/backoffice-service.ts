@@ -422,6 +422,11 @@ export class BackofficeService {
     return this.dataSourceService.testConnection(scoped, dataSourceId);
   }
 
+  async probeDataSourceConnection(ctx: RequestContext, tenantId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.probeConnection(scoped, raw);
+  }
+
   async discoverDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string) {
     const scoped = await this.operatorScope(ctx, tenantId);
     return this.dataSourceService.discover(scoped, dataSourceId);

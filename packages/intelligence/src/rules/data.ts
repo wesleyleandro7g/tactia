@@ -18,6 +18,8 @@ export const staleDataRule: Rule = {
       // CSV uploads are one-off by nature: only flag connected sources or errors.
       const connected =
         source.type === 'postgres' ||
+        source.type === 'database' ||
+        source.type === 'mysql' ||
         source.type === 'rest' ||
         source.type === 'google_sheets' ||
         source.type === 'mcp';

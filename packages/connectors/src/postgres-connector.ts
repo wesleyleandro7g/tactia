@@ -9,9 +9,14 @@ import type {
   SyncContext,
   SyncResult,
 } from './types';
-import { applyTransform } from './transforms';
-import { computeChecksum } from './checksum';
 import type { RawRecordRepository } from '@tactia/database';
+import {
+  SQL_BATCH_SIZE,
+  normalizeSqlRow,
+  quotePgIdent,
+  resourcesFromInformationSchema,
+  syncSqlMappings,
+} from './sql-helpers';
 
 export type PostgresConnectorConfig = {
   host: string;
@@ -22,8 +27,6 @@ export type PostgresConnectorConfig = {
   username: string;
   password: string;
 };
-
-const BATCH_SIZE = 1000;
 
 export class PostgresConnector implements Connector {
   private readonly schema: string;
@@ -78,23 +81,7 @@ export class PostgresConnector implements Connector {
         [this.schema],
       );
 
-      const resourceMap = new Map<string, { name: string; type: string; nullable: boolean }[]>();
-      for (const row of rows) {
-        const cols = resourceMap.get(row.table_name) ?? [];
-        cols.push({
-          name: row.column_name,
-          type: row.data_type,
-          nullable: row.is_nullable === 'YES',
-        });
-        resourceMap.set(row.table_name, cols);
-      }
-
-      return {
-        resources: Array.from(resourceMap.entries()).map(([name, columns]) => ({
-          name,
-          columns,
-        })),
-      };
+      return { resources: resourcesFromInformationSchema(rows) };
     } finally {
       await client.end().catch(() => undefined);
     }
@@ -104,12 +91,10 @@ export class PostgresConnector implements Connector {
     const client = this.newClient();
     try {
       await client.connect();
-      const limit = options?.limit ?? BATCH_SIZE;
+      const limit = options?.limit ?? SQL_BATCH_SIZE;
       const offset = options?.offset ?? 0;
-      const { rows } = await client.query(
-        `SELECT * FROM "${this.schema}"."${resource}" LIMIT $1 OFFSET $2`,
-        [limit, offset],
-      );
+      const qualified = `${quotePgIdent(this.schema)}.${quotePgIdent(resource)}`;
+      const { rows } = await client.query(`SELECT * FROM ${qualified} LIMIT $1 OFFSET $2`, [limit, offset]);
       return rows as RawRow[];
     } finally {
       await client.end().catch(() => undefined);
@@ -117,61 +102,17 @@ export class PostgresConnector implements Connector {
   }
 
   normalize(row: RawRow, fieldMappings: FieldMapping[]): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const fm of fieldMappings) {
-      result[fm.target] = applyTransform(row[fm.source], fm.transform);
-    }
-    return result;
+    return normalizeSqlRow(row, fieldMappings);
   }
 
   async sync(context: SyncContext): Promise<SyncResult> {
     if (!this.rawRecords) {
       throw new Error('RawRecordRepository required for sync');
     }
-
-    const counters = { read: 0, created: 0, updated: 0, failed: 0 };
-
-    for (const mapping of context.mappings) {
-      let offset = 0;
-      let hasMore = true;
-
-      while (hasMore) {
-        const rows = await this.fetch(mapping.sourceEntity, { limit: BATCH_SIZE, offset });
-        hasMore = rows.length === BATCH_SIZE;
-        offset += rows.length;
-
-        for (const row of rows) {
-          counters.read++;
-          try {
-            const externalId = String(row['id'] ?? row['external_id'] ?? counters.read);
-            const checksum = computeChecksum(row as Record<string, unknown>);
-
-            const { created } = await this.rawRecords.upsertByKey({
-              tenantId: context.tenantId,
-              dataSourceId: context.dataSourceId,
-              syncJobId: context.syncJobId,
-              externalId,
-              entityType: mapping.targetEntity,
-              payload: row as Record<string, unknown>,
-              checksum,
-            });
-
-            if (created) counters.created++;
-            else counters.updated++;
-          } catch {
-            counters.failed++;
-          }
-        }
-
-        context.onProgress?.(counters);
-      }
-    }
-
-    return {
-      recordsRead: counters.read,
-      recordsCreated: counters.created,
-      recordsUpdated: counters.updated,
-      recordsFailed: counters.failed,
-    };
+    return syncSqlMappings({
+      rawRecords: this.rawRecords,
+      context,
+      fetch: (resource, options) => this.fetch(resource, options),
+    });
   }
 }

@@ -25,8 +25,8 @@ import {
   McpConnector,
   normalizeRow,
   normalizeToCanonical,
-  PostgresConnector,
   runDataQualityChecks,
+  sqlConnectorFromSource,
   type FieldMapping,
   type MappingConfig,
   type QualityIssue,
@@ -540,36 +540,16 @@ export class SyncService {
       );
     }
 
-    if (ds.type === 'postgres') {
-      let credData: Record<string, unknown> = {};
-      if (ds.credentialId) {
-        const cred = await this.deps.credentials.findById({ tenantId, id: ds.credentialId });
-        if (cred) {
-          credData = JSON.parse(decrypt(cred.encryptedData)) as Record<string, unknown>;
-        }
-      }
-      return new PostgresConnector(
-        {
-          host: String(config['host'] ?? 'localhost'),
-          port: Number(config['port'] ?? 5432),
-          database: String(config['database'] ?? ''),
-          schema: config['schema'] ? String(config['schema']) : undefined,
-          ssl: config['ssl'] === true,
-          username: String(credData['username'] ?? ''),
-          password: String(credData['password'] ?? ''),
-        },
-        this.deps.rawRecords,
-      );
-    }
+    const sql = sqlConnectorFromSource({
+      type: ds.type,
+      configuration: ds.configuration,
+      credentials: await this.decryptCredentials(tenantId, ds.credentialId),
+      rawRecords: this.deps.rawRecords,
+    });
+    if (sql) return sql;
 
     if (ds.type === 'mcp') {
-      let credData: Record<string, unknown> = {};
-      if (ds.credentialId) {
-        const cred = await this.deps.credentials.findById({ tenantId, id: ds.credentialId });
-        if (cred) {
-          credData = JSON.parse(decrypt(cred.encryptedData)) as Record<string, unknown>;
-        }
-      }
+      const credData = await this.decryptCredentials(tenantId, ds.credentialId);
       return new McpConnector(
         {
           url: String(config['url'] ?? ''),
@@ -581,6 +561,16 @@ export class SyncService {
     }
 
     throw new AppError(ErrorCode.CONNECTOR_ERROR, `Connector type '${ds.type}' not supported yet`);
+  }
+
+  private async decryptCredentials(
+    tenantId: string,
+    credentialId: string | null,
+  ): Promise<Record<string, unknown>> {
+    if (!credentialId) return {};
+    const cred = await this.deps.credentials.findById({ tenantId, id: credentialId });
+    if (!cred) return {};
+    return JSON.parse(decrypt(cred.encryptedData)) as Record<string, unknown>;
   }
 }
 

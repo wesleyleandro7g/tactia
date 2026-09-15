@@ -20,6 +20,7 @@
     "@tactia/database": "workspace:*",
     "@tactia/shared": "workspace:*",
     "csv-parse": "^5.6.0",
+    "mysql2": "^3.15.1",
     "pg": "^8.16.3"
   },
   "devDependencies": {

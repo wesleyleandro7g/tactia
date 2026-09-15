@@ -25,6 +25,8 @@ export const TARGET_ENTITIES = [
   { value: 'campaign', label: 'Campanhas' },
 ] as const;
 
+export type TargetEntity = (typeof TARGET_ENTITIES)[number]['value'];
+
 const FIELDS_BY_ENTITY: Record<string, MappingField[]> = {
   customer: [
     IGNORE,

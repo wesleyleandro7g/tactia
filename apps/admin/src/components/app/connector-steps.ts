@@ -26,6 +26,7 @@ function configStepLabel(kindId: string): string {
     case 'xlsx':
       return 'Arquivo';
     case 'postgres':
+    case 'database':
       return 'Conexão';
     case 'mcp':
     case 'rest':
@@ -44,9 +45,11 @@ export function connectorScreenCopy(kind: SourceKind): { title: string; descript
         description: 'Envie a planilha exportada do sistema do cliente. O arquivo fica no servidor para sync.',
       };
     case 'postgres':
+    case 'database':
       return {
-        title: 'PostgreSQL',
-        description: 'Informe host, banco e credenciais de leitura. A senha é criptografada antes de gravar.',
+        title: 'Banco de dados',
+        description:
+          'Escolha o dialeto, informe as credenciais e teste a conexão antes de mapear as tabelas.',
       };
     case 'mcp':
       return {

@@ -9,7 +9,58 @@ export type CatalogField = {
   placeholder?: string;
 };
 
-export type SourceConnectorKind = 'csv' | 'postgres' | 'mcp' | 'none';
+export type SourceConnectorKind = 'csv' | 'sql' | 'mcp' | 'none';
+
+export const SQL_DIALECTS = [
+  { value: 'postgres', label: 'PostgreSQL', defaultPort: 5432 },
+  { value: 'mysql', label: 'MySQL', defaultPort: 3306 },
+] as const;
+
+export type SqlDialect = (typeof SQL_DIALECTS)[number]['value'];
+
+const DATABASE_CONFIG_FIELDS: CatalogField[] = [
+  { key: 'host', label: 'Host', type: 'string', required: true, placeholder: 'db.cliente.com' },
+  { key: 'port', label: 'Porta', type: 'number', placeholder: '5432' },
+  { key: 'database', label: 'Banco', type: 'string', required: true },
+  { key: 'schema', label: 'Schema', type: 'string', placeholder: 'public' },
+  { key: 'ssl', label: 'SSL', type: 'boolean' },
+];
+
+const DATABASE_CREDENTIAL_FIELDS: CatalogField[] = [
+  { key: 'username', label: 'Usuário', type: 'string', required: true },
+  { key: 'password', label: 'Senha', type: 'secret', required: true },
+];
+
+export function isSqlDialect(value: unknown): value is SqlDialect {
+  return value === 'postgres' || value === 'mysql';
+}
+
+export function defaultSqlPort(dialect: SqlDialect): number {
+  return dialect === 'mysql' ? 3306 : 5432;
+}
+
+function configurationRecord(configuration: unknown): Record<string, unknown> | null {
+  if (!configuration || typeof configuration !== 'object' || Array.isArray(configuration)) return null;
+  return configuration as Record<string, unknown>;
+}
+
+export function sqlDialectFromSource(type: string, configuration?: unknown): SqlDialect | null {
+  if (type === 'postgres') return 'postgres';
+  if (type === 'mysql') return 'mysql';
+  if (type !== 'database') return null;
+  const dialect = configurationRecord(configuration)?.['dialect'];
+  return isSqlDialect(dialect) ? dialect : 'postgres';
+}
+
+export function sqlDialectLabel(dialect: SqlDialect): string {
+  return SQL_DIALECTS.find((item) => item.value === dialect)?.label ?? dialect;
+}
+
+export function sourceKindDisplayLabel(type: string, configuration?: unknown): string {
+  const dialect = sqlDialectFromSource(type, configuration);
+  if (dialect) return sqlDialectLabel(dialect);
+  return getSourceKind(type)?.label ?? type;
+}
 
 export type SourceKindGroupId =
   | 'files'
@@ -72,24 +123,26 @@ export const SOURCE_KINDS: readonly SourceKind[] = [
     credentialFields: [],
   },
   {
+    id: 'database',
+    label: 'Banco de dados',
+    description: 'PostgreSQL ou MySQL de leitura da empresa.',
+    group: 'databases',
+    groupLabel: DATABASES,
+    connector: 'sql',
+    selectable: true,
+    configFields: DATABASE_CONFIG_FIELDS,
+    credentialFields: DATABASE_CREDENTIAL_FIELDS,
+  },
+  {
     id: 'postgres',
     label: 'PostgreSQL',
     description: 'Banco de leitura da empresa.',
     group: 'databases',
     groupLabel: DATABASES,
-    connector: 'postgres',
-    selectable: true,
-    configFields: [
-      { key: 'host', label: 'Host', type: 'string', required: true, placeholder: 'db.cliente.com' },
-      { key: 'port', label: 'Porta', type: 'number', placeholder: '5432' },
-      { key: 'database', label: 'Banco', type: 'string', required: true },
-      { key: 'schema', label: 'Schema', type: 'string', placeholder: 'public' },
-      { key: 'ssl', label: 'SSL', type: 'boolean' },
-    ],
-    credentialFields: [
-      { key: 'username', label: 'Usuário', type: 'string', required: true },
-      { key: 'password', label: 'Senha', type: 'secret', required: true },
-    ],
+    connector: 'sql',
+    selectable: false,
+    configFields: DATABASE_CONFIG_FIELDS,
+    credentialFields: DATABASE_CREDENTIAL_FIELDS,
   },
   {
     id: 'google_sheets',

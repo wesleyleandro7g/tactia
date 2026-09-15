@@ -147,24 +147,31 @@ export {
   updateMappingSchema,
   createCredentialSchema,
   previewQuerySchema,
+  probeDataSourceSchema,
 } from './schemas/data-platform';
 export {
   SOURCE_KINDS,
+  SQL_DIALECTS,
   getSourceKind,
   isKnownSourceKind,
   isSelectableSourceKind,
+  isSqlDialect,
+  defaultSqlPort,
+  sqlDialectFromSource,
+  sqlDialectLabel,
+  sourceKindDisplayLabel,
   sourceKindHasConnector,
   listSelectableSourceKinds,
   groupSelectableSourceKinds,
 } from './data-sources/catalog';
-export type { SourceKind, CatalogField, SourceConnectorKind } from './data-sources/catalog';
+export type { SourceKind, CatalogField, SourceConnectorKind, SqlDialect } from './data-sources/catalog';
 export {
   TARGET_ENTITIES,
   targetFieldsFor,
   guessMapping,
   sourceNameFromFile,
 } from './data-sources/import-mapping';
-export type { MappingField } from './data-sources/import-mapping';
+export type { MappingField, TargetEntity } from './data-sources/import-mapping';
 export {
   createConversationSchema,
   listConversationsQuerySchema,

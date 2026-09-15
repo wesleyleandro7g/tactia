@@ -169,7 +169,7 @@ describe('PostgresConnector', () => {
   it('stores the password encrypted and never returns it', async () => {
     const connection = connectionFromEnv();
     const credential = await credentialService.create(ctx, {
-      provider: 'postgres',
+      provider: 'database',
       data: { username: connection.username, password: connection.password },
     });
 
@@ -181,8 +181,9 @@ describe('PostgresConnector', () => {
 
     const ds = await dataSourceService.create(ctx, {
       name: 'ERP do cliente',
-      type: 'postgres',
+      type: 'database',
       configuration: {
+        dialect: 'postgres',
         host: connection.host,
         port: connection.port,
         database: connection.database,
@@ -196,6 +197,22 @@ describe('PostgresConnector', () => {
   it('tests the connection', async () => {
     const result = await dataSourceService.testConnection(ctx, dataSourceId);
     expect(result.success).toBe(true);
+  });
+
+  it('probes a postgres dialect without persisting a source', async () => {
+    const connection = connectionFromEnv();
+    const result = await dataSourceService.probeConnection(ctx, {
+      dialect: 'postgres',
+      configuration: {
+        host: connection.host,
+        port: connection.port,
+        database: connection.database,
+        schema: SOURCE_SCHEMA,
+      },
+      credentials: { username: connection.username, password: connection.password },
+    });
+    expect(result.success).toBe(true);
+    expect(result.resources?.some((resource) => resource.name === 'clientes')).toBe(true);
   });
 
   it('discovers tables and columns from information_schema', async () => {
@@ -271,8 +288,8 @@ describe('PostgresConnector', () => {
   it('reports a connector error without leaking the password', async () => {
     const broken = await dataSourceService.create(ctx, {
       name: 'Host inválido',
-      type: 'postgres',
-      configuration: { host: '127.0.0.1', port: 1, database: 'nope' },
+      type: 'database',
+      configuration: { dialect: 'postgres', host: '127.0.0.1', port: 1, database: 'nope' },
     });
     const result = await dataSourceService.testConnection(ctx, broken.id);
     expect(result.success).toBe(false);

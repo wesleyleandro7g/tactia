@@ -1,19 +1,20 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  TARGET_ENTITIES,
-  guessMapping,
-  targetFieldsFor,
-} from '@tactia/domain/data-sources/import-mapping';
+import { guessMapping, type TargetEntity } from '@tactia/domain/data-sources/import-mapping';
 import { Alert } from '@/components/ui/alert';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Textarea } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { SyncButton } from '@/components/app/tenant-actions';
+import {
+  TableMappingEditor,
+  fieldsFromMap,
+  type DiscoveryResource,
+} from '@/components/app/table-mapping-editor';
 import { opsJson } from '@/lib/ops-fetch';
 
 type DataSource = {
@@ -33,9 +34,6 @@ type MappingRow = {
   active: boolean;
   configuration: { fields?: Array<{ source: string; target: string }> };
 };
-
-type DiscoveryColumn = { name: string; type: string; nullable: boolean };
-type DiscoveryResource = { name: string; columns: DiscoveryColumn[] };
 
 export function DataSourceManagePanel({
   tenantId,
@@ -59,14 +57,8 @@ export function DataSourceManagePanel({
   const [message, setMessage] = useState<string | null>(null);
   const [resources, setResources] = useState<DiscoveryResource[]>([]);
   const [sourceEntity, setSourceEntity] = useState('');
-  const [targetEntity, setTargetEntity] = useState<(typeof TARGET_ENTITIES)[number]['value']>('customer');
+  const [targetEntity, setTargetEntity] = useState<TargetEntity>('customer');
   const [fieldMap, setFieldMap] = useState<Record<string, string>>({});
-
-  const selected = useMemo(
-    () => resources.find((resource) => resource.name === sourceEntity) ?? null,
-    [resources, sourceEntity],
-  );
-  const targetFields = targetFieldsFor(targetEntity);
 
   async function saveMeta(event: React.FormEvent) {
     event.preventDefault();
@@ -140,11 +132,6 @@ export function DataSourceManagePanel({
     }
   }
 
-  function applyEntity(next: (typeof TARGET_ENTITIES)[number]['value']) {
-    setTargetEntity(next);
-    if (selected) setFieldMap(guessMapping(selected.columns, next));
-  }
-
   async function saveMapping(event: React.FormEvent) {
     event.preventDefault();
     if (!sourceEntity) {
@@ -154,14 +141,11 @@ export function DataSourceManagePanel({
     setPending(true);
     setError(null);
     try {
-      const fields = Object.entries(fieldMap)
-        .filter(([, target]) => target)
-        .map(([source, target]) => ({ source, target }));
       await opsJson(`${base}/mappings`, {
         body: {
           sourceEntity,
           targetEntity,
-          configuration: { fields },
+          configuration: { fields: fieldsFromMap(fieldMap) },
         },
       });
       setMessage('Mapeamento salvo.');
@@ -243,78 +227,21 @@ export function DataSourceManagePanel({
           <h2 className="font-mono text-sm uppercase tracking-[0.16em] text-muted-foreground">
             Mapeamento
           </h2>
-          <div className="grid max-w-xl gap-3 sm:grid-cols-2">
-            <Field htmlFor="source-entity" label="Recurso de origem">
-              {resources.length > 0 ? (
-                <Select
-                  id="source-entity"
-                  value={sourceEntity}
-                  onChange={(event) => {
-                    setSourceEntity(event.target.value);
-                    const resource = resources.find((item) => item.name === event.target.value);
-                    if (resource) setFieldMap(guessMapping(resource.columns, targetEntity));
-                  }}
-                >
-                  {resources.map((resource) => (
-                    <option key={resource.name} value={resource.name}>
-                      {resource.name}
-                    </option>
-                  ))}
-                </Select>
-              ) : (
-                <Input
-                  id="source-entity"
-                  value={sourceEntity}
-                  onChange={(event) => setSourceEntity(event.target.value)}
-                  placeholder="data ou nome da tabela"
-                />
-              )}
-            </Field>
-            <Field htmlFor="target-entity" label="Entidade Tactia">
-              <Select
-                id="target-entity"
-                value={targetEntity}
-                onChange={(event) => applyEntity(event.target.value as typeof targetEntity)}
-              >
-                {TARGET_ENTITIES.map((entity) => (
-                  <option key={entity.value} value={entity.value}>
-                    {entity.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-
-          {selected ? (
-            <DataTable
-              caption="Colunas"
-              columns={[
-                { key: 'source', header: 'Origem', render: (row: DiscoveryColumn) => row.name },
-                {
-                  key: 'target',
-                  header: 'Destino',
-                  render: (row) => (
-                    <Select
-                      aria-label={`Destino de ${row.name}`}
-                      value={fieldMap[row.name] ?? ''}
-                      onChange={(event) =>
-                        setFieldMap((current) => ({ ...current, [row.name]: event.target.value }))
-                      }
-                    >
-                      {targetFields.map((field) => (
-                        <option key={field.value || 'ignore'} value={field.value}>
-                          {field.label}
-                        </option>
-                      ))}
-                    </Select>
-                  ),
-                },
-              ]}
-              rows={selected.columns}
-              rowKey={(row) => row.name}
-            />
-          ) : null}
-
+          <TableMappingEditor
+            resources={resources}
+            sourceEntity={sourceEntity}
+            targetEntity={targetEntity}
+            fieldMap={fieldMap}
+            onSourceEntityChange={(next, nextMap) => {
+              setSourceEntity(next);
+              setFieldMap(nextMap);
+            }}
+            onTargetEntityChange={(next, nextMap) => {
+              setTargetEntity(next);
+              setFieldMap(nextMap);
+            }}
+            onFieldMapChange={setFieldMap}
+          />
           <div>
             <Button type="submit" loading={pending} variant="secondary">
               Salvar mapeamento

@@ -5,6 +5,22 @@ export { CsvConnector } from './csv-connector';
 export type { CsvConnectorConfig } from './csv-connector';
 export { PostgresConnector } from './postgres-connector';
 export type { PostgresConnectorConfig } from './postgres-connector';
+export { MySqlConnector } from './mysql-connector';
+export type { MySqlConnectorConfig } from './mysql-connector';
+export {
+  buildSqlConnector,
+  defaultSqlPort,
+  isSqlDialect,
+  sqlConnectionInputFrom,
+  sqlConnectorFromSource,
+  sqlDialectFromSource,
+} from './sql-connector';
+export type { SqlConnectionInput, SqlDialect } from './sql-connector';
+export {
+  quoteMysqlIdent,
+  quotePgIdent,
+  resourcesFromInformationSchema,
+} from './sql-helpers';
 export { McpConnector, rowsFromToolResult, MCP_HTTP_ACCEPT } from './mcp-connector';
 export type { McpConnectorConfig, McpRpc } from './mcp-connector';
 export { runDataQualityChecks } from './data-quality';

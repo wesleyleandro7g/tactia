@@ -23,7 +23,7 @@ import {
 } from '@/lib/format';
 import { requireOperator } from '@/lib/server-context';
 import { backofficeService } from '@/lib/services';
-import { getSourceKind, sourceKindHasConnector } from '@tactia/domain';
+import { sourceKindDisplayLabel, sourceKindHasConnector } from '@tactia/domain';
 
 export const metadata = { title: 'Empresa · Tactia Ops' };
 
@@ -117,7 +117,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             {
               key: 'type',
               header: 'Tipo',
-              render: (row) => getSourceKind(row.type)?.label ?? row.type,
+              render: (row) => sourceKindDisplayLabel(row.type, row.configuration),
             },
             {
               key: 'status',
