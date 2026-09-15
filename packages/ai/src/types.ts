@@ -37,6 +37,17 @@ export type MessageSource = {
   excerpt?: string;
 };
 
+/** Media produced by a tool (e.g. generate_infographic) for chat/WhatsApp delivery. */
+export type ChatAttachment = {
+  id: string;
+  type: 'infographic';
+  title: string;
+  mime: string;
+  template: string;
+  /** Authenticated path the web client can load, e.g. /api/v1/infographics/:id */
+  url: string;
+};
+
 export type ToolResult<TData = unknown> = {
   data: TData;
   sources: MessageSource[];
@@ -45,6 +56,8 @@ export type ToolResult<TData = unknown> = {
    * (Etapa 7). The LLM never executes anything — it can only propose.
    */
   proposal?: ActionProposal;
+  /** Optional media attachment produced by the tool (infographic PNG, etc.). */
+  attachment?: ChatAttachment;
 };
 
 /** Structured action proposed during the conversation (spec §44). */
@@ -152,6 +165,8 @@ export type ChatAnswer = {
   toolCalls: ExecutedToolCall[];
   /** Actions proposed in this turn, awaiting human approval (Etapa 7). */
   proposals: ActionProposal[];
+  /** Infographics / media generated during this turn. */
+  attachments: ChatAttachment[];
   provider: string;
   model: string;
   usage?: LLMUsage;
@@ -167,6 +182,7 @@ export type ChatStreamEvent =
       sources: MessageSource[];
       durationMs?: number;
       proposal?: ActionProposal;
+      attachment?: ChatAttachment;
       error?: string;
     }
   | { type: 'text'; delta: string }

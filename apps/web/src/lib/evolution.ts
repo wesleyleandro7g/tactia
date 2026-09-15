@@ -174,3 +174,44 @@ export async function sendWhatsappText(number: string, text: string): Promise<vo
     }
   }
 }
+
+export async function sendWhatsappImage(input: {
+  number: string;
+  imageBase64: string;
+  mimetype?: string;
+  caption?: string;
+  fileName?: string;
+}): Promise<void> {
+  const config = getEvolutionConfig();
+  if (!config) {
+    logger.warn({ number: input.number }, 'Evolution API is not configured; skip send image');
+    return;
+  }
+
+  const response = await fetch(
+    `${config.apiUrl}/message/sendMedia/${encodeURIComponent(config.instance)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: config.apiKey,
+      },
+      body: JSON.stringify({
+        number: input.number,
+        mediatype: 'image',
+        mimetype: input.mimetype ?? 'image/png',
+        caption: input.caption ?? '',
+        media: input.imageBase64,
+        fileName: input.fileName ?? 'infographic.png',
+      }),
+    },
+  );
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    logger.error(
+      { status: response.status, body: body.slice(0, 500), number: input.number },
+      'Evolution sendMedia failed',
+    );
+    throw new Error(`Evolution sendMedia failed with ${response.status}`);
+  }
+}

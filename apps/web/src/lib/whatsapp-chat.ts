@@ -2,9 +2,9 @@ import type { ChatAnswer, ChatTurn } from '@tactia/ai';
 import { logChatTurn } from '@tactia/ai';
 import { ErrorCode, createId, isAppError, logger, type RequestContext } from '@tactia/shared';
 import { answerMetadata, getOrchestrator, toToolContext } from '@/lib/ai';
-import { sendWhatsappText } from '@/lib/evolution';
+import { sendWhatsappImage, sendWhatsappText } from '@/lib/evolution';
 import { consumeRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
-import { conversationService, whatsappAuthorizedNumberService } from '@/lib/services';
+import { conversationService, infographicService, whatsappAuthorizedNumberService } from '@/lib/services';
 
 const HISTORY_TURNS = 12;
 const NEW_THREAD_COMMAND = /^\/nova$/i;
@@ -98,6 +98,22 @@ export async function handleWhatsappInbound(input: {
     metadata: { ...answerMetadata(answer), source: 'whatsapp' },
   });
   logChatTurn(ctx, { conversationId, startedAt, mode: 'sync', answer });
+
+  for (const attachment of answer.attachments) {
+    try {
+      const asset = await infographicService.getBytes(ctx, attachment.id);
+      await sendWhatsappImage({
+        number: input.phone,
+        imageBase64: asset.body.toString('base64'),
+        mimetype: asset.contentType,
+        caption: attachment.title,
+        fileName: 'infographic.png',
+      });
+    } catch (error) {
+      logger.error({ err: error, attachmentId: attachment.id }, 'WhatsApp infographic send failed');
+    }
+  }
+
   await sendWhatsappText(input.phone, answer.content || ERROR_REPLY);
 }
 

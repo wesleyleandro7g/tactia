@@ -27,6 +27,7 @@ export { customerEmbeddingText, productEmbeddingText } from './memory/catalog-te
 export { chunkText, estimateTokens, CHUNK_TARGET_TOKENS, CHUNK_OVERLAP_TOKENS } from './services/chunker';
 export { KnowledgeDocumentService } from './services/knowledge-document-service';
 export { MediaIngestService } from './services/media-ingest-service';
+export { InfographicService, type InfographicAttachment } from './services/infographic-service';
 export { Utf8AndPdfExtractor, PDF_NO_TEXT } from './ports/document-extractor';
 export type { DocumentTextExtractor } from './ports/document-extractor';
 export type { VisionExtractor, AudioTranscriber, VisionClassification } from './ports/media';

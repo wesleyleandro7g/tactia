@@ -119,6 +119,8 @@ const TOOL_GUIDE: Record<string, string> = {
   get_inventory_risk: 'risco de ruptura e estoque parado por produto.',
   get_acquisition: 'CAC e ROI por origem/campanha.',
   propose_action: 'propor tarefa ou e-mail para aprovação humana.',
+  generate_infographic:
+    'gera um infográfico PNG (KPI, comparação, ranking ou insight). Use só se o usuário pedir visual/imagem/infográfico OU se a resposta tiver 3+ números/comparações que se beneficiem de um quadro. Não use em respostas curtas.',
 };
 
 /**
@@ -220,7 +222,10 @@ export function buildSystemPrompt(context: AiContext, toolNames: string[]): stri
         'nunca diga que a ação foi executada — diga que ficou pendente de aprovação. Quando uma recomendação trouxer `suggestedAction`, ofereça propô-la.'
       : '4. Não prometa executar ações (enviar e-mail, criar tarefa). Você apenas analisa e recomenda.',
     '5. Use Markdown: **negrito** para destaques, listas curtas, tabelas para comparar valores.',
-    `6. Termine TODA resposta com um bloco final exatamente neste formato (até 3 itens, perguntas que o usuário pode fazer em seguida, específicas ao que foi discutido):`,
+    toolNames.includes('generate_infographic')
+      ? '6. Infográficos: chame generate_infographic apenas quando pedido ou quando 3+ números/comparações ganharem clareza visual. Valores do payload vêm das ferramentas — nunca invente. O PNG é anexado automaticamente; na resposta, comente o visual sem repetir todos os números.'
+      : '6. Você não gera imagens nesta sessão.',
+    `7. Termine TODA resposta com um bloco final exatamente neste formato (até 3 itens, perguntas que o usuário pode fazer em seguida, específicas ao que foi discutido):`,
     `### ${FOLLOW_UPS_HEADING}`,
     '- pergunta 1',
     '- pergunta 2',

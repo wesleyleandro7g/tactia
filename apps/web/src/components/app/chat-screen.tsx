@@ -16,11 +16,12 @@ type MessageRow = {
   metadata: unknown;
 };
 
-/** Extrai `sources`/`proposals` do metadata persistido pela Etapa 6/7. */
+/** Extrai `sources`/`proposals`/`attachments` do metadata persistido. */
 export function toMessageView(message: MessageRow): ChatMessageView {
   const metadata = (message.metadata ?? {}) as {
     sources?: ChatMessageView['sources'];
     proposals?: ChatMessageView['proposals'];
+    attachments?: ChatMessageView['attachments'];
     followUps?: string[];
     toolCalls?: Array<{ name: string }>;
   };
@@ -31,6 +32,7 @@ export function toMessageView(message: MessageRow): ChatMessageView {
     content: message.content,
     sources: metadata.sources ?? [],
     proposals: metadata.proposals ?? [],
+    attachments: metadata.attachments ?? [],
     followUps: metadata.followUps ?? [],
     toolsUsed: (metadata.toolCalls ?? []).map((call) => call.name),
   };

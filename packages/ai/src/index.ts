@@ -103,6 +103,7 @@ export {
   createSearchDocumentsTool,
   createSearchCatalogTool,
   createProposeActionTool,
+  createGenerateInfographicTool,
   currentMonthPeriod,
   periodInputSchema,
   periodLabel,
@@ -112,13 +113,28 @@ export {
   PROPOSABLE_ACTION_TYPES,
   type ActionProposalPort,
   type CreateToolsOptions,
+  type InfographicStore,
   type ToolDeps,
 } from './tools/index';
+export {
+  renderInfographic,
+  infographicSpecSchema,
+  demoInfographicSpec,
+  INFOGRAPHIC_TEMPLATES,
+  INFOGRAPHIC_TEMPLATE_LABELS,
+  WIDTH as INFOGRAPHIC_WIDTH,
+  HEIGHT as INFOGRAPHIC_HEIGHT,
+  type InfographicSpec,
+  type InfographicTemplate,
+  type InfographicTheme,
+  type RenderedInfographic,
+} from './infographics/index';
 export { handleMcpHttpRequest, MCP_HTTP_ACCEPT, MCP_SERVER_NAME, MCP_SERVER_VERSION } from './mcp/server';
 export type { HandleMcpHttpOptions, McpToolCallAudit } from './mcp/server';
 export type {
   ActionProposal,
   ChatAnswer,
+  ChatAttachment,
   ChatStreamEvent,
   ChatTurn,
   ExecutedToolCall,

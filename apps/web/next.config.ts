@@ -2,8 +2,41 @@ import path from 'path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@tactia/shared', '@tactia/domain', '@tactia/database', '@tactia/execution', '@tactia/intelligence'],
-  serverExternalPackages: ['pino', 'pino-pretty', '@prisma/client', 'pg-boss'],
+  transpilePackages: [
+    '@tactia/shared',
+    '@tactia/domain',
+    '@tactia/database',
+    '@tactia/execution',
+    '@tactia/intelligence',
+    '@tactia/ai',
+  ],
+  // Keep WASM/native deps out of Turbopack so satori can find hb.wasm.
+  serverExternalPackages: [
+    'pino',
+    'pino-pretty',
+    '@prisma/client',
+    'pg-boss',
+    '@resvg/resvg-js',
+    'satori',
+    'harfbuzzjs',
+    'yoga-layout',
+  ],
+  outputFileTracingIncludes: {
+    '/api/v1/conversations/[id]/messages': [
+      '../../packages/ai/src/infographics/fonts/**/*',
+      '../../packages/ai/src/infographics/assets/**/*',
+      './node_modules/@tactia/ai/src/infographics/fonts/**/*',
+      './node_modules/@tactia/ai/src/infographics/assets/**/*',
+      '../../node_modules/.pnpm/harfbuzzjs@*/node_modules/harfbuzzjs/hb.wasm',
+      './node_modules/harfbuzzjs/hb.wasm',
+    ],
+    '/api/v1/infographics/[id]': [
+      '../../packages/ai/src/infographics/fonts/**/*',
+      '../../packages/ai/src/infographics/assets/**/*',
+      './node_modules/@tactia/ai/src/infographics/fonts/**/*',
+      './node_modules/@tactia/ai/src/infographics/assets/**/*',
+    ],
+  },
   // Docker image (docker/Dockerfile): ships only the traced files.
   output: 'standalone',
   // Monorepo: trace from the repo root so workspace packages are included and

@@ -6,6 +6,7 @@ import {
   requireLLMAdapter,
   type ActionProposalPort,
   type ChatAnswer,
+  type InfographicStore,
   type ToolContext,
 } from '@tactia/ai';
 import { AppError, ErrorCode, redactSensitiveDeep, type RequestContext } from '@tactia/shared';
@@ -27,6 +28,7 @@ import {
   tenantService,
   knowledgeDocumentService,
   catalogEmbeddingService,
+  infographicService,
 } from './services';
 import { createEmbeddingAdapterFromEnv } from '@tactia/ai';
 
@@ -39,6 +41,10 @@ const actionProposer: ActionProposalPort = {
     ctx.origin === 'mcp'
       ? executionEngine.proposeFromMcp(ctx, input)
       : executionEngine.proposeFromAi(ctx, input),
+};
+
+const infographicStore: InfographicStore = {
+  save: (ctx, input) => infographicService.create(ctx, input),
 };
 
 /**
@@ -71,7 +77,7 @@ export const toolRegistry = new ToolRegistry(
         EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
       }),
     },
-    { actionProposer },
+    { actionProposer, infographicStore },
   ),
 );
 
@@ -173,6 +179,7 @@ export function answerMetadata(answer: ChatAnswer) {
       ...(call.error ? { error: call.error } : {}),
     })),
     ...(answer.proposals.length > 0 ? { proposals: answer.proposals } : {}),
+    ...(answer.attachments.length > 0 ? { attachments: answer.attachments } : {}),
     provider: answer.provider,
     model: answer.model,
     ...(answer.usage ? { usage: answer.usage } : {}),

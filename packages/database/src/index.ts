@@ -133,6 +133,11 @@ export type {
 } from './repositories/action-execution-repository';
 export { KnowledgeDocumentRepository } from './repositories/knowledge-document-repository';
 export { MediaAssetRepository } from './repositories/media-asset-repository';
+export { InfographicAssetRepository } from './repositories/infographic-asset-repository';
+export type {
+  CreateInfographicAssetInput,
+  InfographicAssetRecord,
+} from './repositories/infographic-asset-repository';
 export { TenantApiKeyRepository } from './repositories/tenant-api-key-repository';
 export type { CreateTenantApiKeyInput, TenantApiKeyPublic } from './repositories/tenant-api-key-repository';
 export { WhatsappAuthorizedNumberRepository } from './repositories/whatsapp-authorized-number-repository';

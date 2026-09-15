@@ -8,8 +8,38 @@ const nextConfig: NextConfig = {
     '@tactia/database',
     '@tactia/connectors',
     '@tactia/execution',
+    '@tactia/ai',
+    '@tactia/intelligence',
   ],
-  serverExternalPackages: ['pino', 'pino-pretty', '@prisma/client'],
+  // Keep WASM/native deps out of Turbopack so __dirname stays real (hb.wasm).
+  serverExternalPackages: [
+    'pino',
+    'pino-pretty',
+    '@prisma/client',
+    '@resvg/resvg-js',
+    'satori',
+    'harfbuzzjs',
+    'yoga-layout',
+  ],
+  // Keep TTF + harfbuzz wasm available in standalone/Docker builds.
+  outputFileTracingIncludes: {
+    '/infographics': [
+      '../../packages/ai/src/infographics/fonts/**/*',
+      '../../packages/ai/src/infographics/assets/**/*',
+      './node_modules/@tactia/ai/src/infographics/fonts/**/*',
+      './node_modules/@tactia/ai/src/infographics/assets/**/*',
+      '../../node_modules/.pnpm/harfbuzzjs@*/node_modules/harfbuzzjs/hb.wasm',
+      './node_modules/harfbuzzjs/hb.wasm',
+    ],
+    '/api/v1/infographics/preview': [
+      '../../packages/ai/src/infographics/fonts/**/*',
+      '../../packages/ai/src/infographics/assets/**/*',
+      './node_modules/@tactia/ai/src/infographics/fonts/**/*',
+      './node_modules/@tactia/ai/src/infographics/assets/**/*',
+      '../../node_modules/.pnpm/harfbuzzjs@*/node_modules/harfbuzzjs/hb.wasm',
+      './node_modules/harfbuzzjs/hb.wasm',
+    ],
+  },
   // Docker image (docker/Dockerfile): ships only the traced files.
   output: 'standalone',
   // Monorepo: trace from the repo root so workspace packages are included.

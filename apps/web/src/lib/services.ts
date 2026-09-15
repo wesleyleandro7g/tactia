@@ -39,6 +39,7 @@ import {
   PlaybookRepository,
   KnowledgeDocumentRepository,
   MediaAssetRepository,
+  InfographicAssetRepository,
   TenantApiKeyRepository,
   WhatsappAuthorizedNumberRepository,
 } from '@tactia/database';
@@ -66,6 +67,7 @@ import {
   KnowledgeDocumentService,
   LeadService,
   MediaIngestService,
+  InfographicService,
   MembershipService,
   MetricService,
   EpisodeService,
@@ -123,6 +125,7 @@ const episodeRepository = new EpisodeRepository(prisma);
 const playbookRepository = new PlaybookRepository(prisma);
 const knowledgeDocumentRepository = new KnowledgeDocumentRepository(prisma);
 const mediaAssetRepository = new MediaAssetRepository(prisma);
+const infographicAssetRepository = new InfographicAssetRepository(prisma);
 const insightFeedbackRepository = new InsightFeedbackRepository(prisma);
 const tenantSettingsRepository = new TenantSettingsRepository(prisma);
 const expenseRepository = new ExpenseRepository(prisma);
@@ -317,6 +320,8 @@ export const mediaIngestService = new MediaIngestService({
       }
     : undefined,
 });
+
+export const infographicService = new InfographicService(infographicAssetRepository, objectStorage);
 
 export const credentialService = new CredentialService(credentialRepository);
 

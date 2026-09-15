@@ -41,12 +41,22 @@ export type ChatProposal = {
   input?: Record<string, unknown>;
 };
 
+export type ChatAttachment = {
+  id: string;
+  type: 'infographic';
+  title: string;
+  mime: string;
+  template: string;
+  url: string;
+};
+
 export type ChatMessageView = {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   sources?: ChatSource[];
   proposals?: ChatProposal[];
+  attachments?: ChatAttachment[];
   /** Perguntas sugeridas pelo assistente (bloco "Próximos passos"). */
   followUps?: string[];
   /** Nomes das tools consultadas para produzir a resposta. */
@@ -62,6 +72,7 @@ type StreamEvent =
       name: string;
       sources?: ChatSource[];
       proposal?: ChatProposal;
+      attachment?: ChatAttachment;
       durationMs?: number;
       error?: string;
     }
@@ -72,6 +83,7 @@ type StreamEvent =
       content: string;
       sources?: ChatSource[];
       proposals?: ChatProposal[];
+      attachments?: ChatAttachment[];
       followUps?: string[];
       toolCalls?: Array<{ name: string; input?: unknown }>;
     }
@@ -106,6 +118,7 @@ const TOOL_LABELS: Record<string, string> = {
   search_documents: 'buscando nos documentos',
   search_catalog: 'buscando no catálogo',
   propose_action: 'preparando uma proposta de ação',
+  generate_infographic: 'gerando um infográfico',
   compare_periods: 'comparando períodos',
   explain_change: 'investigando a causa da variação',
   get_trend: 'analisando a tendência',
@@ -328,6 +341,9 @@ export function ChatPanel({
                 ...message,
                 toolsUsed: [...(message.toolsUsed ?? []), event.name],
                 sources: [...(message.sources ?? []), ...(event.sources ?? [])],
+                attachments: event.attachment
+                  ? [...(message.attachments ?? []), event.attachment]
+                  : message.attachments,
               }
             : message,
         ),
@@ -356,6 +372,7 @@ export function ChatPanel({
                 content: event.content,
                 sources: event.sources ?? [],
                 proposals: event.proposals ?? [],
+                attachments: event.attachments ?? [],
                 followUps: event.followUps ?? [],
                 toolsUsed: event.toolCalls?.map((call) => call.name) ?? message.toolsUsed ?? [],
               }
@@ -585,6 +602,28 @@ function MessageRow({
         streaming={message.id === 'streaming'}
         variant={isError ? 'error' : 'assistant'}
       />
+
+      {message.attachments && message.attachments.length > 0 ? (
+        <div className="mt-3 flex flex-col gap-3">
+          {message.attachments.map((attachment) => (
+            <figure
+              key={attachment.id}
+              className="overflow-hidden rounded-2xl border border-border bg-card"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={attachment.url}
+                alt={attachment.title}
+                className="h-auto w-full max-w-md object-cover"
+                loading="lazy"
+              />
+              <figcaption className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                {attachment.title}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : null}
 
       {message.id !== 'streaming' && message.sources && message.sources.length > 0 ? (
         <SourceChips sources={message.sources} toolsUsed={message.toolsUsed ?? []} />

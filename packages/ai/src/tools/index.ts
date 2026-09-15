@@ -33,6 +33,7 @@ import {
   createSearchEpisodesTool,
 } from './memory';
 import { createProposeActionTool, type ActionProposalPort } from './propose-action';
+import { createGenerateInfographicTool, type InfographicStore } from './generate-infographic';
 import {
   createGetAcquisitionTool,
   createGetCashFlowTool,
@@ -99,6 +100,10 @@ export {
   type ActionProposalPort,
 } from './propose-action';
 export {
+  createGenerateInfographicTool,
+  type InfographicStore,
+} from './generate-infographic';
+export {
   currentMonthPeriod,
   periodInputSchema,
   periodLabel,
@@ -114,6 +119,11 @@ export type CreateToolsOptions = {
    * actions for human approval (Etapa 7). Omit it to keep the chat read-only.
    */
   actionProposer?: ActionProposalPort;
+  /**
+   * When provided, `generate_infographic` is registered so the assistant can
+   * attach branded PNGs to chat/WhatsApp answers.
+   */
+  infographicStore?: InfographicStore;
 };
 
 /** Read tools + analytics tools + optional propose_action (Etapa 7). */
@@ -165,6 +175,9 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
 
   if (options.actionProposer) {
     tools.push(createProposeActionTool(options.actionProposer));
+  }
+  if (options.infographicStore) {
+    tools.push(createGenerateInfographicTool(options.infographicStore));
   }
 
   return tools;

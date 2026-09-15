@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./infographics": {
+      "types": "./src/infographics/index.ts",
+      "default": "./src/infographics/index.ts"
     }
   },
   "scripts": {
@@ -18,10 +22,12 @@
   "dependencies": {
     "@ai-sdk/openai": "4.0.52",
     "@modelcontextprotocol/sdk": "1.30.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@tactia/domain": "workspace:*",
     "@tactia/intelligence": "workspace:*",
     "@tactia/shared": "workspace:*",
     "ai": "7.0.85",
+    "satori": "^0.33.4",
     "zod": "^3.25.76",
     "zod-to-json-schema": "3.25.2"
   },

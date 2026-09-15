@@ -6,6 +6,7 @@ import type { ToolRegistry } from './tool-registry';
 import type {
   ActionProposal,
   ChatAnswer,
+  ChatAttachment,
   ChatStreamEvent,
   ChatTurn,
   ExecutedToolCall,
@@ -156,6 +157,7 @@ export class Orchestrator {
     const sources: MessageSource[] = [...context.sources];
     const executed: ExecutedToolCall[] = [];
     const proposals: ActionProposal[] = [];
+    const attachments: ChatAttachment[] = [];
     let usage: LLMUsage | undefined;
     const tools = this.deps.tools.definitions(request.ctx.role);
 
@@ -168,7 +170,7 @@ export class Orchestrator {
       usage = sumUsage(usage, completion.usage);
 
       if (completion.toolCalls.length === 0) {
-        return this.finalize(completion.text, sources, executed, proposals, usage, context);
+        return this.finalize(completion.text, sources, executed, proposals, attachments, usage, context);
       }
 
       messages.push({
@@ -192,13 +194,23 @@ export class Orchestrator {
         executed.push(outcome.executed);
         sources.push(...outcome.executed.sources);
         if (outcome.proposal) proposals.push(outcome.proposal);
+        if (outcome.attachment) attachments.push(outcome.attachment);
       });
     }
 
     // Tool budget exhausted: force a final answer with the data already gathered.
     const forced = await this.deps.llm.complete({ system, messages });
     usage = sumUsage(usage, forced.usage);
-    return this.finalize(forced.text, sources, executed, proposals, usage, context, 'max_iterations');
+    return this.finalize(
+      forced.text,
+      sources,
+      executed,
+      proposals,
+      attachments,
+      usage,
+      context,
+      'max_iterations',
+    );
   }
 
   /**
@@ -210,6 +222,7 @@ export class Orchestrator {
     const sources: MessageSource[] = [...context.sources];
     const executed: ExecutedToolCall[] = [];
     const proposals: ActionProposal[] = [];
+    const attachments: ChatAttachment[] = [];
     let usage: LLMUsage | undefined;
     const tools = this.deps.tools.definitions(request.ctx.role);
 
@@ -244,7 +257,7 @@ export class Orchestrator {
       if (toolCalls.length === 0) {
         yield {
           type: 'done',
-          answer: this.finalize(text, sources, executed, proposals, usage, context),
+          answer: this.finalize(text, sources, executed, proposals, attachments, usage, context),
         };
         return;
       }
@@ -269,12 +282,14 @@ export class Orchestrator {
         executed.push(outcome.executed);
         sources.push(...outcome.executed.sources);
         if (outcome.proposal) proposals.push(outcome.proposal);
+        if (outcome.attachment) attachments.push(outcome.attachment);
         yield {
           type: 'tool_result',
           name: toolCall.name,
           sources: outcome.executed.sources,
           durationMs: outcome.executed.durationMs,
           ...(outcome.proposal ? { proposal: outcome.proposal } : {}),
+          ...(outcome.attachment ? { attachment: outcome.attachment } : {}),
           ...(outcome.executed.error ? { error: outcome.executed.error } : {}),
         };
       }
@@ -285,7 +300,16 @@ export class Orchestrator {
     if (forced.text) yield { type: 'text', delta: forced.text };
     yield {
       type: 'done',
-      answer: this.finalize(forced.text, sources, executed, proposals, usage, context, 'max_iterations'),
+      answer: this.finalize(
+        forced.text,
+        sources,
+        executed,
+        proposals,
+        attachments,
+        usage,
+        context,
+        'max_iterations',
+      ),
     };
   }
 
@@ -315,7 +339,12 @@ export class Orchestrator {
   private async executeToolCall(
     ctx: ToolContext,
     toolCall: LLMToolCall,
-  ): Promise<{ output: unknown; executed: ExecutedToolCall; proposal?: ActionProposal }> {
+  ): Promise<{
+    output: unknown;
+    executed: ExecutedToolCall;
+    proposal?: ActionProposal;
+    attachment?: ChatAttachment;
+  }> {
     const started = Date.now();
     try {
       const result = await this.deps.tools.execute(toolCall.name, ctx, toolCall.input);
@@ -328,6 +357,7 @@ export class Orchestrator {
           sources: result.sources,
         },
         ...(result.proposal ? { proposal: result.proposal } : {}),
+        ...(result.attachment ? { attachment: result.attachment } : {}),
       };
     } catch (error) {
       // Tool failures are fed back to the model instead of aborting the chat —
@@ -360,6 +390,7 @@ export class Orchestrator {
     sources: MessageSource[],
     toolCalls: ExecutedToolCall[],
     proposals: ActionProposal[],
+    attachments: ChatAttachment[],
     usage: LLMUsage | undefined,
     context: AiContext,
     guardrail?: ChatAnswer['guardrail'],
@@ -401,6 +432,7 @@ export class Orchestrator {
       sources: deduped,
       toolCalls: redactToolCalls(toolCalls),
       proposals,
+      attachments,
       provider: this.deps.llm.provider,
       model: this.deps.llm.model,
       ...(usage ? { usage } : {}),

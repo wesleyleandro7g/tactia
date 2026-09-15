@@ -444,6 +444,7 @@ model Tenant {
   knowledgeDocuments KnowledgeDocument[]
   documentChunks     DocumentChunk[]
   mediaAssets        MediaAsset[]
+  infographicAssets  InfographicAsset[]
   apiKeys            TenantApiKey[]
   whatsappNumbers    WhatsappAuthorizedNumber[]
 
@@ -1490,4 +1491,22 @@ model MediaAsset {
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
   @@map("media_assets")
+}
+
+model InfographicAsset {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  title      String
+  template   String
+  mime       String
+  storageKey String   @map("storage_key")
+  byteSize   Int      @map("byte_size")
+  width      Int
+  height     Int
+  createdBy  String?  @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("infographic_assets")
 }

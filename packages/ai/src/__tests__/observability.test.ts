@@ -12,6 +12,7 @@ describe('chat observability', () => {
       sources: [],
       toolCalls: [{ name: 'get_revenue', input: { from: '2025-01-01' }, durationMs: 12, sources: [] }],
       proposals: [],
+      attachments: [],
       provider: 'mock',
       model: 'mock-model',
     };
