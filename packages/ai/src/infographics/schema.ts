@@ -2,56 +2,81 @@ import { z } from 'zod';
 
 const themeSchema = z.enum(['light', 'dark']).optional();
 
+/** Display labels/values — LLMs often send bare numbers; coerce to string. */
+const displayString = (max: number) =>
+  z.preprocess(
+    (val) => (typeof val === 'number' && Number.isFinite(val) ? String(val) : val),
+    z.string().trim().min(1).max(max),
+  );
+
+const optionalDisplayString = (max: number) =>
+  z.preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === '') return undefined;
+      if (typeof val === 'number' && Number.isFinite(val)) return String(val);
+      return val;
+    },
+    z.string().trim().max(max).optional(),
+  );
+
 const kpiItemSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  value: z.string().trim().min(1).max(32),
+  label: displayString(40),
+  value: displayString(32),
   delta: z.number().min(-10).max(10).optional(),
-  hint: z.string().trim().max(48).optional(),
+  hint: optionalDisplayString(48),
 });
 
 const comparisonSideSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  value: z.string().trim().min(1).max(32),
+  label: displayString(40),
+  value: displayString(32),
   numeric: z.number().optional(),
 });
 
 const rankingItemSchema = z.object({
-  label: z.string().trim().min(1).max(48),
-  value: z.string().trim().min(1).max(32),
+  label: displayString(48),
+  value: displayString(32),
   numeric: z.number().optional(),
   share: z.number().min(0).max(1).optional(),
 });
 
 const pieSliceSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  value: z.string().trim().min(1).max(32),
+  label: displayString(40),
+  value: displayString(32),
   numeric: z.number().nonnegative().optional(),
   share: z.number().min(0).max(1).optional(),
 });
 
 const linePointSchema = z.object({
-  label: z.string().trim().min(1).max(16),
-  value: z.string().trim().min(1).max(32),
+  label: displayString(16),
+  value: displayString(32),
   numeric: z.number(),
 });
 
 const periodMetricSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  left: z.string().trim().min(1).max(32),
-  right: z.string().trim().min(1).max(32),
+  label: displayString(40),
+  left: displayString(32),
+  right: displayString(32),
   leftNumeric: z.number().optional(),
   rightNumeric: z.number().optional(),
   delta: z.number().min(-10).max(10).optional(),
 });
 
 const barItemSchema = z.object({
-  label: z.string().trim().min(1).max(28),
-  value: z.string().trim().min(1).max(32),
+  label: displayString(28),
+  value: displayString(32),
   numeric: z.number().nonnegative(),
 });
 
+/** Keep layout bounds: LLMs often send full lists; take the first N. */
+function cappedArray<T extends z.ZodTypeAny>(item: T, min: number, max: number) {
+  return z
+    .array(item)
+    .min(min)
+    .transform((items) => (items.length > max ? items.slice(0, max) : items));
+}
+
 export const kpiSnapshotPayloadSchema = z.object({
-  items: z.array(kpiItemSchema).min(1).max(4),
+  items: cappedArray(kpiItemSchema, 1, 4),
   footnote: z.string().trim().max(120).optional(),
 });
 
@@ -65,27 +90,27 @@ export const comparisonPayloadSchema = z.object({
 
 export const rankingPayloadSchema = z.object({
   metricLabel: z.string().trim().min(1).max(40).optional(),
-  items: z.array(rankingItemSchema).min(1).max(8),
+  items: cappedArray(rankingItemSchema, 1, 8),
   footnote: z.string().trim().max(120).optional(),
 });
 
 export const insightCardPayloadSchema = z.object({
-  highlight: z.string().trim().min(1).max(48),
-  highlightLabel: z.string().trim().min(1).max(40).optional(),
-  bullets: z.array(z.string().trim().min(1).max(120)).min(1).max(4),
-  footnote: z.string().trim().max(120).optional(),
+  highlight: displayString(48),
+  highlightLabel: optionalDisplayString(40),
+  bullets: cappedArray(z.string().trim().min(1).max(120), 1, 4),
+  footnote: optionalDisplayString(120),
 });
 
 export const pieChartPayloadSchema = z.object({
-  items: z.array(pieSliceSchema).min(2).max(6),
-  centerLabel: z.string().trim().max(24).optional(),
-  centerValue: z.string().trim().max(24).optional(),
-  footnote: z.string().trim().max(120).optional(),
+  items: cappedArray(pieSliceSchema, 2, 6),
+  centerLabel: optionalDisplayString(24),
+  centerValue: optionalDisplayString(24),
+  footnote: optionalDisplayString(120),
 });
 
 export const lineChartPayloadSchema = z.object({
   metricLabel: z.string().trim().min(1).max(40).optional(),
-  points: z.array(linePointSchema).min(3).max(12),
+  points: cappedArray(linePointSchema, 3, 12),
   delta: z.number().min(-10).max(10).optional(),
   footnote: z.string().trim().max(120).optional(),
 });
@@ -93,13 +118,13 @@ export const lineChartPayloadSchema = z.object({
 export const periodComparisonPayloadSchema = z.object({
   leftLabel: z.string().trim().min(1).max(32),
   rightLabel: z.string().trim().min(1).max(32),
-  metrics: z.array(periodMetricSchema).min(2).max(6),
+  metrics: cappedArray(periodMetricSchema, 2, 6),
   footnote: z.string().trim().max(120).optional(),
 });
 
 export const barChartPayloadSchema = z.object({
   metricLabel: z.string().trim().min(1).max(40).optional(),
-  items: z.array(barItemSchema).min(2).max(8),
+  items: cappedArray(barItemSchema, 2, 8),
   footnote: z.string().trim().max(120).optional(),
 });
 
@@ -175,3 +200,33 @@ export const INFOGRAPHIC_TEMPLATE_IDS = [
   'period_comparison',
   'bar_chart',
 ] as const satisfies readonly InfographicTemplate[];
+
+/**
+ * LLM tool input — must be a top-level Zod object.
+ * OpenAI rejects discriminatedUnion (JSON Schema `anyOf` without `type: "object"`).
+ * Strict shape is re-validated with `infographicSpecSchema` after the call.
+ */
+export const generateInfographicToolInputSchema = z.object({
+  template: z
+    .enum(INFOGRAPHIC_TEMPLATE_IDS)
+    .describe(
+      'Template: kpi_snapshot | comparison | ranking | insight_card | pie_chart | line_chart | period_comparison | bar_chart',
+    ),
+  title: z.string().trim().min(1).max(80),
+  subtitle: z.string().trim().max(120).optional(),
+  theme: themeSchema,
+  payload: z
+    .record(z.unknown())
+    .describe(
+      'Dados do template. kpi_snapshot: {items[{label,value,delta?,hint?}],footnote?}. ' +
+        'comparison: {metricLabel,left{label,value,numeric?},right{...},delta?,footnote?}. ' +
+        'ranking: {metricLabel?,items[{label,value,numeric?,share?}],footnote?}. ' +
+        'insight_card: {highlight,highlightLabel?,bullets[],footnote?}. ' +
+        'pie_chart: {items[{label,value,numeric?,share?}],centerLabel?,centerValue?,footnote?}. ' +
+        'line_chart: {metricLabel?,points[{label,value,numeric}],delta?,footnote?}. ' +
+        'period_comparison: {leftLabel,rightLabel,metrics[{label,left,right,leftNumeric?,rightNumeric?,delta?}],footnote?}. ' +
+        'bar_chart: {metricLabel?,items[{label,value,numeric}],footnote?}.',
+    ),
+});
+
+export type GenerateInfographicToolInput = z.infer<typeof generateInfographicToolInputSchema>;

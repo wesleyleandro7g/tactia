@@ -118,12 +118,14 @@ export {
 } from './tools/index';
 export {
   renderInfographic,
+  generateInfographicToolInputSchema,
   infographicSpecSchema,
   demoInfographicSpec,
   INFOGRAPHIC_TEMPLATES,
   INFOGRAPHIC_TEMPLATE_LABELS,
   WIDTH as INFOGRAPHIC_WIDTH,
   HEIGHT as INFOGRAPHIC_HEIGHT,
+  type GenerateInfographicToolInput,
   type InfographicSpec,
   type InfographicTemplate,
   type InfographicTheme,

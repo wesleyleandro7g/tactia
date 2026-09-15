@@ -68,6 +68,48 @@ function containsNumber(text: string): boolean {
   return /\d/.test(text);
 }
 
+/** Years from company "today" and cited periods — prose like "setembro de 2026". */
+function allowContextCalendarYears(
+  allowed: Set<string>,
+  context: AiContext,
+  sources: MessageSource[],
+): Set<string> {
+  const addYear = (iso?: string | null) => {
+    if (!iso) return;
+    const year = new Date(iso).getFullYear();
+    if (Number.isFinite(year) && year >= 2000 && year <= 2100) {
+      allowed.add(`n:${year}`);
+    }
+  };
+
+  addYear(context.company.today);
+  addYear(context.period.from);
+  addYear(context.period.to);
+  addYear(context.trailingPeriod?.from);
+  addYear(context.trailingPeriod?.to);
+  for (const source of sources) {
+    addYear(source.period?.from);
+    addYear(source.period?.to);
+  }
+  return allowed;
+}
+
+/**
+ * Drop attachment IDs/URLs and UUID-like tokens before claim checks.
+ * Models often paste `/api/v1/infographics/<id>`; digit fragments then trip claim_mismatch.
+ */
+function scrubClaimNoise(content: string, attachments: ChatAttachment[]): string {
+  let text = content;
+  for (const attachment of attachments) {
+    if (attachment.id) text = text.split(attachment.id).join(' ');
+    if (attachment.url) text = text.split(attachment.url).join(' ');
+  }
+  return text
+    .replace(/\/api\/v1\/infographics\/[A-Za-z0-9_-]+/gi, ' ')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ')
+    .replace(/\b01[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ');
+}
+
 const FOLLOW_UPS_PATTERN = new RegExp(
   `(?:^|\\n)\\s*(?:#{1,4}\\s*|\\*\\*)?${FOLLOW_UPS_HEADING}:?(?:\\*\\*)?\\s*:?\\s*\\n([\\s\\S]*)$`,
   'i',
@@ -408,11 +450,13 @@ export class Orchestrator {
       followUps = [];
       flag = 'unsourced_numbers';
     } else if (this.enforceSources) {
-      const allowlist = buildClaimAllowlist(
-        [...context.metrics, ...context.trailing30],
+      const allowlist = allowContextCalendarYears(
+        buildClaimAllowlist([...context.metrics, ...context.trailing30], deduped),
+        context,
         deduped,
       );
-      const offenders = unsourcedNumbers(content, allowlist);
+      const claimText = scrubClaimNoise(content, attachments);
+      const offenders = unsourcedNumbers(claimText, allowlist);
       if (offenders.length > 0) {
         logger.warn({
           operation: 'ai_guardrail',

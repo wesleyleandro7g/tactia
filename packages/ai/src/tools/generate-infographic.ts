@@ -1,6 +1,9 @@
 import { defineTool } from '../tool-registry';
 import { renderInfographic } from '../infographics/render';
-import { infographicSpecSchema } from '../infographics/schema';
+import {
+  generateInfographicToolInputSchema,
+  infographicSpecSchema,
+} from '../infographics/schema';
 import type { ChatAttachment, Tool, ToolContext } from '../types';
 
 /**
@@ -38,9 +41,10 @@ export function createGenerateInfographicTool(store: InfographicStore): Tool {
       'Use SOMENTE quando o usuário pedir imagem/infográfico/visual OU quando a resposta tiver ' +
       '3+ números/comparações que ganham clareza em um quadro. NÃO use em respostas curtas de 1 número. ' +
       'Os valores devem vir de ferramentas anteriores — nunca invente. Após gerar, mencione o visual na resposta.',
-    inputSchema: infographicSpecSchema,
+    inputSchema: generateInfographicToolInputSchema,
     async execute(ctx, input) {
-      const rendered = await renderInfographic(input);
+      const spec = infographicSpecSchema.parse(input);
+      const rendered = await renderInfographic(spec);
 
       const attachment = await store.save(ctx, {
         title: rendered.title,
@@ -53,13 +57,12 @@ export function createGenerateInfographicTool(store: InfographicStore): Tool {
 
       return {
         data: {
-          attachmentId: attachment.id,
+          ok: true,
           title: attachment.title,
           template: attachment.template,
-          url: attachment.url,
           message:
-            'Infográfico gerado. Ele será anexado à mensagem. Mencione o visual na resposta, ' +
-            'sem inventar números além dos já obtidos nas ferramentas.',
+            'Infográfico gerado e anexado automaticamente à mensagem. ' +
+            'Comente o visual na resposta sem colar URLs/IDs e sem repetir todos os números do quadro.',
         },
         sources: [],
         attachment,

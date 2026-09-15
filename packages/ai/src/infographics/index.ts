@@ -1,6 +1,8 @@
 export { renderInfographic, type RenderedInfographic } from './render';
 export {
+  generateInfographicToolInputSchema,
   infographicSpecSchema,
+  type GenerateInfographicToolInput,
   type InfographicSpec,
   type InfographicTemplate,
 } from './schema';

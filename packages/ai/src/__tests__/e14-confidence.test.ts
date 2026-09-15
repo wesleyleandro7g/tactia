@@ -13,6 +13,7 @@ import { ToolRegistry, defineTool } from '../tool-registry';
 import { createDefaultTools } from '../tools/index';
 import type { ToolDeps } from '../tools/shared';
 import { createProposeActionTool, type ActionProposalPort } from '../tools/propose-action';
+import { createGenerateInfographicTool } from '../tools/generate-infographic';
 import { INSTRUCTION_REMOVED } from '../untrusted';
 import type { ToolContext } from '../types';
 
@@ -144,6 +145,76 @@ describe('E14 claim_mismatch', () => {
     const answer = await orchestrator.run({ ctx: toolContext(), question: 'Quando começou?' });
     expect(answer.guardrail).toBeUndefined();
     expect(answer.content).toContain('7 dias');
+  });
+
+  it('allows calendar year from context period in prose (infographic captions)', async () => {
+    const llm = new MockLLMAdapter({
+      script: [
+        {
+          text: 'O infográfico com o ranking de vendedores para setembro de 2025 foi gerado.',
+        },
+      ],
+    });
+    const orchestrator = new Orchestrator({
+      llm,
+      tools: new ToolRegistry([revenueTool]),
+      contextBuilder: contextSource(),
+    });
+
+    const answer = await orchestrator.run({ ctx: toolContext(), question: 'Gere o visual' });
+    expect(answer.guardrail).toBeUndefined();
+    expect(answer.content).toContain('2025');
+  });
+
+  it('does not trip claim_mismatch on pasted infographic attachment ids', async () => {
+    const attachmentId = '01a0a2c5-3f64-7084-a3e1-f3f9682f3545';
+    const llm = new MockLLMAdapter({
+      script: [
+        {
+          toolCalls: [
+            {
+              id: 'call-1',
+              name: 'generate_infographic',
+              input: {
+                template: 'insight_card',
+                title: 'Resumo',
+                payload: { highlight: 'Ok', bullets: ['a'] },
+              },
+            },
+          ],
+        },
+        {
+          text:
+            `O infográfico para setembro de 2025 foi gerado. ` +
+            `Veja em /api/v1/infographics/${attachmentId}`,
+        },
+      ],
+    });
+    const store = {
+      async save() {
+        return {
+          id: attachmentId,
+          type: 'infographic' as const,
+          title: 'Resumo',
+          mime: 'image/png',
+          template: 'insight_card',
+          url: `/api/v1/infographics/${attachmentId}`,
+        };
+      },
+    };
+    const orchestrator = new Orchestrator({
+      llm,
+      tools: new ToolRegistry([
+        revenueTool,
+        createGenerateInfographicTool(store),
+      ]),
+      contextBuilder: contextSource(),
+    });
+
+    const answer = await orchestrator.run({ ctx: toolContext(), question: 'Gere o visual' });
+    expect(answer.guardrail).toBeUndefined();
+    expect(answer.attachments).toHaveLength(1);
+    expect(answer.content).toContain('infográfico');
   });
 });
 

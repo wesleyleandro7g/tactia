@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { createId, type RequestContext } from '@tactia/shared';
 import { MockLLMAdapter } from '../adapters/mock-llm-adapter';
 import type { AiContext } from '../context-builder';
 import { renderInfographic } from '../infographics/render';
-import { infographicSpecSchema } from '../infographics/schema';
+import {
+  generateInfographicToolInputSchema,
+  infographicSpecSchema,
+} from '../infographics/schema';
 import { Orchestrator, type ContextSource } from '../orchestrator';
 import { ToolRegistry } from '../tool-registry';
 import { createDefaultTools } from '../tools/index';
@@ -77,6 +81,16 @@ function contextSource(): ContextSource {
 const emptyDeps = {} as ToolDeps;
 
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+describe('generate_infographic tool schema', () => {
+  it('exports a top-level JSON Schema object (OpenAI requirement)', () => {
+    const json = zodToJsonSchema(generateInfographicToolInputSchema, {
+      $refStrategy: 'none',
+      target: 'jsonSchema7',
+    }) as { type?: string };
+    expect(json.type).toBe('object');
+  });
+});
 
 describe('infographic renderer', () => {
   it('renders kpi_snapshot as a non-empty PNG', async () => {
