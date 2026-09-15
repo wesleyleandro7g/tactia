@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, IBM_Plex_Sans } from 'next/font/google';
+import { Bricolage_Grotesque, Fraunces, IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -15,6 +15,12 @@ const fraunces = Fraunces({
   subsets: ['latin', 'latin-ext'],
   style: ['normal', 'italic'],
   variable: '--font-fraunces',
+  display: 'swap',
+});
+
+const bricolage = Bricolage_Grotesque({
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-bricolage',
   display: 'swap',
 });
 
@@ -39,7 +45,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning className={`${ibmPlexSans.variable} ${fraunces.variable}`}>
+    <html
+      lang="pt-BR"
+      suppressHydrationWarning
+      className={`${ibmPlexSans.variable} ${fraunces.variable} ${bricolage.variable}`}
+    >
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>{children}</TooltipProvider>
