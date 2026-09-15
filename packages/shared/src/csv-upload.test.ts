@@ -2,8 +2,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AppError } from '@tactia/shared';
-import { isCsvFile, saveCsvUpload, uploadRoot } from '../csv-upload';
+import { AppError } from './errors';
+import { isCsvFile, saveCsvUpload, uploadRoot } from './csv-upload';
 
 const tenantId = '0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee';
 

@@ -13,7 +13,7 @@ import {
   type DiscoveryResult,
   type RawRow,
 } from '@tactia/connectors';
-import { assertRole, assertTenantContext } from '../authz';
+import { assertCanManageConnections, assertTenantScope } from '../authz';
 import { createDataSourceSchema, updateDataSourceSchema, createMappingSchema, updateMappingSchema } from '../schemas/data-platform';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import { CredentialService } from './credential-service';
@@ -28,7 +28,7 @@ export class DataSourceService {
   ) {}
 
   async list(ctx: RequestContext, query: Record<string, string | undefined>) {
-    assertTenantContext(ctx);
+    assertTenantScope(ctx);
     const parsed = listQuerySchema.parse(query);
     const { skip, take } = paginationArgs(parsed);
     const result = await this.dataSources.list({
@@ -42,14 +42,14 @@ export class DataSourceService {
   }
 
   async get(ctx: RequestContext, id: string) {
-    assertTenantContext(ctx);
+    assertTenantScope(ctx);
     const ds = await this.dataSources.findById({ tenantId: ctx.tenantId!, id });
     if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');
     return ds;
   }
 
   async create(ctx: RequestContext, raw: unknown) {
-    assertRole(ctx, 'admin');
+    assertCanManageConnections(ctx);
     const input = createDataSourceSchema.parse(raw);
     const ds = await this.dataSources.create({
       tenantId: ctx.tenantId!,
@@ -67,15 +67,16 @@ export class DataSourceService {
   }
 
   async update(ctx: RequestContext, id: string, raw: unknown) {
-    assertRole(ctx, 'admin');
+    assertCanManageConnections(ctx);
     const input = updateDataSourceSchema.parse(raw);
     const ds = await this.dataSources.update({
       tenantId: ctx.tenantId!,
       id,
       data: {
         name: input.name,
-        configuration: input.configuration ?? null,
-        credentialId: input.credentialId,
+        status: input.status,
+        ...(input.configuration !== undefined ? { configuration: input.configuration } : {}),
+        ...(input.credentialId !== undefined ? { credentialId: input.credentialId } : {}),
       },
     });
     if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');
@@ -89,7 +90,7 @@ export class DataSourceService {
   }
 
   async remove(ctx: RequestContext, id: string) {
-    assertRole(ctx, 'admin');
+    assertCanManageConnections(ctx);
     const ds = await this.dataSources.softDelete({ tenantId: ctx.tenantId!, id });
     if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');
     await this.auditLogs.record(ctx, {
@@ -128,7 +129,7 @@ export class DataSourceService {
   }
 
   async createMapping(ctx: RequestContext, dataSourceId: string, raw: unknown) {
-    assertRole(ctx, 'member');
+    assertCanManageConnections(ctx);
     await this.get(ctx, dataSourceId);
     const input = createMappingSchema.parse(raw);
     return this.mappings.create({
@@ -148,7 +149,7 @@ export class DataSourceService {
   }
 
   async updateMapping(ctx: RequestContext, dataSourceId: string, mappingId: string, raw: unknown) {
-    assertRole(ctx, 'member');
+    assertCanManageConnections(ctx);
     await this.get(ctx, dataSourceId);
     const input = updateMappingSchema.parse(raw);
     const mapping = await this.mappings.update({
@@ -166,7 +167,7 @@ export class DataSourceService {
   }
 
   async deleteMapping(ctx: RequestContext, dataSourceId: string, mappingId: string) {
-    assertRole(ctx, 'member');
+    assertCanManageConnections(ctx);
     await this.get(ctx, dataSourceId);
     const mapping = await this.mappings.delete({ tenantId: ctx.tenantId!, id: mappingId });
     if (!mapping) throw new AppError(ErrorCode.NOT_FOUND, 'Mapping not found');

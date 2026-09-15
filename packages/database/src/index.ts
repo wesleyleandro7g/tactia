@@ -7,7 +7,6 @@ export type {
   SaleStatus,
   ActivityType,
   PaymentStatus,
-  DataSourceType,
   DataSourceStatus,
   SyncJobStatus,
   ImportStatus,
@@ -111,7 +110,7 @@ export type {
   InteractionRecord,
   InteractionSearchHit,
 } from './repositories/interaction-repository';
-export type { CreateDataSourceInput } from './repositories/data-source-repository';
+export type { CreateDataSourceInput, DataSourceType } from './repositories/data-source-repository';
 export type { CreateCredentialInput } from './repositories/credential-repository';
 export type { CreateSyncJobInput } from './repositories/sync-job-repository';
 export type { UpsertRawRecordInput } from './repositories/raw-record-repository';

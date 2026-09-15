@@ -7,7 +7,6 @@ import type { Icon as LucideIcon } from 'lucide-react';
 import {
   BookOpen,
   ClipboardCheck,
-  Database,
   FileText,
   Files,
   History,
@@ -47,7 +46,6 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/settings/documents': Files,
   '/settings/api-keys': Key,
   '/settings/whatsapp': MessageCircle,
-  '/onboarding': Database,
 };
 
 /** Marca o item ativo com aria-current e destaca visualmente. */

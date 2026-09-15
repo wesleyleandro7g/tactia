@@ -11,6 +11,7 @@ import {
   TenantProfileForm,
 } from '@/components/app/tenant-actions';
 import { Badge, severityTone, statusTone } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardLabel } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import {
@@ -22,6 +23,7 @@ import {
 } from '@/lib/format';
 import { requireOperator } from '@/lib/server-context';
 import { backofficeService } from '@/lib/services';
+import { getSourceKind, sourceKindHasConnector } from '@tactia/domain';
 
 export const metadata = { title: 'Empresa · Tactia Ops' };
 
@@ -94,12 +96,29 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-mono text-sm uppercase tracking-[0.16em] text-muted-foreground">Fontes de dados</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="font-mono text-sm uppercase tracking-[0.16em] text-muted-foreground">Fontes de dados</h2>
+          <Link href={`/tenants/${tenant.id}/data-sources/new`} className={buttonVariants()}>
+            Nova fonte
+          </Link>
+        </div>
         <DataTable
           caption={`Fontes de ${tenant.name}`}
           columns={[
-            { key: 'name', header: 'Fonte', render: (row: (typeof dataSources)[number]) => row.name },
-            { key: 'type', header: 'Tipo', render: (row) => row.type },
+            {
+              key: 'name',
+              header: 'Fonte',
+              render: (row: (typeof dataSources)[number]) => (
+                <Link href={`/tenants/${tenant.id}/data-sources/${row.id}`} className="text-primary hover:underline">
+                  {row.name}
+                </Link>
+              ),
+            },
+            {
+              key: 'type',
+              header: 'Tipo',
+              render: (row) => getSourceKind(row.type)?.label ?? row.type,
+            },
             {
               key: 'status',
               header: 'Status',
@@ -113,7 +132,12 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             {
               key: 'actions',
               header: 'Ações',
-              render: (row) => <SyncButton tenantId={tenant.id} dataSourceId={row.id} />,
+              render: (row) =>
+                sourceKindHasConnector(row.type) ? (
+                  <SyncButton tenantId={tenant.id} dataSourceId={row.id} />
+                ) : (
+                  <span className="text-xs text-muted-foreground">Sem conector</span>
+                ),
             },
           ]}
           rows={dataSources}

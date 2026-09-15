@@ -1,6 +1,8 @@
 import { createId } from '@tactia/shared';
-import type { PrismaClient, DataSourceStatus, DataSourceType } from '../client';
+import type { PrismaClient, DataSourceStatus } from '../client';
 import { asNullableJson } from '../json';
+
+export type DataSourceType = string;
 
 export type CreateDataSourceInput = {
   tenantId: string;
@@ -85,7 +87,8 @@ export class DataSourceRepository {
       data: {
         name: data.name,
         status: data.status,
-        configuration: data.configuration ? asNullableJson(data.configuration) : undefined,
+        configuration:
+          data.configuration !== undefined ? asNullableJson(data.configuration) : undefined,
         credentialId: data.credentialId,
       },
     });

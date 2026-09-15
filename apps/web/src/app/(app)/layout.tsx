@@ -14,7 +14,6 @@ const BASE_NAV: NavItem[] = [
   { href: '/settings/memory', label: 'Memória' },
   { href: '/settings/playbooks', label: 'Playbooks' },
   { href: '/settings/documents', label: 'Documentos' },
-  { href: '/onboarding', label: 'Dados' },
 ];
 
 /**
@@ -27,11 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const tenants = await listUserTenants(ctx);
   const nav: NavItem[] = [...BASE_NAV];
   if (ctx.role && hasMinRole(ctx.role, 'admin')) {
-    const onboarding = nav.findIndex((item) => item.href === '/onboarding');
-    const insertAt = onboarding === -1 ? nav.length : onboarding;
-    nav.splice(
-      insertAt,
-      0,
+    nav.push(
       { href: '/settings/api-keys', label: 'API keys' },
       { href: '/settings/whatsapp', label: 'WhatsApp' },
     );

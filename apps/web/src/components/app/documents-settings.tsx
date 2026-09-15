@@ -161,7 +161,7 @@ export function DocumentsSettings({
         <Card className="flex flex-col gap-2 p-5">
           <h2 className="text-sm font-medium">Pendentes de mapeamento</h2>
           <p className="text-xs text-muted-foreground">
-            Extraímos os campos. Importe como venda/despesa no onboarding para entrar nas métricas.
+            Extraímos os campos. Peça à equipe Tactia para mapear como venda ou despesa na fonte de dados.
           </p>
           <ul className="flex flex-col gap-1 text-sm">
             {pendingMapping.map((item) => (

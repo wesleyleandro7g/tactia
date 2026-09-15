@@ -8,7 +8,6 @@ import { RunPipelineButton } from '@/components/app/run-pipeline-button';
 import { TrendChart } from '@/components/app/trend-chart';
 import { PageHeader } from '@/components/app/page-header';
 import { Alert } from '@/components/ui/alert';
-import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/feedback';
 import { cn } from '@/lib/cn';
 import { formatCurrency, formatInteger, formatPeriod, resolveRangeParam } from '@/lib/format';
@@ -94,12 +93,7 @@ export default async function DashboardPage({
         <DashboardHeader period={period} />
         <EmptyState
           title="Nenhum dado importado ainda"
-          description="Conecte uma fonte de dados para a Tactia calcular métricas, detectar anomalias e sugerir ações."
-          action={
-            <Link href="/onboarding" className={buttonVariants()}>
-              Importar dados
-            </Link>
-          }
+          description="A equipe Tactia ainda não conectou os dados desta empresa. Quando as fontes estiverem ativas, as métricas aparecem aqui."
         />
       </div>
     );

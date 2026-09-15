@@ -1,7 +1,8 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import type { CredentialRepository } from '@tactia/database';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
-import { assertTenantContext, assertRole } from '../authz';
+import { assertCanManageConnections, assertTenantScope } from '../authz';
+import { createCredentialSchema } from '../schemas/data-platform';
 
 const ALGORITHM = 'aes-256-gcm';
 
@@ -41,11 +42,8 @@ export class CredentialService {
   constructor(private readonly credentials: CredentialRepository) {}
 
   async create(ctx: RequestContext, raw: unknown) {
-    assertRole(ctx, 'admin');
-    const { provider, data } = raw as { provider: string; data: Record<string, unknown> };
-    if (!provider || !data) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, 'provider and data are required');
-    }
+    assertCanManageConnections(ctx);
+    const { provider, data } = createCredentialSchema.parse(raw);
     const encryptedData = encrypt(JSON.stringify(data));
     return this.credentials.create({
       tenantId: ctx.tenantId!,
@@ -55,7 +53,7 @@ export class CredentialService {
   }
 
   async get(ctx: RequestContext, id: string) {
-    assertTenantContext(ctx);
+    assertTenantScope(ctx);
     const cred = await this.credentials.findById({ tenantId: ctx.tenantId!, id });
     if (!cred) throw new AppError(ErrorCode.NOT_FOUND, 'Credential not found');
     // Never expose decrypted data via the public get
@@ -63,14 +61,14 @@ export class CredentialService {
   }
 
   async getDecryptedData(ctx: RequestContext, id: string): Promise<Record<string, unknown>> {
-    assertTenantContext(ctx);
+    assertTenantScope(ctx);
     const cred = await this.credentials.findById({ tenantId: ctx.tenantId!, id });
     if (!cred) throw new AppError(ErrorCode.NOT_FOUND, 'Credential not found');
     return JSON.parse(decrypt(cred.encryptedData)) as Record<string, unknown>;
   }
 
   async delete(ctx: RequestContext, id: string) {
-    assertRole(ctx, 'admin');
+    assertCanManageConnections(ctx);
     const cred = await this.credentials.delete({ tenantId: ctx.tenantId!, id });
     if (!cred) throw new AppError(ErrorCode.NOT_FOUND, 'Credential not found');
     return cred;

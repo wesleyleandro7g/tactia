@@ -7,6 +7,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./data-sources/catalog": {
+      "types": "./src/data-sources/catalog.ts",
+      "default": "./src/data-sources/catalog.ts"
+    },
+    "./data-sources/import-mapping": {
+      "types": "./src/data-sources/import-mapping.ts",
+      "default": "./src/data-sources/import-mapping.ts"
     }
   },
   "scripts": {

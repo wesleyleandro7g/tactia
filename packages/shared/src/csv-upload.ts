@@ -1,13 +1,16 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { AppError, ErrorCode, createId } from '@tactia/shared';
-import { MAX_UPLOAD_BYTES, isCsvFile } from './csv-upload-shared';
+import { AppError, ErrorCode } from './errors';
+import { createId } from './uuid';
 
-export { MAX_UPLOAD_BYTES, isCsvFile } from './csv-upload-shared';
-
+export const CSV_MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export const DEFAULT_UPLOAD_DIR = '/tmp/tactia-uploads';
 
-export function uploadRoot(dir = process.env.UPLOAD_DIR): string {
+export function isCsvFile(file: { name: string; type?: string }): boolean {
+  return file.name.toLowerCase().endsWith('.csv');
+}
+
+export function uploadRoot(dir = process.env['UPLOAD_DIR']): string {
   return path.resolve(dir && dir.trim().length > 0 ? dir : DEFAULT_UPLOAD_DIR);
 }
 
@@ -25,12 +28,12 @@ function assertSafeTenantId(tenantId: string): string {
 export async function saveCsvUpload(
   tenantId: string,
   file: File,
-  dir = process.env.UPLOAD_DIR,
+  dir = process.env['UPLOAD_DIR'],
 ): Promise<{ filePath: string; fileName: string; size: number }> {
   if (!(file instanceof File) || file.size === 0) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Envie um arquivo CSV.');
   }
-  if (file.size > MAX_UPLOAD_BYTES) {
+  if (file.size > CSV_MAX_UPLOAD_BYTES) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'O arquivo pode ter no máximo 20 MB.');
   }
   if (!isCsvFile(file)) {

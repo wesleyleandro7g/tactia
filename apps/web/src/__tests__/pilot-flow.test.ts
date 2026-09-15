@@ -289,6 +289,9 @@ let ownerUserId: string;
 let memberUserId: string | null = null;
 let tenantId: string;
 let ownerCtx: RequestContext;
+let opsCtx: RequestContext;
+let opsId: string;
+let opsAuthId: string;
 let otherTenantId: string;
 let otherUserId: string;
 let otherAuthId: string;
@@ -303,27 +306,27 @@ async function writeCsv(name: string, content: string) {
   return filePath;
 }
 
-/** Creates a CSV DataSource the same way the onboarding wizard does. */
+/** Creates a CSV DataSource the way Ops registers a file source. */
 async function configureCsvSource(input: {
   name: string;
   filePath: string;
   targetEntity: string;
   fields: string[];
 }) {
-  const ds = await dataSourceService.create(ownerCtx, {
+  const ds = await dataSourceService.create(opsCtx, {
     name: input.name,
     type: 'csv',
     configuration: { filePath: input.filePath },
   });
 
-  const test = await dataSourceService.testConnection(ownerCtx, ds.id);
+  const test = await dataSourceService.testConnection(opsCtx, ds.id);
   expect(test.success).toBe(true);
 
-  const discovery = await dataSourceService.discover(ownerCtx, ds.id);
+  const discovery = await dataSourceService.discover(opsCtx, ds.id);
   const columns = discovery.resources[0]!.columns.map((column) => column.name);
   for (const field of input.fields) expect(columns).toContain(field);
 
-  await dataSourceService.createMapping(ownerCtx, ds.id, {
+  await dataSourceService.createMapping(opsCtx, ds.id, {
     sourceEntity: 'data',
     targetEntity: input.targetEntity,
     configuration: { fields: input.fields.map((field) => ({ source: field, target: field })) },
@@ -349,6 +352,16 @@ beforeAll(async () => {
     email: ownerEmail,
   });
   ownerUserId = ownerUser.id;
+
+  opsAuthId = createId();
+  opsId = createId();
+  const opsEmail = `pilot-ops-${opsAuthId}@pilot.local`;
+  await prisma.operatorAuthUser.create({
+    data: { id: opsAuthId, name: 'Ops', email: opsEmail, emailVerified: true },
+  });
+  await prisma.operator.create({
+    data: { id: opsId, externalAuthId: opsAuthId, name: 'Ops', email: opsEmail },
+  });
 });
 
 afterAll(async () => {
@@ -362,6 +375,8 @@ afterAll(async () => {
   await prisma.authUser.deleteMany({
     where: { email: { in: [ownerEmail, memberEmail, `other-${otherAuthId}@pilot.local`] } },
   });
+  await prisma.operator.deleteMany({ where: { id: opsId } });
+  await prisma.operatorAuthUser.deleteMany({ where: { id: opsAuthId } });
   await rm(dir, { recursive: true, force: true });
   await prisma.$disconnect();
 });
@@ -377,6 +392,7 @@ describe('Fluxo do piloto (spec §2)', () => {
     const tenant = await tenantService.create(ctx, { name: `Piloto ${createId().slice(0, 8)}` });
     tenantId = tenant.id;
     ownerCtx = { requestId: createId(), tenantId, userId: ownerUserId, role: 'owner' };
+    opsCtx = { ...ownerCtx, operatorId: opsId };
 
     const audit = await auditLogService.list({ tenantId, skip: 0, take: 20 });
     expect(audit.items.map((log) => log.action)).toContain('TENANT_CREATED');
@@ -465,7 +481,7 @@ describe('Fluxo do piloto (spec §2)', () => {
       ],
     });
 
-    const preview = await dataSourceService.preview(ownerCtx, sourceIds['sale']!, 'data', 3);
+    const preview = await dataSourceService.preview(opsCtx, sourceIds['sale']!, 'data', 3);
     expect(preview).toHaveLength(3);
 
     const audit = await auditLogService.list({ tenantId, skip: 0, take: 50 });

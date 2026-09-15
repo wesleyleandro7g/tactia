@@ -18,11 +18,11 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 | Rota | O que faz |
 |---|---|
 | `/dashboard` | Receita, vendas, clientes e ticket médio; séries no tempo; insights por severidade; recomendações pendentes |
-| `/onboarding` | Wizard empresa → arquivo (upload/CSV ou Postgres) → colunas → conferir → importação |
+| `/onboarding` | Criar empresa (sem conectar fontes — isso é no Ops) |
 | `/chat` | Conversa com a Tactia com streaming, fonte de cada número e proposta de ação |
 | `/approvals` | Fila de aprovações e execuções recentes |
 
-Backoffice (`apps/admin`, http://localhost:3001): login de operador, empresas, usuários, sync e audit. Identidade separada do app dos clientes.
+Backoffice (`apps/admin`, http://localhost:3001): login de operador, empresas, usuários, **fontes de dados** (conexão, mapeamento, sync) e audit. Identidade separada do app dos clientes.
 
 ## Setup
 

@@ -229,7 +229,7 @@ containers `web` e `admin` se necessário.
    (ou o equivalente no container). Entre em `https://ops.suaempresa.com`.
 2. No Ops, **Nova empresa** com o owner do cliente. O owner entra em
    `https://tactia.suaempresa.com/login`.
-3. Siga o wizard em `/onboarding` (arquivo → colunas → conferir → importar).
+3. No Tactia Ops, conecte a fonte da empresa (`/tenants/:id/data-sources`).
 4. Para CSV: arraste o arquivo na tela ou clique para escolher. Os uploads
    ficam no volume `uploads_data` (`UPLOAD_DIR=/data/uploads`).
 5. Valide em `/dashboard`, teste o `/chat` e confira `/approvals`.

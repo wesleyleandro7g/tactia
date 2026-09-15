@@ -1,13 +1,21 @@
 import { z } from 'zod';
+import { isSelectableSourceKind } from '../data-sources/catalog';
 
 export const createDataSourceSchema = z.object({
   name: z.string().min(1).max(200),
-  type: z.enum(['csv', 'xlsx', 'postgres', 'rest', 'google_sheets', 'document', 'image', 'audio', 'mcp']),
+  type: z.string().min(1).refine((value) => isSelectableSourceKind(value), {
+    message: 'Unknown or non-selectable data source type',
+  }),
   configuration: z.record(z.unknown()).optional(),
   credentialId: z.string().uuid().optional().nullable(),
 });
 
-export const updateDataSourceSchema = createDataSourceSchema.partial();
+export const updateDataSourceSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  configuration: z.record(z.unknown()).optional().nullable(),
+  credentialId: z.string().uuid().optional().nullable(),
+  status: z.enum(['active', 'inactive', 'error']).optional(),
+});
 
 export const createMappingSchema = z.object({
   sourceEntity: z.string().min(1),
@@ -40,4 +48,9 @@ export const updateMappingSchema = createMappingSchema.partial();
 export const createCredentialSchema = z.object({
   provider: z.string().min(1),
   data: z.record(z.unknown()),
+});
+
+export const previewQuerySchema = z.object({
+  resource: z.string().min(1).default('data'),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
 });

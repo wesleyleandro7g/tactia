@@ -24,7 +24,11 @@ import {
   resetPasswordSchema,
   updateMembershipSchema,
 } from '../schemas/identity';
+import { previewQuerySchema } from '../schemas/data-platform';
+import { listSelectableSourceKinds, sourceKindHasConnector } from '../data-sources/catalog';
 import { AuditAction, type AuditLogService } from './audit-log-service';
+import type { CredentialService } from './credential-service';
+import type { DataSourceService } from './data-source-service';
 import type { SyncService } from './sync-service';
 
 function slugify(name: string): string {
@@ -61,6 +65,8 @@ export class BackofficeService {
     private readonly auditLogRepo: AuditLogRepository,
     private readonly clientAuth: AuthProvider,
     private readonly syncService: SyncService,
+    private readonly dataSourceService: DataSourceService,
+    private readonly credentialService: CredentialService,
   ) {}
 
   async listTenants(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -369,5 +375,100 @@ export class BackofficeService {
 
     const operatorCtx = operatorTenantCtx(ctx, tenantId);
     return this.syncService.startSync(operatorCtx, record.dataSourceId);
+  }
+
+  listDataSourceKinds(ctx: RequestContext) {
+    assertOperator(ctx);
+    return listSelectableSourceKinds();
+  }
+
+  async getDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    const dataSource = await this.dataSourceService.get(scoped, dataSourceId);
+    const mappings = await this.dataSourceService.listMappings(scoped, dataSourceId, {
+      page: '1',
+      pageSize: '50',
+    });
+    const { credential, ...rest } = dataSource;
+    return {
+      dataSource: {
+        ...rest,
+        credential: credential
+          ? { id: credential.id, provider: credential.provider, createdAt: credential.createdAt }
+          : null,
+      },
+      mappings: mappings.items,
+      connectorAvailable: sourceKindHasConnector(dataSource.type),
+    };
+  }
+
+  async createDataSource(ctx: RequestContext, tenantId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.create(scoped, raw);
+  }
+
+  async updateDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.update(scoped, dataSourceId, raw);
+  }
+
+  async removeDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.remove(scoped, dataSourceId);
+  }
+
+  async testDataSourceConnection(ctx: RequestContext, tenantId: string, dataSourceId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.testConnection(scoped, dataSourceId);
+  }
+
+  async discoverDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.discover(scoped, dataSourceId);
+  }
+
+  async previewDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    const input = previewQuerySchema.parse(raw ?? {});
+    return this.dataSourceService.preview(scoped, dataSourceId, input.resource, input.limit);
+  }
+
+  async listMappings(ctx: RequestContext, tenantId: string, dataSourceId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.listMappings(scoped, dataSourceId, { page: '1', pageSize: '50' });
+  }
+
+  async createMapping(ctx: RequestContext, tenantId: string, dataSourceId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.createMapping(scoped, dataSourceId, raw);
+  }
+
+  async updateMapping(
+    ctx: RequestContext,
+    tenantId: string,
+    dataSourceId: string,
+    mappingId: string,
+    raw: unknown,
+  ) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.updateMapping(scoped, dataSourceId, mappingId, raw);
+  }
+
+  async deleteMapping(ctx: RequestContext, tenantId: string, dataSourceId: string, mappingId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.deleteMapping(scoped, dataSourceId, mappingId);
+  }
+
+  async createCredential(ctx: RequestContext, tenantId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    const credential = await this.credentialService.create(scoped, raw);
+    return { id: credential.id, provider: credential.provider, createdAt: credential.createdAt };
+  }
+
+  private async operatorScope(ctx: RequestContext, tenantId: string): Promise<RequestContext> {
+    assertOperator(ctx);
+    const tenant = await this.tenants.findByIdForOperator(tenantId);
+    if (!tenant) throw new AppError(ErrorCode.NOT_FOUND, 'Tenant not found');
+    return operatorTenantCtx(ctx, tenantId);
   }
 }

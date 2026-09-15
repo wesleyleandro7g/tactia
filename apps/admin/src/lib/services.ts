@@ -28,6 +28,8 @@ import {
 import {
   AuditLogService,
   BackofficeService,
+  CredentialService,
+  DataSourceService,
   OperatorService,
   SyncService,
 } from '@tactia/domain';
@@ -61,6 +63,15 @@ const insightRepository = new InsightRepository(prisma);
 export const auditLogService = new AuditLogService(auditLogRepository);
 
 export const operatorService = new OperatorService(operatorRepository, operatorAuthProvider);
+
+export const credentialService = new CredentialService(credentialRepository);
+
+export const dataSourceService = new DataSourceService(
+  dataSourceRepository,
+  mappingRepository,
+  credentialRepository,
+  auditLogService,
+);
 
 export const syncService = new SyncService({
   dataSources: dataSourceRepository,
@@ -96,4 +107,6 @@ export const backofficeService = new BackofficeService(
   auditLogRepository,
   clientAuthProvider,
   syncService,
+  dataSourceService,
+  credentialService,
 );

@@ -8,9 +8,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   AuditLogRepository,
+  CredentialRepository,
   DataSourceRepository,
   ImportRepository,
   InsightRepository,
+  MappingRepository,
   MembershipRepository,
   OperatorRepository,
   prisma,
@@ -22,6 +24,8 @@ import {
 import { AppError, ErrorCode, createId, type RequestContext } from '@tactia/shared';
 import { AuditLogService } from '../services/audit-log-service';
 import { BackofficeService } from '../services/backoffice-service';
+import { CredentialService } from '../services/credential-service';
+import { DataSourceService } from '../services/data-source-service';
 import { OperatorService } from '../services/operator-service';
 import { TenantApiKeyService } from '../services/tenant-api-key-service';
 import { TenantService } from '../services/tenant-service';
@@ -114,6 +118,11 @@ const syncService = {
   },
 } as unknown as SyncService;
 
+const mappingRepo = new MappingRepository(prisma);
+const credentialRepo = new CredentialRepository(prisma);
+const dataSourceService = new DataSourceService(dataSources, mappingRepo, credentialRepo, auditLogs);
+const credentialService = new CredentialService(credentialRepo);
+
 const backoffice = new BackofficeService(
   tenants,
   users,
@@ -126,6 +135,8 @@ const backoffice = new BackofficeService(
   auditLogRepo,
   clientAuth,
   syncService,
+  dataSourceService,
+  credentialService,
 );
 
 function operatorCtx(operatorId: string): RequestContext {
@@ -368,5 +379,39 @@ describe('backoffice operators', () => {
     });
     expect(added.membership.role).toBe('member');
     expect(added.user.email).toBe(MEMBER_EMAIL);
+  });
+
+  it('operator registers a source; the client owner cannot', async () => {
+    const ctx = operatorCtx(ops.id);
+    const { tenant, user } = await backoffice.provisionTenant(ctx, {
+      name: 'Ops Co',
+      slug: SLUG,
+      ownerName: 'Owner',
+      ownerEmail: OWNER_EMAIL,
+      ownerPassword: 'password123',
+    });
+
+    const source = await backoffice.createDataSource(ctx, tenant.id, {
+      name: 'Wiki comercial',
+      type: 'notion',
+      configuration: { databaseId: 'db-1' },
+    });
+    expect(source.type).toBe('notion');
+    expect(source.name).toBe('Wiki comercial');
+
+    const ownerCtx: RequestContext = {
+      requestId: createId(),
+      tenantId: tenant.id,
+      userId: user.id,
+      role: 'owner',
+      ip: '127.0.0.1',
+    };
+    await expect(
+      dataSourceService.create(ownerCtx, { name: 'CSV do cliente', type: 'csv' }),
+    ).rejects.toMatchObject({ code: ErrorCode.AUTHORIZATION_ERROR });
+
+    await expect(
+      backoffice.createDataSource(ctx, tenant.id, { name: 'Desconhecida', type: 'salesforce' }),
+    ).rejects.toThrow();
   });
 });

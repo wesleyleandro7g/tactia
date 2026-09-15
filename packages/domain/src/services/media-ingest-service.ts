@@ -99,7 +99,7 @@ export class MediaIngestService {
         entityType: item.entityType,
         payload: item.payload,
         createdAt: item.createdAt,
-        hint: 'Extraímos os campos. Importe como venda/despesa no onboarding para entrar nas métricas.',
+        hint: 'Extraímos os campos. Peça à equipe Tactia para mapear como venda ou despesa na fonte de dados.',
       })),
     };
   }

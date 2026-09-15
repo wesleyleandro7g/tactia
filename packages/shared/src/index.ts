@@ -2,6 +2,13 @@ export { AppError, ErrorCode, isAppError } from './errors';
 export { logger, type OperationLog } from './logger';
 export { redactSensitive, redactSensitiveDeep } from './redact';
 export { createId } from './uuid';
+export {
+  saveCsvUpload,
+  isCsvFile,
+  uploadRoot,
+  CSV_MAX_UPLOAD_BYTES,
+  DEFAULT_UPLOAD_DIR,
+} from './csv-upload';
 export { ok, fail, type ApiSuccess, type ApiErrorBody, type PaginationMeta } from './api-response';
 export {
   MembershipRole,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
-import { assertOperator, assertOwnerOrAdmin, assertRole, hasMinRole } from '../authz';
+import { assertCanManageConnections, assertOperator, assertOwnerOrAdmin, assertRole, assertTenantScope, hasMinRole } from '../authz';
 
 function ctx(role: RequestContext['role']): RequestContext {
   return {
@@ -41,6 +41,29 @@ describe('authorization', () => {
         tenantId: null,
         userId: null,
         role: null,
+        operatorId: 'op_a',
+      }),
+    ).not.toThrow();
+  });
+
+  it('lets operators manage connections only with a tenant', () => {
+    const owner = ctx('owner');
+    expect(() => assertCanManageConnections(owner)).toThrow(AppError);
+    expect(() =>
+      assertCanManageConnections({
+        requestId: 'req_ops',
+        tenantId: 'tenant_a',
+        userId: null,
+        role: 'owner',
+        operatorId: 'op_a',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertTenantScope({
+        requestId: 'req_ops',
+        tenantId: 'tenant_a',
+        userId: null,
+        role: 'owner',
         operatorId: 'op_a',
       }),
     ).not.toThrow();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessMapping, sourceNameFromFile, targetFieldsFor } from '../import-mapping';
+import { guessMapping, sourceNameFromFile, targetFieldsFor } from './import-mapping';
 
 describe('import-mapping', () => {
   it('expõe campos de venda, produto e vendedor', () => {

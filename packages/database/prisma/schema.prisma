@@ -77,18 +77,6 @@ enum ActivityType {
   status_change
 }
 
-enum DataSourceType {
-  csv
-  xlsx
-  postgres
-  rest
-  google_sheets
-  document
-  image
-  audio
-  mcp
-}
-
 enum DataSourceStatus {
   active
   inactive
@@ -843,7 +831,7 @@ model Credential {
 model DataSource {
   id           String           @id @db.Uuid
   tenantId     String           @map("tenant_id") @db.Uuid
-  type         DataSourceType
+  type         String
   name         String
   status       DataSourceStatus @default(active)
   configuration Json?

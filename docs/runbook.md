@@ -74,11 +74,11 @@ O campo `error` vem no formato `CÓDIGO: mensagem`:
 
 | Erro | Causa provável | O que fazer |
 |---|---|---|
-| `VALIDATION_ERROR: A fonte de dados não tem nenhum mapeamento ativo` | Fonte criada sem mapping | Criar o mapping em `/onboarding` ou via `POST /api/v1/data-sources/:id/mappings` |
-| `SYNC_ERROR: ENOENT ... .csv` | Caminho do CSV não existe **dentro do container** | Reenvie o arquivo pelo wizard ou confira `UPLOAD_DIR` |
+| `VALIDATION_ERROR: A fonte de dados não tem nenhum mapeamento ativo` | Fonte criada sem mapping | Criar o mapping em Tactia Ops → fonte → **Mapeamento** |
+| `SYNC_ERROR: ENOENT ... .csv` | Caminho do CSV não existe **dentro do container** | Reenvie o arquivo em **Nova fonte** (CSV) ou confira `UPLOAD_DIR` |
 | `SYNC_ERROR: EACCES` | Arquivo sem permissão de leitura para o usuário do container (uid 1001) | `chmod 644` no arquivo |
-| `CONNECTOR_ERROR` / `P1001` | Postgres do cliente inacessível (firewall, host, porta) | Testar com `POST /api/v1/data-sources/:id/test-connection` |
-| `SYNC_ERROR: password authentication failed` | Credencial trocada no lado do cliente | Recriar a credential e apontar a fonte para o novo `credentialId` |
+| `CONNECTOR_ERROR` / `P1001` | Postgres do cliente inacessível (firewall, host, porta) | Testar a conexão na ficha da fonte no Ops |
+| `SYNC_ERROR: password authentication failed` | Credencial trocada no lado do cliente | Recriar a credential no Ops e apontar a fonte para o novo `credentialId` |
 | `SYNC_ERROR: relation "x" does not exist` | Mapping aponta para tabela/coluna que não existe mais | Rodar **Descobrir** de novo e corrigir o mapping |
 | `INTERNAL_ERROR: ENCRYPTION_KEY ...` | Chave ausente ou com tamanho errado | Ver §7 |
 
@@ -158,8 +158,8 @@ O chat nunca executa nada: uma proposta de ação sempre cai em `/approvals`.
 | `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Webhook do WhatsApp não processa |
 
 **Trocar `ENCRYPTION_KEY` invalida todas as credenciais existentes** (AES-GCM
-falha na autenticação da tag). Se for inevitável: recrie as credentials
-(`POST /api/v1/credentials`) e atualize o `credentialId` de cada fonte.
+falha na autenticação da tag). Se for inevitável: recrie as credentials no Ops
+(`POST /api/v1/tenants/<TENANT>/credentials`) e atualize o `credentialId` de cada fonte.
 
 Segredos vêm exclusivamente do ambiente. Nenhum arquivo `.env` entra na imagem
 (`.dockerignore`); confira com:

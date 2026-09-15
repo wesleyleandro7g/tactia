@@ -1,4 +1,4 @@
-export { assertAuthenticated, assertTenantContext, assertRole, assertOwnerOrAdmin, assertOperator, hasMinRole } from './authz';
+export { assertAuthenticated, assertTenantContext, assertRole, assertOwnerOrAdmin, assertOperator, assertTenantScope, assertOperatorForTenant, assertCanManageConnections, hasMinRole } from './authz';
 export { AuditLogService, AuditAction } from './services/audit-log-service';
 export { TenantService } from './services/tenant-service';
 export { OperatorService } from './services/operator-service';
@@ -145,7 +145,25 @@ export {
   createMappingSchema,
   updateMappingSchema,
   createCredentialSchema,
+  previewQuerySchema,
 } from './schemas/data-platform';
+export {
+  SOURCE_KINDS,
+  getSourceKind,
+  isKnownSourceKind,
+  isSelectableSourceKind,
+  sourceKindHasConnector,
+  listSelectableSourceKinds,
+  groupSelectableSourceKinds,
+} from './data-sources/catalog';
+export type { SourceKind, CatalogField, SourceConnectorKind } from './data-sources/catalog';
+export {
+  TARGET_ENTITIES,
+  targetFieldsFor,
+  guessMapping,
+  sourceNameFromFile,
+} from './data-sources/import-mapping';
+export type { MappingField } from './data-sources/import-mapping';
 export {
   createConversationSchema,
   listConversationsQuerySchema,

@@ -60,3 +60,40 @@ export function assertOwnerOrAdmin(ctx: RequestContext): asserts ctx is RequestC
 } {
   assertRole(ctx, 'admin');
 }
+
+/**
+ * Tenant-scoped read: a client membership or a backoffice operator impersonating
+ * that tenant (operatorTenantCtx).
+ */
+export function assertTenantScope(ctx: RequestContext): asserts ctx is RequestContext & {
+  tenantId: string;
+} {
+  if (ctx.operatorId) {
+    if (!ctx.tenantId) {
+      throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+    }
+    return;
+  }
+  assertTenantContext(ctx);
+}
+
+export function assertOperatorForTenant(ctx: RequestContext): asserts ctx is RequestContext & {
+  operatorId: string;
+  tenantId: string;
+} {
+  assertOperator(ctx);
+  if (!ctx.tenantId) {
+    throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+  }
+}
+
+const CONNECTIONS_OPERATOR_ONLY = 'Data source connections are managed by Tactia operators';
+
+/** Create/update/remove of connections, credentials and mappings. */
+export function assertCanManageConnections(ctx: RequestContext): asserts ctx is RequestContext & {
+  operatorId: string;
+  tenantId: string;
+} {
+  if (ctx.operatorId && ctx.tenantId) return;
+  throw new AppError(ErrorCode.AUTHORIZATION_ERROR, CONNECTIONS_OPERATOR_ONLY);
+}

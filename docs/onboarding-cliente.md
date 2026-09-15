@@ -1,9 +1,10 @@
 # Onboarding de um cliente real
 
 Guia do operador para colocar uma empresa dentro da Tactia, do zero até o primeiro
-insight. Espelha o roteiro da spec §55 e é o caminho que o wizard `/onboarding`
-implementa. Tempo esperado: **20 a 40 minutos**, sendo a maior parte a preparação
-dos dados do cliente.
+insight. A conexão das fontes de dados é feita **só no Tactia Ops**
+(`/tenants/:id/data-sources`). O app do cliente (`/onboarding`) registra a empresa
+quando o próprio usuário cria a conta — não importa CSV nem Postgres. Tempo esperado:
+**20 a 40 minutos**, sendo a maior parte a preparação dos dados do cliente.
 
 > Se o ambiente ainda não estiver no ar, comece por [deploy-producao.md](./deploy-producao.md).
 > Se algo falhar no meio do caminho, vá para o [runbook](./runbook.md).
@@ -31,14 +32,12 @@ curl -s https://SEU-HOST/api/v1/health
 
 ### Se a fonte for CSV
 
-No wizard `/onboarding`, arraste o arquivo ou clique para escolher. O upload
+No Tactia Ops, abra a empresa → **Nova fonte** → **Arquivo CSV**. O upload
 grava o CSV em `UPLOAD_DIR` (default `/tmp/tactia-uploads` no host, `/data/uploads`
 no compose de produção) e o conector lê o caminho gerado.
 
-Operadores ainda podem colar um caminho no servidor em **Opção avançada**.
-
 Um arquivo por entidade. Cabeçalhos aceitos pelo mapeamento (o nome da coluna de
-origem pode ser qualquer um — você escolhe o destino no passo de colunas):
+origem pode ser qualquer um — você escolhe o destino no mapeamento):
 
 | Entidade | Campos de destino |
 |---|---|
@@ -105,11 +104,16 @@ curl -X POST https://SEU-HOST/api/v1/users -b cookies.txt \
 Papéis: `owner` > `admin` > `member` > `viewer`. Só `owner`/`admin` aprovam ações.
 Não há e-mail de convite na V0.1 — combine a senha provisória por outro canal.
 
-## 3. Trazer o arquivo
+## 3. Trazer os dados (Ops)
 
-Você cai em `/onboarding` automaticamente. Escolha **Arquivo CSV** (arraste ou
-clique para enviar) ou **PostgreSQL** (host, porta, banco, usuário, senha).
-Diga de que entidade o arquivo é (clientes, produtos, vendedores, vendas…).
+No Tactia Ops, abra a ficha da empresa → **Nova fonte**. Escolha o tipo
+(CSV, PostgreSQL, Notion, Trello, ERP, CRM, REST, MCP, custom…). Tipos sem
+conector ficam **registrados** (a equipe sabe de onde vêm os dados); teste e
+sync só funcionam hoje para CSV, PostgreSQL e MCP.
+
+Para CSV: envie o arquivo e diga de que entidade ele é no mapeamento
+(clientes, produtos, vendedores, vendas…). Para PostgreSQL: host, porta, banco,
+usuário e senha de leitura.
 
 Importante para CSV: **um arquivo por entidade**. Referências entre entidades
 são resolvidas primeiro dentro da mesma fonte e, se não encontradas, no tenant
@@ -128,13 +132,15 @@ funciona; com metas ele passa a falar de ritmo e gap.
 
 ## 4. Conferir a leitura
 
-O wizard envia o CSV, testa se o arquivo é legível e lista as colunas. Para
-Postgres, o Continuar abre a conexão (`SELECT 1`) e descobre as tabelas. Erro
-aqui é de arquivo, infraestrutura ou credencial — a mensagem aparece na tela.
+Na ficha da fonte, **Testar conexão** e **Descobrir**. Para CSV, o teste confirma
+que o arquivo é legível e lista as colunas. Para Postgres, abre a conexão
+(`SELECT 1`) e descobre as tabelas. Erro aqui é de arquivo, infraestrutura ou
+credencial — a mensagem aparece na tela.
 
 ## 5. Mapear colunas
 
-Ligue cada coluna de origem ao campo canônico usando a tabela do passo 0.
+Na mesma tela da fonte, ligue cada coluna de origem ao campo canônico usando a
+tabela do passo 0.
 
 Ordem de importação obrigatória quando as vendas referenciam outras entidades:
 
@@ -144,13 +150,12 @@ clientes → produtos → vendedores → vendas
 
 ## 6. Prévia
 
-Mostra as primeiras linhas como a Tactia vai lê-las. Confira acentuação, separador
-decimal e formato de data antes de importar. Datas devem ser reconhecíveis por
+Depois de descobrir, confira as colunas mapeadas. Datas devem ser reconhecíveis por
 `new Date()` — `2026-08-25` e `2026-08-25T13:00:00Z` funcionam; `25/08/2026` não.
 
 ## 7. Importar
 
-**Importar dados** executa o ciclo completo (spec §37):
+**Disparar sync** na ficha da fonte (ou da empresa) executa o ciclo completo (spec §37):
 
 ```text
 fonte → RawRecord (original preservado) → normalização → upsert canônico
@@ -162,7 +167,7 @@ duplica (spec §38).
 
 ## 8. Validar os dados
 
-A tela de resultado mostra o que entrou:
+A tela de resultado no Ops mostra sync jobs e imports:
 
 ```text
 ✓ 1.842 clientes na base
@@ -214,8 +219,7 @@ Um roteiro de 15 minutos que costuma funcionar:
 
 ## Depois do onboarding
 
-- Reimporte periodicamente (Tactia Ops → ficha da empresa → **Disparar sync**)
-  ou agende `POST /api/v1/data-sources/:id/sync` no app do cliente.
+- Reimporte periodicamente (Tactia Ops → ficha da empresa ou da fonte → **Disparar sync**).
 - Acompanhe a ficha da empresa no Ops: sync jobs, contadores, erros e insights.
 - Limites por padrão: 6 syncs/min, 20 mensagens de chat/min por tenant,
   60 req/min por API key MCP.

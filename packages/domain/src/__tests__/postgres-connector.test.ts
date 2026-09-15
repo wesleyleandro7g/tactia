@@ -89,6 +89,8 @@ const syncService = new SyncService({
 let tenantId: string;
 let authUserId: string;
 let userId: string;
+let operatorId: string;
+let operatorAuthId: string;
 let ctx: RequestContext;
 let dataSourceId: string;
 let email: string;
@@ -139,7 +141,17 @@ beforeAll(async () => {
   await prisma.membership.create({
     data: { id: createId(), tenantId, userId, role: 'owner', status: 'active' },
   });
-  ctx = { requestId: createId(), tenantId, userId, role: 'owner' };
+
+  operatorAuthId = createId();
+  operatorId = createId();
+  const operatorEmail = `pg-ops-${operatorAuthId}@connector.local`;
+  await prisma.operatorAuthUser.create({
+    data: { id: operatorAuthId, name: 'Ops', email: operatorEmail, emailVerified: true },
+  });
+  await prisma.operator.create({
+    data: { id: operatorId, externalAuthId: operatorAuthId, name: 'Ops', email: operatorEmail },
+  });
+  ctx = { requestId: createId(), tenantId, userId, role: 'owner', operatorId };
 });
 
 afterAll(async () => {
@@ -148,6 +160,8 @@ afterAll(async () => {
   await prisma.user.deleteMany({ where: { id: userId } });
   await prisma.authAccount.deleteMany({ where: { userId: authUserId } });
   await prisma.authUser.deleteMany({ where: { id: authUserId } });
+  await prisma.operator.deleteMany({ where: { id: operatorId } });
+  await prisma.operatorAuthUser.deleteMany({ where: { id: operatorAuthId } });
   await prisma.$disconnect();
 });
 
