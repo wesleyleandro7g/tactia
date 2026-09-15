@@ -26,6 +26,9 @@ import { createGetSellersTool } from './get-sellers';
 import { createSearchInteractionsTool } from './search-interactions';
 import { createSearchDocumentsTool } from './search-documents';
 import { createSearchCatalogTool } from './search-catalog';
+import { createGetDataCatalogTool } from './get-data-catalog';
+import { createQueryBusinessDataTool } from './query-business-data';
+import { createAggregateBusinessDataTool } from './aggregate-business-data';
 import {
   createGetPlaybookTool,
   createListPlaybooksTool,
@@ -88,6 +91,9 @@ export { createGetSellersTool } from './get-sellers';
 export { createSearchInteractionsTool } from './search-interactions';
 export { createSearchDocumentsTool } from './search-documents';
 export { createSearchCatalogTool } from './search-catalog';
+export { createGetDataCatalogTool } from './get-data-catalog';
+export { createQueryBusinessDataTool } from './query-business-data';
+export { createAggregateBusinessDataTool } from './aggregate-business-data';
 export {
   createGetPlaybookTool,
   createListPlaybooksTool,
@@ -139,6 +145,9 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
     createSearchInteractionsTool(deps),
     createSearchDocumentsTool(deps),
     createSearchCatalogTool(deps),
+    createGetDataCatalogTool(deps),
+    createQueryBusinessDataTool(deps),
+    createAggregateBusinessDataTool(deps),
     createGetCustomerProfileTool(deps),
     createGetPipelineTool(deps),
     createGetDataFreshnessTool(deps),

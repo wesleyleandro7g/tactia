@@ -2,12 +2,20 @@ import { createId } from '@tactia/shared';
 import { Prisma, type PrismaClient, type SaleStatus } from '../client';
 import { asJson, asNullableJson } from '../json';
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
 export type CreateSaleItemInput = {
   productId: string;
   quantity: number;
   unitPrice: number;
   discountAmount?: number;
   totalAmount: number;
+  customData?: unknown;
 };
 
 export type CreateSaleInput = {
@@ -25,6 +33,7 @@ export type CreateSaleInput = {
   region?: string | null;
   soldAt: Date;
   metadata?: unknown;
+  customData?: unknown;
   items: CreateSaleItemInput[];
 };
 
@@ -51,6 +60,7 @@ export class SaleRepository {
         region: input.region ?? null,
         soldAt: input.soldAt,
         metadata: asJson(input.metadata),
+        customData: asJson(input.customData ?? {}),
         items: {
           create: input.items.map((item) => ({
             id: createId(),
@@ -60,6 +70,7 @@ export class SaleRepository {
             unitPrice: item.unitPrice,
             discountAmount: item.discountAmount ?? 0,
             totalAmount: item.totalAmount,
+            customData: asJson(item.customData ?? {}),
           })),
         },
       },
@@ -127,6 +138,7 @@ export class SaleRepository {
       status?: SaleStatus;
       soldAt?: Date;
       metadata?: unknown;
+      customData?: unknown;
       externalId?: string | null;
     };
   }) {
@@ -144,6 +156,7 @@ export class SaleRepository {
         soldAt: data.soldAt,
         externalId: data.externalId,
         metadata: asNullableJson(data.metadata),
+        ...(data.customData !== undefined ? { customData: asJson(data.customData) } : {}),
       },
       include: saleInclude,
     });
@@ -200,6 +213,10 @@ export class SaleRepository {
             region: input.region ?? null,
             soldAt: input.soldAt,
             metadata: asJson(input.metadata),
+            customData: asJson({
+              ...(asRecord(existing.customData)),
+              ...(asRecord(input.customData)),
+            }),
             items: {
               create: input.items.map((item) => ({
                 id: createId(),
@@ -209,6 +226,7 @@ export class SaleRepository {
                 unitPrice: item.unitPrice,
                 discountAmount: item.discountAmount ?? 0,
                 totalAmount: item.totalAmount,
+                customData: asJson(item.customData ?? {}),
               })),
             },
           },

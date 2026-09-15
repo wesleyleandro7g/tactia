@@ -10,6 +10,7 @@ import { createProductSchema, listQuerySchema, updateProductSchema } from '../sc
 import { mapMoneyFields } from '../utils/serialize';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import type { CatalogEmbeddingService } from './catalog-embedding-service';
+import type { CustomDataValidationService } from './custom-data-validation-service';
 
 const MONEY = ['cost', 'price'] as const;
 
@@ -24,6 +25,7 @@ type ProductDto = {
   status: string;
   externalId: string | null;
   metadata: unknown;
+  customData: unknown;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -35,6 +37,7 @@ export class ProductService {
     private readonly products: ProductRepository,
     private readonly auditLogs: AuditLogService,
     private readonly catalog?: CatalogEmbeddingService,
+    private readonly customData?: CustomDataValidationService,
   ) {}
 
   private serialize(product: Record<string, unknown>): ProductDto {
@@ -69,6 +72,9 @@ export class ProductService {
   async create(ctx: RequestContext, raw: unknown) {
     assertRole(ctx, 'member');
     const input = createProductSchema.parse(raw);
+    const customData = this.customData
+      ? await this.customData.validate(ctx.tenantId, 'product', input.customData ?? {})
+      : (input.customData ?? {});
     const product = await this.products.create({
       tenantId: ctx.tenantId,
       name: input.name,
@@ -79,6 +85,7 @@ export class ProductService {
       status: input.status,
       externalId: input.externalId,
       metadata: input.metadata ?? undefined,
+      customData,
     });
     await this.auditLogs.record(ctx, {
       action: AuditAction.PRODUCT_CREATED,
@@ -95,6 +102,10 @@ export class ProductService {
   async update(ctx: RequestContext, id: string, raw: unknown) {
     assertRole(ctx, 'member');
     const input = updateProductSchema.parse(raw);
+    const customData =
+      input.customData !== undefined && this.customData
+        ? await this.customData.validate(ctx.tenantId, 'product', input.customData)
+        : input.customData;
     const product = await this.products.update({
       tenantId: ctx.tenantId,
       id,
@@ -107,6 +118,7 @@ export class ProductService {
         status: input.status,
         externalId: input.externalId,
         metadata: input.metadata,
+        customData,
       },
     });
     if (!product) throw new AppError(ErrorCode.NOT_FOUND, 'Product not found');

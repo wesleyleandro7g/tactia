@@ -29,6 +29,8 @@ import {
   knowledgeDocumentService,
   catalogEmbeddingService,
   infographicService,
+  dataCatalogService,
+  structuredQueryService,
 } from './services';
 import { createEmbeddingAdapterFromEnv } from '@tactia/ai';
 
@@ -69,6 +71,8 @@ export const toolRegistry = new ToolRegistry(
       interactions: interactionService,
       documents: knowledgeDocumentService,
       catalog: catalogEmbeddingService,
+      dataCatalog: dataCatalogService,
+      structuredQuery: structuredQueryService,
       embedder: createEmbeddingAdapterFromEnv({
         LLM_PROVIDER: process.env.LLM_PROVIDER,
         LLM_API_KEY: process.env.LLM_API_KEY,
@@ -132,6 +136,10 @@ export const contextBuilder = new ContextBuilder({
         createdAt: latest.createdAt.toISOString(),
         headline: headline.replace(/^#+\s*/, '').slice(0, 160),
       };
+    },
+    customFields: async (ctx) => {
+      const summary = await dataCatalogService.summarize(ctx.tenantId);
+      return summary.total > 0 ? summary : null;
     },
   },
 });

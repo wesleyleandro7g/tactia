@@ -23,6 +23,7 @@ import {
   canonicalEntityRank,
   CsvConnector,
   McpConnector,
+  extractCustomData,
   normalizeRow,
   normalizeToCanonical,
   runDataQualityChecks,
@@ -34,6 +35,7 @@ import {
 import { assertTenantContext } from '../authz';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import { decrypt } from './credential-service';
+import type { CustomDataValidationService } from './custom-data-validation-service';
 
 export type SyncServiceDeps = {
   dataSources: DataSourceRepository;
@@ -86,6 +88,7 @@ export type SyncServiceDeps = {
     requestId: string;
     userId: string | null;
   }) => Promise<void>;
+  customData?: CustomDataValidationService;
 };
 
 /** Raw records are normalized in pages to keep memory flat on large imports. */
@@ -488,6 +491,11 @@ export class SyncService {
         }
         outcome.normalized.push(normalized);
 
+        const extracted = extractCustomData(normalized);
+        const customData = this.deps.customData
+          ? await this.deps.customData.pickValid(tenantId, entityType, extracted)
+          : extracted;
+
         try {
           const result = await normalizeToCanonical(
             tenantId,
@@ -495,6 +503,7 @@ export class SyncService {
             entityType,
             normalized,
             repositories,
+            customData,
           );
           if (result.status === 'skipped') {
             outcome.skipped += 1;

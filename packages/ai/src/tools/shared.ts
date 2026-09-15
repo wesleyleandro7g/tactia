@@ -6,6 +6,7 @@ import type {
   BusinessFactService,
   CatalogEmbeddingService,
   CustomerService,
+  DataCatalogService,
   EpisodeService,
   InsightService,
   InteractionService,
@@ -16,6 +17,7 @@ import type {
   RecommendationService,
   SaleService,
   SellerService,
+  StructuredQueryService,
 } from '@tactia/domain';
 import type { EmbeddingAdapter } from '../embeddings/types';
 import type { MessageSource } from '../types';
@@ -42,6 +44,8 @@ export type ToolDeps = {
   embedder?: EmbeddingAdapter | null;
   documents?: KnowledgeDocumentService;
   catalog?: CatalogEmbeddingService;
+  dataCatalog?: DataCatalogService;
+  structuredQuery?: StructuredQueryService;
 };
 
 /** Optional ISO period accepted by every data tool. */

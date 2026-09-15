@@ -5,6 +5,7 @@ import {
   TARGET_ENTITIES,
   guessMapping,
   targetFieldsFor,
+  type MappingField,
   type TargetEntity,
 } from '@tactia/domain/data-sources/import-mapping';
 import { Field } from '@/components/ui/field';
@@ -31,6 +32,7 @@ export function TableMappingEditor({
   sourceEntity,
   targetEntity,
   fieldMap,
+  extraFields = [],
   onSourceEntityChange,
   onTargetEntityChange,
   onFieldMapChange,
@@ -39,6 +41,7 @@ export function TableMappingEditor({
   sourceEntity: string;
   targetEntity: TargetEntity;
   fieldMap: Record<string, string>;
+  extraFields?: MappingField[];
   onSourceEntityChange: (sourceEntity: string, fieldMap: Record<string, string>) => void;
   onTargetEntityChange: (targetEntity: TargetEntity, fieldMap: Record<string, string>) => void;
   onFieldMapChange: (fieldMap: Record<string, string>) => void;
@@ -47,7 +50,7 @@ export function TableMappingEditor({
     () => resources.find((resource) => resource.name === sourceEntity) ?? null,
     [resources, sourceEntity],
   );
-  const targetFields = targetFieldsFor(targetEntity);
+  const targetFields = targetFieldsFor(targetEntity, extraFields);
 
   return (
     <div className="flex flex-col gap-3">
@@ -60,7 +63,7 @@ export function TableMappingEditor({
               onChange={(event) => {
                 const next = event.target.value;
                 const resource = resources.find((item) => item.name === next);
-                onSourceEntityChange(next, resource ? guessMapping(resource.columns, targetEntity) : {});
+                onSourceEntityChange(next, resource ? guessMapping(resource.columns, targetEntity, extraFields) : {});
               }}
             >
               {resources.map((resource) => (
@@ -84,7 +87,7 @@ export function TableMappingEditor({
             value={targetEntity}
             onChange={(event) => {
               const next = event.target.value as TargetEntity;
-              onTargetEntityChange(next, selected ? guessMapping(selected.columns, next) : fieldMap);
+              onTargetEntityChange(next, selected ? guessMapping(selected.columns, next, extraFields) : fieldMap);
             }}
           >
             {TARGET_ENTITIES.map((entity) => (

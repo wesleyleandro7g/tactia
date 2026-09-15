@@ -15,6 +15,7 @@ import { assertRole, assertTenantContext } from '../authz';
 import { createSaleSchema, listQuerySchema, updateSaleSchema } from '../schemas/business';
 import { decimalToNumber, mapMoneyFields } from '../utils/serialize';
 import { AuditAction, type AuditLogService } from './audit-log-service';
+import type { CustomDataValidationService } from './custom-data-validation-service';
 
 const SALE_MONEY = ['totalAmount', 'discountAmount'] as const;
 const ITEM_MONEY = ['quantity', 'unitPrice', 'discountAmount', 'totalAmount'] as const;
@@ -48,6 +49,7 @@ export class SaleService {
     private readonly products: ProductRepository,
     private readonly sellers: SellerRepository,
     private readonly auditLogs: AuditLogService,
+    private readonly customData?: CustomDataValidationService,
   ) {}
 
   private serialize(sale: Record<string, unknown> & { items?: Array<Record<string, unknown>> }): SaleDto {
@@ -121,12 +123,18 @@ export class SaleService {
         unitPrice: item.unitPrice,
         discountAmount: discount,
         totalAmount,
+        customData: this.customData
+          ? await this.customData.validate(ctx.tenantId, 'sale_item', item.customData ?? {})
+          : (item.customData ?? {}),
       });
     }
 
     const itemsTotal = items.reduce((sum, i) => sum + i.totalAmount, 0);
     const discountAmount = input.discountAmount ?? 0;
     const totalAmount = input.totalAmount ?? itemsTotal - discountAmount;
+    const customData = this.customData
+      ? await this.customData.validate(ctx.tenantId, 'sale', input.customData ?? {})
+      : (input.customData ?? {});
 
     const sale = await this.sales.create({
       tenantId: ctx.tenantId,
@@ -139,6 +147,7 @@ export class SaleService {
       soldAt: input.soldAt,
       externalId: input.externalId,
       metadata: input.metadata ?? undefined,
+      customData,
       items,
     });
 
@@ -174,6 +183,11 @@ export class SaleService {
       if (!seller) throw new AppError(ErrorCode.NOT_FOUND, 'Seller not found');
     }
 
+    const customData =
+      input.customData !== undefined && this.customData
+        ? await this.customData.validate(ctx.tenantId, 'sale', input.customData)
+        : input.customData;
+
     const sale = await this.sales.update({
       tenantId: ctx.tenantId,
       id,
@@ -187,6 +201,7 @@ export class SaleService {
         soldAt: input.soldAt,
         externalId: input.externalId,
         metadata: input.metadata,
+        customData,
       },
     });
     if (!sale) throw new AppError(ErrorCode.NOT_FOUND, 'Sale not found');

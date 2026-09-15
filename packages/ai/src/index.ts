@@ -9,6 +9,7 @@ export {
   type ContextFact,
   type ContextBriefing,
   type ContextPlaybook,
+  type ContextCustomFields,
   type ContextInsight,
   type ContextMetric,
 } from './context-builder';
@@ -102,6 +103,9 @@ export {
   createSearchInteractionsTool,
   createSearchDocumentsTool,
   createSearchCatalogTool,
+  createGetDataCatalogTool,
+  createQueryBusinessDataTool,
+  createAggregateBusinessDataTool,
   createProposeActionTool,
   createGenerateInfographicTool,
   currentMonthPeriod,

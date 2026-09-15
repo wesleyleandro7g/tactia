@@ -9,12 +9,14 @@ import { assertRole, assertTenantContext } from '../authz';
 import { createCustomerSchema, listQuerySchema, updateCustomerSchema } from '../schemas/business';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import type { CatalogEmbeddingService } from './catalog-embedding-service';
+import type { CustomDataValidationService } from './custom-data-validation-service';
 
 export class CustomerService {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly auditLogs: AuditLogService,
     private readonly catalog?: CatalogEmbeddingService,
+    private readonly customData?: CustomDataValidationService,
   ) {}
 
   async list(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -41,6 +43,9 @@ export class CustomerService {
   async create(ctx: RequestContext, raw: unknown) {
     assertRole(ctx, 'member');
     const input = createCustomerSchema.parse(raw);
+    const customData = this.customData
+      ? await this.customData.validate(ctx.tenantId, 'customer', input.customData ?? {})
+      : (input.customData ?? {});
     const customer = await this.customers.create({
       tenantId: ctx.tenantId,
       name: input.name,
@@ -50,6 +55,7 @@ export class CustomerService {
       status: input.status,
       externalId: input.externalId,
       metadata: input.metadata ?? undefined,
+      customData,
     });
     await this.auditLogs.record(ctx, {
       action: AuditAction.CUSTOMER_CREATED,
@@ -66,6 +72,10 @@ export class CustomerService {
   async update(ctx: RequestContext, id: string, raw: unknown) {
     assertRole(ctx, 'member');
     const input = updateCustomerSchema.parse(raw);
+    const customData =
+      input.customData !== undefined && this.customData
+        ? await this.customData.validate(ctx.tenantId, 'customer', input.customData)
+        : input.customData;
     const customer = await this.customers.update({
       tenantId: ctx.tenantId,
       id,
@@ -77,6 +87,7 @@ export class CustomerService {
         status: input.status,
         externalId: input.externalId,
         metadata: input.metadata,
+        customData,
       },
     });
     if (!customer) throw new AppError(ErrorCode.NOT_FOUND, 'Customer not found');

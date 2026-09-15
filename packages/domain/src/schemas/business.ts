@@ -4,6 +4,7 @@ import { paginationQuerySchema } from '@tactia/shared';
 const idSchema = z.string().uuid();
 const optionalId = z.string().uuid().nullable().optional();
 const metadataSchema = z.record(z.unknown()).nullable().optional();
+const customDataSchema = z.record(z.unknown()).optional();
 const moneySchema = z.number().finite();
 
 export const listQuerySchema = paginationQuerySchema.extend({
@@ -23,6 +24,7 @@ export const createCustomerSchema = z.object({
   status: z.enum(['active', 'inactive', 'blocked']).optional(),
   externalId: z.string().trim().min(1).max(120).nullable().optional(),
   metadata: metadataSchema,
+  customData: customDataSchema,
 });
 
 export const updateCustomerSchema = createCustomerSchema.partial();
@@ -50,6 +52,7 @@ export const createProductSchema = z.object({
   status: z.enum(['active', 'inactive', 'discontinued']).optional(),
   externalId: z.string().trim().min(1).max(120).nullable().optional(),
   metadata: metadataSchema,
+  customData: customDataSchema,
 });
 
 export const updateProductSchema = createProductSchema.partial();
@@ -70,6 +73,7 @@ export const saleItemSchema = z.object({
   unitPrice: moneySchema.nonnegative(),
   discountAmount: moneySchema.nonnegative().optional(),
   totalAmount: moneySchema.nonnegative().optional(),
+  customData: customDataSchema,
 });
 
 export const createSaleSchema = z.object({
@@ -82,6 +86,7 @@ export const createSaleSchema = z.object({
   soldAt: z.coerce.date(),
   externalId: z.string().trim().min(1).max(120).nullable().optional(),
   metadata: metadataSchema,
+  customData: customDataSchema,
   items: z.array(saleItemSchema).min(1),
 });
 
@@ -95,6 +100,7 @@ export const updateSaleSchema = z.object({
   soldAt: z.coerce.date().optional(),
   externalId: z.string().trim().min(1).max(120).nullable().optional(),
   metadata: metadataSchema,
+  customData: customDataSchema,
 });
 
 export const createActivitySchema = z.object({

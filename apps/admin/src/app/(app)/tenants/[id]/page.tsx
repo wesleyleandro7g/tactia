@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app/page-header';
+import { CustomFieldsPanel } from '@/components/app/custom-fields-panel';
 import {
   AddUserForm,
   MembershipControls,
@@ -30,7 +31,10 @@ export const metadata = { title: 'Empresa · Tactia Ops' };
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { ctx } = await requireOperator(`/tenants/${id}`);
-  const detail = await backofficeService.getTenant(ctx, id).catch(() => null);
+  const [detail, customFields] = await Promise.all([
+    backofficeService.getTenant(ctx, id).catch(() => null),
+    backofficeService.listCustomFields(ctx, id).catch(() => ({ items: [] })),
+  ]);
   if (!detail) notFound();
 
   const { tenant, users, dataSources, syncJobs, imports, insights, auditLogs } = detail;
@@ -63,6 +67,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           currency={tenant.currency}
         />
       </section>
+
+      <CustomFieldsPanel tenantId={tenant.id} fields={customFields.items} />
 
       <section className="flex flex-col gap-3">
         <h2 className="font-mono text-sm uppercase tracking-[0.16em] text-muted-foreground">Usuários</h2>

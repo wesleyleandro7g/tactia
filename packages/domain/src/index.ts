@@ -6,6 +6,10 @@ export { BackofficeService } from './services/backoffice-service';
 export { UserService } from './services/user-service';
 export { MembershipService } from './services/membership-service';
 export { CustomerService } from './services/customer-service';
+export { CustomFieldDefinitionService } from './services/custom-field-definition-service';
+export { CustomDataValidationService } from './services/custom-data-validation-service';
+export { DataCatalogService } from './services/data-catalog-service';
+export { StructuredQueryService } from './services/structured-query-service';
 export { LeadService } from './services/lead-service';
 export { GoalService } from './services/goal-service';
 export { BusinessFactService } from './services/business-fact-service';
@@ -141,6 +145,23 @@ export {
   listQuerySchema,
 } from './schemas/business';
 export {
+  createCustomFieldSchema,
+  updateCustomFieldSchema,
+  catalogQuerySchema,
+  structuredQuerySchema,
+  structuredAggregateSchema,
+  flexibleEntityTypeSchema,
+} from './schemas/custom-fields';
+export {
+  FLEXIBLE_ENTITY_TYPES,
+  CUSTOM_FIELD_TYPES,
+  CUSTOM_MAPPING_PREFIX,
+  isCustomMappingTarget,
+  customFieldKeyFromTarget,
+  customMappingTarget,
+} from './data-catalog/types';
+export { ENTITY_TABLES, getEntitySpec } from './data-catalog/canonical-fields';
+export {
   createDataSourceSchema,
   updateDataSourceSchema,
   createMappingSchema,
@@ -170,6 +191,7 @@ export {
   targetFieldsFor,
   guessMapping,
   sourceNameFromFile,
+  customMappingFields,
 } from './data-sources/import-mapping';
 export type { MappingField, TargetEntity } from './data-sources/import-mapping';
 export {

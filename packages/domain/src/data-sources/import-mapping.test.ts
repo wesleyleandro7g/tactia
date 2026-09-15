@@ -22,9 +22,14 @@ describe('import-mapping', () => {
     expect(sale.valor).toBe('total_amount');
     expect(sale.data).toBe('sold_at');
 
-    const customer = guessMapping([{ name: 'Nome' }, { name: 'telefone' }], 'customer');
+    const customer = guessMapping(
+      [{ name: 'Nome' }, { name: 'telefone' }, { name: 'tipo_equipamento' }],
+      'customer',
+      [{ value: 'custom:tipo_equipamento', label: 'Tipo de equipamento (custom)' }],
+    );
     expect(customer.Nome).toBe('name');
     expect(customer.telefone).toBe('phone');
+    expect(customer.tipo_equipamento).toBe('custom:tipo_equipamento');
   });
 
   it('deriva o nome da fonte a partir do arquivo', () => {

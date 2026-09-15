@@ -63,6 +63,7 @@ export function createGetCustomersTool(deps: ToolDeps): Tool {
             status: customer.status,
             email: customer.email,
             createdAt: customer.createdAt,
+            customData: customer.customData ?? {},
           })),
         },
         sources: [sourceFromMetric(customerCount, 'get_customers')],

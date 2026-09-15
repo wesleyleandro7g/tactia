@@ -28,6 +28,7 @@ import { previewQuerySchema } from '../schemas/data-platform';
 import { listSelectableSourceKinds, sourceKindHasConnector } from '../data-sources/catalog';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import type { CredentialService } from './credential-service';
+import type { CustomFieldDefinitionService } from './custom-field-definition-service';
 import type { DataSourceService } from './data-source-service';
 import type { SyncService } from './sync-service';
 
@@ -67,6 +68,7 @@ export class BackofficeService {
     private readonly syncService: SyncService,
     private readonly dataSourceService: DataSourceService,
     private readonly credentialService: CredentialService,
+    private readonly customFields?: CustomFieldDefinitionService,
   ) {}
 
   async listTenants(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -468,6 +470,33 @@ export class BackofficeService {
     const scoped = await this.operatorScope(ctx, tenantId);
     const credential = await this.credentialService.create(scoped, raw);
     return { id: credential.id, provider: credential.provider, createdAt: credential.createdAt };
+  }
+
+  async listCustomFields(ctx: RequestContext, tenantId: string, entityType?: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.requireCustomFields().list(scoped, entityType);
+  }
+
+  async createCustomField(ctx: RequestContext, tenantId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.requireCustomFields().create(scoped, raw);
+  }
+
+  async updateCustomField(ctx: RequestContext, tenantId: string, fieldId: string, raw: unknown) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.requireCustomFields().update(scoped, fieldId, raw);
+  }
+
+  async deleteCustomField(ctx: RequestContext, tenantId: string, fieldId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.requireCustomFields().remove(scoped, fieldId);
+  }
+
+  private requireCustomFields(): CustomFieldDefinitionService {
+    if (!this.customFields) {
+      throw new AppError(ErrorCode.INTERNAL_ERROR, 'Custom fields are not configured');
+    }
+    return this.customFields;
   }
 
   private async operatorScope(ctx: RequestContext, tenantId: string): Promise<RequestContext> {

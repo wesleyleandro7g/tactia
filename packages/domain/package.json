@@ -15,6 +15,10 @@
     "./data-sources/import-mapping": {
       "types": "./src/data-sources/import-mapping.ts",
       "default": "./src/data-sources/import-mapping.ts"
+    },
+    "./data-catalog/types": {
+      "types": "./src/data-catalog/types.ts",
+      "default": "./src/data-catalog/types.ts"
     }
   },
   "scripts": {

@@ -64,6 +64,18 @@ export function normalizeRow(row: RawRow, fieldMappings: FieldMapping[]): Record
   return result;
 }
 
+export const CUSTOM_MAPPING_PREFIX = 'custom:';
+
+export function extractCustomData(normalized: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(normalized)) {
+    if (!key.startsWith(CUSTOM_MAPPING_PREFIX)) continue;
+    const fieldKey = key.slice(CUSTOM_MAPPING_PREFIX.length);
+    if (fieldKey) out[fieldKey] = value;
+  }
+  return out;
+}
+
 function str(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const text = String(value).trim();
@@ -141,6 +153,7 @@ export async function normalizeToCanonical(
   targetEntity: string,
   normalized: Record<string, unknown>,
   repositories: NormalizerRepositories,
+  customData: Record<string, unknown> = {},
 ): Promise<NormalizeOutcome> {
   const externalId = str(normalized['external_id']);
 
@@ -161,6 +174,7 @@ export async function normalizeToCanonical(
         city: str(normalized['city']),
         state: str(normalized['state']),
         acquisitionSource: str(normalized['acquisition_source']),
+        customData,
       });
       return { status: created ? 'created' : 'updated' };
     }
@@ -179,6 +193,7 @@ export async function normalizeToCanonical(
         supplier: str(normalized['supplier']),
         price: num(normalized['price']),
         cost: num(normalized['cost']),
+        customData,
       });
       return { status: created ? 'created' : 'updated' };
     }
@@ -287,6 +302,7 @@ export async function normalizeToCanonical(
         channel: str(normalized['channel']),
         region: str(normalized['region']),
         soldAt,
+        customData,
         items,
       });
       return { status: created ? 'created' : 'updated' };

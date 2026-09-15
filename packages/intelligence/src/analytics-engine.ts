@@ -320,6 +320,7 @@ export class AnalyticsEngine {
         phone: customer.phone,
         status: customer.status,
         createdAt: customer.createdAt.toISOString(),
+        customData: customer.customData ?? {},
       },
       lifetime: {
         totalSales: sales.length,

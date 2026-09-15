@@ -3,6 +3,7 @@ import {
   AuditLogRepository,
   CampaignRepository,
   CredentialRepository,
+  CustomFieldDefinitionRepository,
   CustomerRepository,
   DataQualityReportRepository,
   DataSourceRepository,
@@ -29,6 +30,9 @@ import {
   AuditLogService,
   BackofficeService,
   CredentialService,
+  CustomDataValidationService,
+  CustomFieldDefinitionService,
+  DataCatalogService,
   DataSourceService,
   OperatorService,
   SyncService,
@@ -59,6 +63,7 @@ const mappingRepository = new MappingRepository(prisma);
 const importRepository = new ImportRepository(prisma);
 const dataQualityReportRepository = new DataQualityReportRepository(prisma);
 const insightRepository = new InsightRepository(prisma);
+const customFieldDefinitionRepository = new CustomFieldDefinitionRepository(prisma);
 
 export const auditLogService = new AuditLogService(auditLogRepository);
 
@@ -71,6 +76,16 @@ export const dataSourceService = new DataSourceService(
   mappingRepository,
   credentialRepository,
   auditLogService,
+);
+
+export const customDataValidationService = new CustomDataValidationService(
+  customFieldDefinitionRepository,
+);
+export const dataCatalogService = new DataCatalogService(customFieldDefinitionRepository);
+export const customFieldDefinitionService = new CustomFieldDefinitionService(
+  customFieldDefinitionRepository,
+  auditLogService,
+  dataCatalogService,
 );
 
 export const syncService = new SyncService({
@@ -93,6 +108,7 @@ export const syncService = new SyncService({
   payments: paymentRepository,
   inventoryLevels: inventoryLevelRepository,
   campaigns: campaignRepository,
+  customData: customDataValidationService,
 });
 
 export const backofficeService = new BackofficeService(
@@ -109,4 +125,5 @@ export const backofficeService = new BackofficeService(
   syncService,
   dataSourceService,
   credentialService,
+  customFieldDefinitionService,
 );

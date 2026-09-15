@@ -219,6 +219,9 @@ describe('E16 tools and guardrails', () => {
     const names = createDefaultTools({} as ToolDeps).map((tool) => tool.name);
     expect(names).toContain('search_documents');
     expect(names).toContain('search_catalog');
+    expect(names).toContain('get_data_catalog');
+    expect(names).toContain('query_business_data');
+    expect(names).toContain('aggregate_business_data');
   });
 });
 

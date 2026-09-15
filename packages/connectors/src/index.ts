@@ -30,5 +30,7 @@ export {
   canonicalEntityRank,
   normalizeRow,
   normalizeToCanonical,
+  extractCustomData,
+  CUSTOM_MAPPING_PREFIX,
 } from './normalizer';
 export type { NormalizeOutcome, NormalizerRepositories } from './normalizer';

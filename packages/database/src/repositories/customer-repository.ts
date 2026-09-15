@@ -3,6 +3,13 @@ import { Prisma, type CustomerStatus, type PrismaClient } from '../client';
 import { asJson, asNullableJson } from '../json';
 import { toVectorLiteral } from '../embeddings';
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
 export type CreateCustomerInput = {
   tenantId: string;
   dataSourceId?: string | null;
@@ -17,6 +24,7 @@ export type CreateCustomerInput = {
   acquisitionSource?: string | null;
   status?: CustomerStatus;
   metadata?: unknown;
+  customData?: unknown;
 };
 
 export class CustomerRepository {
@@ -39,6 +47,7 @@ export class CustomerRepository {
         acquisitionSource: input.acquisitionSource ?? null,
         status: input.status ?? 'active',
         metadata: asJson(input.metadata),
+        customData: asJson(input.customData ?? {}),
       },
     });
   }
@@ -97,6 +106,7 @@ export class CustomerRepository {
       document?: string | null;
       status?: CustomerStatus;
       metadata?: unknown;
+      customData?: unknown;
       externalId?: string | null;
     };
   }) {
@@ -112,6 +122,7 @@ export class CustomerRepository {
         status: data.status,
         externalId: data.externalId,
         metadata: asNullableJson(data.metadata),
+        ...(data.customData !== undefined ? { customData: asJson(data.customData) } : {}),
       },
     });
   }
@@ -179,6 +190,10 @@ export class CustomerRepository {
           acquisitionSource: input.acquisitionSource ?? null,
           status: input.status ?? existing.status,
           metadata: asJson(input.metadata),
+          customData: asJson({
+            ...(asRecord(existing.customData)),
+            ...(asRecord(input.customData)),
+          }),
         },
       });
       return { entity: updated, created: false };

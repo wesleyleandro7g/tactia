@@ -447,6 +447,7 @@ model Tenant {
   infographicAssets  InfographicAsset[]
   apiKeys            TenantApiKey[]
   whatsappNumbers    WhatsappAuthorizedNumber[]
+  customFieldDefinitions CustomFieldDefinition[]
 
   @@unique([slug])
   @@index([status])
@@ -564,6 +565,25 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model CustomFieldDefinition {
+  id          String   @id @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  entityType  String   @map("entity_type")
+  fieldKey    String   @map("field_key")
+  label       String
+  fieldType   String   @map("field_type")
+  description String?
+  required    Boolean  @default(false)
+  config      Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, entityType, fieldKey])
+  @@index([tenantId, entityType])
+  @@map("custom_field_definitions")
+}
+
 // ---------------------------------------------------------------------------
 // Canonical business data (Etapa 2)
 // data_source_id is nullable until DataSource lands in Etapa 3.
@@ -584,6 +604,7 @@ model Customer {
   acquisitionSource String? @map("acquisition_source")
   status       CustomerStatus @default(active)
   metadata     Json?
+  customData   Json           @default("{}") @map("custom_data")
   /// Written via raw SQL (pgvector). Never selected through Prisma.
   embedding    Unsupported("vector")?
   embeddedAt   DateTime?      @map("embedded_at")
@@ -602,6 +623,7 @@ model Customer {
   @@index([tenantId, externalId])
   @@index([tenantId, email])
   @@index([deletedAt])
+  @@index([customData], type: Gin, map: "customers_custom_data_idx")
   @@map("customers")
 }
 
@@ -647,6 +669,7 @@ model Product {
   price        Decimal?      @db.Decimal(18, 4)
   status       ProductStatus @default(active)
   metadata     Json?
+  customData   Json           @default("{}") @map("custom_data")
   /// Written via raw SQL (pgvector). Never selected through Prisma.
   embedding    Unsupported("vector")?
   embeddedAt   DateTime?     @map("embedded_at")
@@ -664,6 +687,7 @@ model Product {
   @@index([tenantId, externalId])
   @@index([tenantId, sku])
   @@index([deletedAt])
+  @@index([customData], type: Gin, map: "products_custom_data_idx")
   @@map("products")
 }
 
@@ -710,6 +734,7 @@ model Sale {
   region         String?
   soldAt         DateTime   @map("sold_at")
   metadata       Json?
+  customData     Json       @default("{}") @map("custom_data")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
   tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -725,6 +750,7 @@ model Sale {
   @@index([tenantId, externalId])
   @@index([tenantId, customerId])
   @@index([tenantId, sellerId])
+  @@index([customData], type: Gin, map: "sales_custom_data_idx")
   @@map("sales")
 }
 
@@ -737,12 +763,14 @@ model SaleItem {
   unitPrice      Decimal @map("unit_price") @db.Decimal(18, 4)
   discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(18, 4)
   totalAmount    Decimal @map("total_amount") @db.Decimal(18, 4)
+  customData     Json    @default("{}") @map("custom_data")
   tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sale           Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product        Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, saleId])
   @@index([tenantId, productId])
+  @@index([customData], type: Gin, map: "sale_items_custom_data_idx")
   @@map("sale_items")
 }
 

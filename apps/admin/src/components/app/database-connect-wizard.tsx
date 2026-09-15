@@ -17,6 +17,7 @@ import {
   type DiscoveryResource,
   type DraftMapping,
 } from '@/components/app/table-mapping-editor';
+import { useCustomMappingFields } from '@/components/app/use-custom-mapping-fields';
 import { WizardStepper } from '@/components/app/wizard-stepper';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ export function DatabaseConnectWizard({
   const [sourceEntity, setSourceEntity] = useState('');
   const [targetEntity, setTargetEntity] = useState<TargetEntity>('customer');
   const [fieldMap, setFieldMap] = useState<Record<string, string>>({});
+  const extraFields = useCustomMappingFields(tenantId, targetEntity);
   const [mappings, setMappings] = useState<DraftMapping[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +169,7 @@ export function DatabaseConnectWizard({
       const first = nextResources[0];
       if (first) {
         setSourceEntity(first.name);
-        setFieldMap(guessMapping(first.columns, targetEntity));
+        setFieldMap(guessMapping(first.columns, targetEntity, extraFields));
       } else {
         setSourceEntity('');
         setFieldMap({});
@@ -351,6 +353,7 @@ export function DatabaseConnectWizard({
               sourceEntity={sourceEntity}
               targetEntity={targetEntity}
               fieldMap={fieldMap}
+              extraFields={extraFields}
               onSourceEntityChange={(next, nextMap) => {
                 setSourceEntity(next);
                 setFieldMap(nextMap);

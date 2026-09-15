@@ -36,6 +36,8 @@ export { OperatorRepository } from './repositories/operator-repository';
 export { UserRepository } from './repositories/user-repository';
 export { MembershipRepository } from './repositories/membership-repository';
 export { AuditLogRepository } from './repositories/audit-log-repository';
+export { CustomFieldDefinitionRepository } from './repositories/custom-field-definition-repository';
+export { StructuredQueryRepository } from './repositories/structured-query-repository';
 export { CustomerRepository } from './repositories/customer-repository';
 export { LeadRepository } from './repositories/lead-repository';
 export { ProductRepository } from './repositories/product-repository';
@@ -85,6 +87,10 @@ export type { CreateOperatorInput, OperatorRecord } from './repositories/operato
 export type { CreateUserInput } from './repositories/user-repository';
 export type { CreateMembershipInput } from './repositories/membership-repository';
 export type { CreateAuditLogInput } from './repositories/audit-log-repository';
+export type {
+  CreateCustomFieldDefinitionInput,
+  UpdateCustomFieldDefinitionInput,
+} from './repositories/custom-field-definition-repository';
 export type { CreateCustomerInput } from './repositories/customer-repository';
 export type { CreateLeadInput } from './repositories/lead-repository';
 export type { CreateProductInput } from './repositories/product-repository';

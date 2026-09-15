@@ -15,6 +15,7 @@ import {
   fieldsFromMap,
   type DiscoveryResource,
 } from '@/components/app/table-mapping-editor';
+import { useCustomMappingFields } from '@/components/app/use-custom-mapping-fields';
 import { opsJson } from '@/lib/ops-fetch';
 
 type DataSource = {
@@ -59,6 +60,7 @@ export function DataSourceManagePanel({
   const [sourceEntity, setSourceEntity] = useState('');
   const [targetEntity, setTargetEntity] = useState<TargetEntity>('customer');
   const [fieldMap, setFieldMap] = useState<Record<string, string>>({});
+  const extraFields = useCustomMappingFields(tenantId, targetEntity);
 
   async function saveMeta(event: React.FormEvent) {
     event.preventDefault();
@@ -122,7 +124,7 @@ export function DataSourceManagePanel({
       const first = next[0];
       if (first) {
         setSourceEntity(first.name);
-        setFieldMap(guessMapping(first.columns, targetEntity));
+        setFieldMap(guessMapping(first.columns, targetEntity, extraFields));
       }
       setMessage(`${next.length} recurso(s) descobertos.`);
     } catch (err) {
@@ -232,6 +234,7 @@ export function DataSourceManagePanel({
             sourceEntity={sourceEntity}
             targetEntity={targetEntity}
             fieldMap={fieldMap}
+            extraFields={extraFields}
             onSourceEntityChange={(next, nextMap) => {
               setSourceEntity(next);
               setFieldMap(nextMap);

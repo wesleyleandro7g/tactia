@@ -8,6 +8,7 @@ import {
   CampaignRepository,
   ConversationRepository,
   CredentialRepository,
+  CustomFieldDefinitionRepository,
   CustomerRepository,
   DataQualityReportRepository,
   DataSourceRepository,
@@ -29,6 +30,7 @@ import {
   RecommendationRepository,
   SaleRepository,
   SellerRepository,
+  StructuredQueryRepository,
   SyncJobRepository,
   TenantRepository,
   TenantSettingsRepository,
@@ -53,7 +55,10 @@ import {
   CatalogEmbeddingService,
   ConversationService,
   CredentialService,
+  CustomDataValidationService,
+  CustomFieldDefinitionService,
   CustomerService,
+  DataCatalogService,
   DataSourceService,
   ExpenseService,
   GoalService,
@@ -78,6 +83,7 @@ import {
   SaleService,
   SellerService,
   SnapshotService,
+  StructuredQueryService,
   SyncService,
   TenantService,
   ThresholdCalibrator,
@@ -132,6 +138,7 @@ const expenseRepository = new ExpenseRepository(prisma);
 const paymentRepository = new PaymentRepository(prisma);
 const inventoryLevelRepository = new InventoryLevelRepository(prisma);
 const campaignRepository = new CampaignRepository(prisma);
+const customFieldDefinitionRepository = new CustomFieldDefinitionRepository(prisma);
 const interactionRepository = new InteractionRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
 const dataSourceRepository = new DataSourceRepository(prisma);
@@ -183,11 +190,35 @@ export const catalogEmbeddingService = new CatalogEmbeddingService(
   embeddingAdapter,
 );
 
-export const customerService = new CustomerService(customerRepository, auditLogService, catalogEmbeddingService);
+export const customDataValidationService = new CustomDataValidationService(
+  customFieldDefinitionRepository,
+);
+export const dataCatalogService = new DataCatalogService(customFieldDefinitionRepository);
+export const customFieldDefinitionService = new CustomFieldDefinitionService(
+  customFieldDefinitionRepository,
+  auditLogService,
+  dataCatalogService,
+);
+export const structuredQueryService = new StructuredQueryService(
+  dataCatalogService,
+  new StructuredQueryRepository(prisma),
+);
+
+export const customerService = new CustomerService(
+  customerRepository,
+  auditLogService,
+  catalogEmbeddingService,
+  customDataValidationService,
+);
 
 export const leadService = new LeadService(leadRepository, customerRepository, auditLogService, prisma);
 
-export const productService = new ProductService(productRepository, auditLogService, catalogEmbeddingService);
+export const productService = new ProductService(
+  productRepository,
+  auditLogService,
+  catalogEmbeddingService,
+  customDataValidationService,
+);
 
 export const sellerService = new SellerService(sellerRepository, auditLogService);
 
@@ -197,6 +228,7 @@ export const saleService = new SaleService(
   productRepository,
   sellerRepository,
   auditLogService,
+  customDataValidationService,
 );
 
 export const activityService = new ActivityService(
@@ -425,6 +457,7 @@ export const syncService = new SyncService({
   payments: paymentRepository,
   inventoryLevels: inventoryLevelRepository,
   campaigns: campaignRepository,
+  customData: customDataValidationService,
   enrichInteractions: async ({ tenantId, dataSourceId }) => {
     await interactionEnrichmentService.enrichPending({ tenantId, dataSourceId });
   },

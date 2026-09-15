@@ -1,3 +1,7 @@
+import { CUSTOM_MAPPING_PREFIX } from '../data-catalog/types';
+
+export { CUSTOM_MAPPING_PREFIX };
+
 export type MappingField = { value: string; label: string };
 
 const IGNORE: MappingField = { value: '', label: 'Ignorar coluna' };
@@ -179,8 +183,8 @@ const COLUMN_ALIASES: Record<string, string> = {
   forma_pagamento: 'payment_method',
 };
 
-export function targetFieldsFor(entity: string): MappingField[] {
-  return FIELDS_BY_ENTITY[entity] ?? FIELDS_BY_ENTITY.customer ?? [IGNORE];
+export function targetFieldsFor(entity: string, extra: MappingField[] = []): MappingField[] {
+  return [...(FIELDS_BY_ENTITY[entity] ?? FIELDS_BY_ENTITY.customer ?? [IGNORE]), ...extra];
 }
 
 function normalizeColumn(name: string): string {
@@ -195,15 +199,22 @@ function normalizeColumn(name: string): string {
 export function guessMapping(
   columns: Array<{ name: string }>,
   entity: string,
+  extra: MappingField[] = [],
 ): Record<string, string> {
-  const allowed = new Set(targetFieldsFor(entity).map((field) => field.value).filter(Boolean));
+  const allowed = new Set(targetFieldsFor(entity, extra).map((field) => field.value).filter(Boolean));
+  const customByBareKey = new Map(
+    extra
+      .filter((field) => field.value.startsWith(CUSTOM_MAPPING_PREFIX))
+      .map((field) => [field.value.slice(CUSTOM_MAPPING_PREFIX.length), field.value]),
+  );
   const guessed: Record<string, string> = {};
 
   for (const column of columns) {
     const key = normalizeColumn(column.name);
     const direct = allowed.has(key) ? key : undefined;
     const aliased = COLUMN_ALIASES[key];
-    const target = direct ?? (aliased && allowed.has(aliased) ? aliased : undefined);
+    const custom = customByBareKey.get(key);
+    const target = direct ?? (aliased && allowed.has(aliased) ? aliased : undefined) ?? custom;
     if (target) guessed[column.name] = target;
   }
 
@@ -213,4 +224,13 @@ export function guessMapping(
 export function sourceNameFromFile(fileName: string): string {
   const base = fileName.replace(/\.csv$/i, '').replace(/[_-]+/g, ' ').trim();
   return base.length > 0 ? base : 'Importação CSV';
+}
+
+export function customMappingFields(
+  definitions: Array<{ fieldKey: string; label: string }>,
+): MappingField[] {
+  return definitions.map((definition) => ({
+    value: `${CUSTOM_MAPPING_PREFIX}${definition.fieldKey}`,
+    label: `${definition.label} (custom)`,
+  }));
 }

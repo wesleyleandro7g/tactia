@@ -12,6 +12,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   AuditLogRepository,
+  CustomFieldDefinitionRepository,
   CustomerRepository,
   InsightRepository,
   InteractionRepository,
@@ -23,6 +24,7 @@ import {
   RecommendationRepository,
   SaleRepository,
   SellerRepository,
+  StructuredQueryRepository,
   TenantRepository,
   UserRepository,
 } from '@tactia/database';
@@ -30,6 +32,7 @@ import {
   AuditLogService,
   AnalyticsService,
   CustomerService,
+  DataCatalogService,
   InsightService,
   InteractionService,
   MetricService,
@@ -37,6 +40,7 @@ import {
   RecommendationService,
   SaleService,
   SellerService,
+  StructuredQueryService,
   TenantService,
 } from '@tactia/domain';
 import { MetricEngine } from '@tactia/intelligence';
@@ -81,6 +85,13 @@ const recommendationService = new RecommendationService(
   auditLogs,
 );
 
+const customFieldDefinitions = new CustomFieldDefinitionRepository(prisma);
+const dataCatalogService = new DataCatalogService(customFieldDefinitions);
+const structuredQueryService = new StructuredQueryService(
+  dataCatalogService,
+  new StructuredQueryRepository(prisma),
+);
+
 const registry = createDefaultToolRegistry({
   metrics: metricService,
   analytics: analyticsService,
@@ -92,12 +103,20 @@ const registry = createDefaultToolRegistry({
   recommendations: recommendationService,
   interactions: interactionService,
   embedder: new MockEmbeddingAdapter(),
+  dataCatalog: dataCatalogService,
+  structuredQuery: structuredQueryService,
 });
 
 const contextBuilder = new ContextBuilder({
   tenants: tenantService,
   metrics: metricService,
   insights: insightService,
+  providers: {
+    customFields: async (ctx) => {
+      const summary = await dataCatalogService.summarize(ctx.tenantId);
+      return summary.total > 0 ? summary : null;
+    },
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -114,6 +133,7 @@ const leadsRepository = new LeadRepository(prisma);
 let ctxA: ToolContext;
 let ctxB: ToolContext;
 let insightId: string;
+let customerAlfaId: string;
 
 function toolContext(partial: Pick<RequestContext, 'tenantId' | 'userId' | 'role'>): ToolContext {
   return {
@@ -140,6 +160,7 @@ async function cleanUp() {
   await prisma.product.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.seller.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.customer.deleteMany({ where: { tenantId: { in: ids } } });
+  await prisma.customFieldDefinition.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.metric.deleteMany({ where: { tenantId: { in: ids } } });
   await prisma.membership.deleteMany({ where: { tenantId: { in: ids } } });
@@ -179,7 +200,23 @@ beforeAll(async () => {
   const tenantId = a.tenant.id;
 
   const customer = await customersRepository.create({ tenantId, name: 'Cliente Alfa' });
+  customerAlfaId = customer.id;
   const otherCustomer = await customersRepository.create({ tenantId, name: 'Cliente Beta' });
+  await customersRepository.update({
+    tenantId,
+    id: customer.id,
+    data: { customData: { equipment_type: 'compressor' } },
+  });
+  await prisma.customFieldDefinition.create({
+    data: {
+      id: createId(),
+      tenantId,
+      entityType: 'customer',
+      fieldKey: 'equipment_type',
+      label: 'Tipo de equipamento',
+      fieldType: 'text',
+    },
+  });
   await leadsRepository.create({ tenantId, name: 'Lead Gama', status: 'new' });
 
   const productPro = await prisma.product.create({
@@ -367,6 +404,9 @@ describe('V0.1 tools', () => {
       'search_interactions',
       'search_documents',
       'search_catalog',
+      'get_data_catalog',
+      'query_business_data',
+      'aggregate_business_data',
     ]));
     expect(registry.has('propose_action')).toBe(false);
   });
@@ -470,7 +510,7 @@ describe('V0.1 tools', () => {
     const data = result.data as {
       customerCount: { value: number };
       totalRegistered: number;
-      customers: Array<{ name: string }>;
+      customers: Array<{ name: string; customData?: Record<string, unknown> }>;
     };
 
     expect(data.customerCount.value).toBe(2);
@@ -479,6 +519,9 @@ describe('V0.1 tools', () => {
       'Cliente Alfa',
       'Cliente Beta',
     ]);
+    expect(data.customers.find((customer) => customer.name === 'Cliente Alfa')?.customData).toEqual({
+      equipment_type: 'compressor',
+    });
     expect(result.sources[0]).toMatchObject({ metric: 'customer_count' });
   });
 
@@ -667,5 +710,89 @@ describe('V0.1 tools', () => {
     expect(context.trailing30.find((metric) => metric.key === 'revenue')).toBeDefined();
     expect(context.company.daysLeftInMonth).toBeGreaterThan(0);
     expect(context.sources.every((source) => source.tool === 'context')).toBe(true);
+    expect(context.customFields?.byEntity.some((row) => row.keys.includes('equipment_type'))).toBe(true);
+  });
+
+  it('get_data_catalog lists canonical and custom fields', async () => {
+    const result = await registry.execute('get_data_catalog', ctxA, { entityType: 'customer' });
+    const data = result.data as {
+      entities: Array<{ entityType: string; fields: Array<{ key: string; source: string }> }>;
+    };
+    const customer = data.entities.find((entity) => entity.entityType === 'customer');
+    expect(customer?.fields.some((field) => field.key === 'name' && field.source === 'canonical')).toBe(
+      true,
+    );
+    expect(
+      customer?.fields.some((field) => field.key === 'equipment_type' && field.source === 'custom'),
+    ).toBe(true);
+  });
+
+  it('query_business_data returns custom fields and rejects unknown ones', async () => {
+    const result = await registry.execute('query_business_data', ctxA, {
+      entityType: 'customer',
+      fields: ['name', 'equipment_type'],
+      filters: [{ field: 'equipment_type', operator: 'eq', value: 'compressor' }],
+    });
+    const data = result.data as {
+      rows: Array<{ name: string; equipment_type: string }>;
+      meta: { count: number };
+    };
+    expect(data.rows.some((row) => row.name === 'Cliente Alfa' && row.equipment_type === 'compressor')).toBe(
+      true,
+    );
+    expect(data.meta.count).toBeGreaterThan(0);
+
+    await expect(
+      registry.execute('query_business_data', ctxA, {
+        entityType: 'customer',
+        fields: ['campo_que_nao_existe'],
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+  });
+
+  it('query_business_data does not leak the other tenant', async () => {
+    const result = await registry.execute('query_business_data', ctxB, {
+      entityType: 'customer',
+      fields: ['name'],
+      filters: [{ field: 'name', operator: 'eq', value: 'Cliente Alfa' }],
+    });
+    const data = result.data as { rows: unknown[]; meta: { count: number } };
+    expect(data.rows).toHaveLength(0);
+    expect(data.meta.count).toBe(0);
+
+    await expect(
+      registry.execute('query_business_data', ctxB, {
+        entityType: 'customer',
+        fields: ['equipment_type'],
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+  });
+
+  it('aggregate_business_data groups by a custom field', async () => {
+    const result = await registry.execute('aggregate_business_data', ctxA, {
+      entityType: 'customer',
+      metrics: [{ op: 'count' }],
+      groupBy: 'equipment_type',
+    });
+    const data = result.data as {
+      metrics: Array<{ equipment_type: string | null; count: number }>;
+      meta: { count: number };
+    };
+    expect(data.metrics.some((row) => row.equipment_type === 'compressor' && row.count >= 1)).toBe(true);
+  });
+
+  it('get_customer_profile includes customData', async () => {
+    const result = await registry.execute('get_customer_profile', ctxA, {
+      customerId: customerAlfaId,
+      from: PERIOD.from,
+      to: PERIOD.to,
+    });
+    const data = result.data as {
+      found: boolean;
+      customer: { name: string; customData?: Record<string, unknown> };
+    };
+    expect(data.found).toBe(true);
+    expect(data.customer.name).toBe('Cliente Alfa');
+    expect(data.customer.customData).toEqual({ equipment_type: 'compressor' });
   });
 });
