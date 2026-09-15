@@ -40,6 +40,8 @@ export type PublishOptions = {
   /** Delay start (seconds or Date). */
   startAfter?: number | Date;
   priority?: number;
+  /** Override the queue default (15 min). Daily sync+insights needs ~2h. */
+  expireInSeconds?: number;
 };
 
 export class PgBossJobQueue implements JobQueue {
@@ -142,6 +144,7 @@ export class PgBossJobQueue implements JobQueue {
       ...(options.singletonKey ? { singletonKey: options.singletonKey } : {}),
       ...(options.startAfter !== undefined ? { startAfter: options.startAfter } : {}),
       ...(options.priority !== undefined ? { priority: options.priority } : {}),
+      ...(options.expireInSeconds !== undefined ? { expireInSeconds: options.expireInSeconds } : {}),
     });
   }
 

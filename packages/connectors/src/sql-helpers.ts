@@ -1,11 +1,13 @@
 import { applyTransform } from './transforms';
 import { computeChecksum } from './checksum';
+import { incrementalFetchDecision } from './incremental';
 import type {
   DiscoveryColumn,
   DiscoveryResource,
   FetchOptions,
   FieldMapping,
   RawRow,
+  SkippedMapping,
   SyncContext,
   SyncResult,
 } from './types';
@@ -51,6 +53,49 @@ export function normalizeSqlRow(row: RawRow, fieldMappings: FieldMapping[]): Rec
   return result;
 }
 
+export type SqlFetchQuery = {
+  sql: string;
+  values: unknown[];
+};
+
+export function buildSqlFetchQuery(args: {
+  dialect: 'postgres' | 'mysql';
+  schema: string;
+  table: string;
+  limit: number;
+  offset: number;
+  dateColumn?: string;
+  since?: Date;
+}): SqlFetchQuery {
+  const quote = args.dialect === 'mysql' ? quoteMysqlIdent : quotePgIdent;
+  const qualified = `${quote(args.schema)}.${quote(args.table)}`;
+  const filter = args.dateColumn && args.since;
+
+  if (args.dialect === 'postgres') {
+    if (filter) {
+      return {
+        sql: `SELECT * FROM ${qualified} WHERE ${quote(args.dateColumn!)} >= $1 LIMIT $2 OFFSET $3`,
+        values: [args.since, args.limit, args.offset],
+      };
+    }
+    return {
+      sql: `SELECT * FROM ${qualified} LIMIT $1 OFFSET $2`,
+      values: [args.limit, args.offset],
+    };
+  }
+
+  if (filter) {
+    return {
+      sql: `SELECT * FROM ${qualified} WHERE ${quote(args.dateColumn!)} >= ? LIMIT ? OFFSET ?`,
+      values: [args.since, args.limit, args.offset],
+    };
+  }
+  return {
+    sql: `SELECT * FROM ${qualified} LIMIT ? OFFSET ?`,
+    values: [args.limit, args.offset],
+  };
+}
+
 export async function syncSqlMappings(args: {
   rawRecords: RawRecordRepository;
   context: SyncContext;
@@ -59,13 +104,34 @@ export async function syncSqlMappings(args: {
 }): Promise<SyncResult> {
   const batchSize = args.batchSize ?? SQL_BATCH_SIZE;
   const counters = { read: 0, created: 0, updated: 0, failed: 0 };
+  const skippedMappings: SkippedMapping[] = [];
 
   for (const mapping of args.context.mappings) {
+    const decision = incrementalFetchDecision(
+      args.context.mode,
+      mapping.targetEntity,
+      mapping.configuration?.fields,
+    );
+    if (!decision.fetch) {
+      skippedMappings.push({
+        sourceEntity: mapping.sourceEntity,
+        targetEntity: mapping.targetEntity,
+        reason: decision.reason,
+      });
+      continue;
+    }
+
     let offset = 0;
     let hasMore = true;
 
     while (hasMore) {
-      const rows = await args.fetch(mapping.sourceEntity, { limit: batchSize, offset });
+      const rows = await args.fetch(mapping.sourceEntity, {
+        limit: batchSize,
+        offset,
+        ...(decision.dateColumn && args.context.since
+          ? { dateColumn: decision.dateColumn, since: args.context.since }
+          : {}),
+      });
       hasMore = rows.length === batchSize;
       offset += rows.length;
 
@@ -101,5 +167,6 @@ export async function syncSqlMappings(args: {
     recordsCreated: counters.created,
     recordsUpdated: counters.updated,
     recordsFailed: counters.failed,
+    ...(skippedMappings.length > 0 ? { skippedMappings } : {}),
   };
 }

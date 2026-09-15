@@ -1,10 +1,12 @@
 import { createId } from '@tactia/shared';
-import type { PrismaClient, SyncJobStatus } from '../client';
+import type { PrismaClient, SyncJobMode, SyncJobStatus, SyncJobTrigger } from '../client';
 
 export type CreateSyncJobInput = {
   tenantId: string;
   dataSourceId: string;
   status?: SyncJobStatus;
+  trigger?: SyncJobTrigger;
+  mode?: SyncJobMode;
 };
 
 export class SyncJobRepository {
@@ -17,6 +19,8 @@ export class SyncJobRepository {
         tenantId: input.tenantId,
         dataSourceId: input.dataSourceId,
         status: input.status ?? 'pending',
+        trigger: input.trigger ?? 'manual',
+        mode: input.mode ?? 'full',
       },
     });
   }

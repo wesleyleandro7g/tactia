@@ -12,8 +12,8 @@ import type {
 import type { RawRecordRepository } from '@tactia/database';
 import {
   SQL_BATCH_SIZE,
+  buildSqlFetchQuery,
   normalizeSqlRow,
-  quoteMysqlIdent,
   resourcesFromInformationSchema,
   syncSqlMappings,
   type InformationSchemaColumnRow,
@@ -83,14 +83,17 @@ export class MySqlConnector implements Connector {
   async fetch(resource: string, options?: FetchOptions): Promise<RawRow[]> {
     const connection = await this.newConnection();
     try {
-      const limit = options?.limit ?? SQL_BATCH_SIZE;
-      const offset = options?.offset ?? 0;
       const schema = this.config.schema?.trim() || this.config.database;
-      const qualified = `${quoteMysqlIdent(schema)}.${quoteMysqlIdent(resource)}`;
-      const [rows] = await connection.query<mysql.RowDataPacket[]>(
-        `SELECT * FROM ${qualified} LIMIT ? OFFSET ?`,
-        [limit, offset],
-      );
+      const { sql, values } = buildSqlFetchQuery({
+        dialect: 'mysql',
+        schema,
+        table: resource,
+        limit: options?.limit ?? SQL_BATCH_SIZE,
+        offset: options?.offset ?? 0,
+        dateColumn: options?.dateColumn,
+        since: options?.since,
+      });
+      const [rows] = await connection.query<mysql.RowDataPacket[]>(sql, values);
       return rows as RawRow[];
     } finally {
       await connection.end().catch(() => undefined);

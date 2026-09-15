@@ -91,6 +91,16 @@ enum SyncJobStatus {
   cancelled
 }
 
+enum SyncJobTrigger {
+  manual
+  scheduled
+}
+
+enum SyncJobMode {
+  full
+  incremental
+}
+
 enum ImportStatus {
   pending
   processing
@@ -883,21 +893,23 @@ model DataSource {
 }
 
 model SyncJob {
-  id              String        @id @db.Uuid
-  tenantId        String        @map("tenant_id") @db.Uuid
-  dataSourceId    String        @map("data_source_id") @db.Uuid
-  status          SyncJobStatus @default(pending)
-  startedAt       DateTime?     @map("started_at")
-  finishedAt      DateTime?     @map("finished_at")
-  recordsRead     Int           @default(0) @map("records_read")
-  recordsCreated  Int           @default(0) @map("records_created")
-  recordsUpdated  Int           @default(0) @map("records_updated")
-  recordsFailed   Int           @default(0) @map("records_failed")
+  id              String         @id @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  dataSourceId    String         @map("data_source_id") @db.Uuid
+  status          SyncJobStatus  @default(pending)
+  trigger         SyncJobTrigger @default(manual)
+  mode            SyncJobMode    @default(full)
+  startedAt       DateTime?      @map("started_at")
+  finishedAt      DateTime?      @map("finished_at")
+  recordsRead     Int            @default(0) @map("records_read")
+  recordsCreated  Int            @default(0) @map("records_created")
+  recordsUpdated  Int            @default(0) @map("records_updated")
+  recordsFailed   Int            @default(0) @map("records_failed")
   error           String?
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  dataSource      DataSource    @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource      DataSource     @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
   rawRecords      RawRecord[]
   imports         Import[]
   qualityReports  DataQualityReport[]

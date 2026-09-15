@@ -219,8 +219,10 @@ Um roteiro de 15 minutos que costuma funcionar:
 
 ## Depois do onboarding
 
-- Reimporte periodicamente (Tactia Ops → ficha da empresa ou da fonte → **Disparar sync**).
-- Acompanhe a ficha da empresa no Ops: sync jobs, contadores, erros e insights.
+- Fontes **SQL** (PostgreSQL/MySQL) sincronizam sozinhas **uma vez ao dia** às 03:00 no fuso da empresa: cadastros (cliente, produto, vendedor, lead) são relidos por completo, fatos só dos **últimos 3 meses**, e a Tactia só regrava o que mudou.
+- O primeiro carga histórica e qualquer recorte além de 3 meses continuam no Tactia Ops → **Disparar sync** (leitura completa da tabela).
+- CSV e MCP não entram no cron — reenvie o arquivo ou dispare o sync manual.
+- Acompanhe a ficha da empresa no Ops: sync jobs (`trigger=scheduled` no diário), contadores, erros e insights.
 - Limites por padrão: 6 syncs/min, 20 mensagens de chat/min por tenant,
   60 req/min por API key MCP.
 

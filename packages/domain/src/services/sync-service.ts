@@ -17,6 +17,8 @@ import type {
   SaleRepository,
   SellerRepository,
   SyncJobRepository,
+  SyncJobMode,
+  SyncJobTrigger,
 } from '@tactia/database';
 import { AppError, ErrorCode, isAppError, logger, type RequestContext } from '@tactia/shared';
 import {
@@ -24,6 +26,7 @@ import {
   CsvConnector,
   McpConnector,
   extractCustomData,
+  incrementalLookbackSince,
   normalizeRow,
   normalizeToCanonical,
   runDataQualityChecks,
@@ -31,6 +34,7 @@ import {
   type FieldMapping,
   type MappingConfig,
   type QualityIssue,
+  type SyncMode,
 } from '@tactia/connectors';
 import { assertTenantContext } from '../authz';
 import { AuditAction, type AuditLogService } from './audit-log-service';
@@ -87,12 +91,27 @@ export type SyncServiceDeps = {
     syncJobId: string;
     requestId: string;
     userId: string | null;
+    timezone?: string;
+    now?: string;
   }) => Promise<void>;
   customData?: CustomDataValidationService;
 };
 
 /** Raw records are normalized in pages to keep memory flat on large imports. */
 const NORMALIZE_PAGE_SIZE = 500;
+
+export type StartSyncOptions = {
+  mode?: SyncJobMode;
+  trigger?: SyncJobTrigger;
+  timezone?: string;
+  now?: Date;
+};
+
+export type SyncTenantSourcesOptions = {
+  now?: Date;
+  timezone?: string;
+  requestId?: string;
+};
 
 type EntityOutcome = {
   entityType: string;
@@ -107,7 +126,7 @@ type EntityOutcome = {
 export class SyncService {
   constructor(private readonly deps: SyncServiceDeps) {}
 
-  async startSync(ctx: RequestContext, dataSourceId: string) {
+  async startSync(ctx: RequestContext, dataSourceId: string, options: StartSyncOptions = {}) {
     if (ctx.operatorId) {
       if (!ctx.tenantId) {
         throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
@@ -123,6 +142,8 @@ export class SyncService {
       tenantId,
       dataSourceId,
       status: 'pending',
+      mode: options.mode ?? 'full',
+      trigger: options.trigger ?? 'manual',
     });
 
     await this.deps.auditLogs.record(ctx, {
@@ -132,9 +153,21 @@ export class SyncService {
       metadata: { dataSourceId },
     });
 
-    const meta = { requestId: ctx.requestId, userId: ctx.userId ?? null };
+    const meta = {
+      requestId: ctx.requestId,
+      userId: ctx.userId ?? null,
+      timezone: options.timezone,
+      now: options.now,
+    };
     if (this.deps.enqueueSync) {
-      await this.deps.enqueueSync({ tenantId, syncJobId: job.id, ...meta });
+      await this.deps.enqueueSync({
+        tenantId,
+        syncJobId: job.id,
+        requestId: meta.requestId,
+        userId: meta.userId,
+        timezone: options.timezone,
+        now: options.now?.toISOString(),
+      });
     } else {
       await this.executeSync(tenantId, job.id, meta);
     }
@@ -174,6 +207,49 @@ export class SyncService {
   }
 
   /**
+   * Daily path: SQL sources only, incremental, inline (must finish before insights).
+   * CSV/MCP are skipped. A failed source does not abort the others.
+   */
+  async syncTenantSources(tenantId: string, options: SyncTenantSourcesOptions = {}) {
+    const sources = await this.deps.dataSources.listActiveForSync(tenantId);
+    const ranked: Array<{ id: string; rank: number }> = [];
+
+    for (const source of sources) {
+      const mappings = await this.deps.mappings.findByDataSource({
+        tenantId,
+        dataSourceId: source.id,
+        activeOnly: true,
+      });
+      if (mappings.length === 0) continue;
+      ranked.push({
+        id: source.id,
+        rank: Math.min(...mappings.map((mapping) => canonicalEntityRank(mapping.targetEntity))),
+      });
+    }
+
+    ranked.sort((a, b) => a.rank - b.rank);
+
+    const jobs = [];
+    for (const item of ranked) {
+      const job = await this.deps.syncJobs.create({
+        tenantId,
+        dataSourceId: item.id,
+        status: 'pending',
+        mode: 'incremental',
+        trigger: 'scheduled',
+      });
+      await this.executeSync(tenantId, job.id, {
+        requestId: options.requestId,
+        userId: null,
+        timezone: options.timezone,
+        now: options.now,
+      });
+      jobs.push(await this.deps.syncJobs.findById({ tenantId, id: job.id }));
+    }
+    return jobs;
+  }
+
+  /**
    * Full lifecycle (spec §37): fetch → raw → normalize → upsert canônico →
    * data quality → import. Counters on the `SyncJob` report canonical results:
    * `recordsRead` are the rows read from the source, `recordsCreated/Updated`
@@ -183,7 +259,12 @@ export class SyncService {
   async executeSync(
     tenantId: string,
     syncJobId: string,
-    meta: { requestId?: string; userId?: string | null } = {},
+    meta: {
+      requestId?: string;
+      userId?: string | null;
+      timezone?: string;
+      now?: Date | string;
+    } = {},
   ): Promise<void> {
     const started = Date.now();
     const requestId = meta.requestId;
@@ -222,6 +303,13 @@ export class SyncService {
       }));
 
       const connector = await this.buildConnector(tenantId, ds);
+      const mode: SyncMode = job.mode === 'incremental' ? 'incremental' : 'full';
+      const clock =
+        meta.now instanceof Date ? meta.now : meta.now ? new Date(meta.now) : new Date();
+      const since =
+        mode === 'incremental'
+          ? incrementalLookbackSince(clock, meta.timezone ?? 'America/Sao_Paulo')
+          : undefined;
 
       // 1. Source → RawRecord (originals preserved, spec §3.3)
       const raw = await connector.sync({
@@ -229,6 +317,8 @@ export class SyncService {
         dataSourceId: ds.id,
         syncJobId,
         mappings: syncContextMappings,
+        mode,
+        ...(since ? { since } : {}),
         onProgress: async (counters) => {
           await this.deps.syncJobs.updateCounters({
             id: syncJobId,
@@ -240,8 +330,32 @@ export class SyncService {
         },
       });
 
+      for (const skipped of raw.skippedMappings ?? []) {
+        await this.deps.qualityReports.create({
+          tenantId,
+          dataSourceId: ds.id,
+          syncJobId,
+          entityType: skipped.targetEntity,
+          totalRecords: 0,
+          validRecords: 0,
+          invalidRecords: 0,
+          warnings: [],
+          errors: [
+            {
+              rule: skipped.reason,
+              count: 1,
+              sample: skipped.sourceEntity,
+            },
+          ],
+        });
+      }
+
+      const skippedTargets = new Set((raw.skippedMappings ?? []).map((item) => item.targetEntity));
+
       // 2. RawRecord → normalize → canonical upsert, in dependency order
-      const fieldsByEntity = mergeFieldsByTargetEntity(syncContextMappings);
+      const fieldsByEntity = mergeFieldsByTargetEntity(
+        syncContextMappings.filter((mapping) => !skippedTargets.has(mapping.targetEntity)),
+      );
       const entityTypes = [...fieldsByEntity.keys()].sort(
         (a, b) => canonicalEntityRank(a) - canonicalEntityRank(b),
       );
@@ -254,6 +368,7 @@ export class SyncService {
             dataSourceId: ds.id,
             entityType,
             fields: fieldsByEntity.get(entityType)!,
+            unprocessedOnly: mode === 'incremental',
           }),
         );
       }
@@ -377,7 +492,7 @@ export class SyncService {
         status: 'completed',
       });
 
-      if (this.deps.onSyncCompleted) {
+      if (this.deps.onSyncCompleted && job.trigger !== 'scheduled') {
         try {
           await this.deps.onSyncCompleted({
             tenantId,
@@ -444,8 +559,9 @@ export class SyncService {
     dataSourceId: string;
     entityType: string;
     fields: FieldMapping[];
+    unprocessedOnly?: boolean;
   }): Promise<EntityOutcome> {
-    const { tenantId, dataSourceId, entityType, fields } = input;
+    const { tenantId, dataSourceId, entityType, fields, unprocessedOnly } = input;
     const repositories = {
       customers: this.deps.customers,
       products: this.deps.products,
@@ -477,8 +593,9 @@ export class SyncService {
         tenantId,
         dataSourceId,
         entityType,
-        skip,
+        skip: unprocessedOnly ? 0 : skip,
         take: NORMALIZE_PAGE_SIZE,
+        unprocessedOnly,
       });
       if (page.items.length === 0) break;
 
@@ -508,6 +625,7 @@ export class SyncService {
           if (result.status === 'skipped') {
             outcome.skipped += 1;
             addReason(reasons, result.reason, result.sample);
+            if (unprocessedOnly) await this.deps.rawRecords.markProcessed({ id: record.id });
             continue;
           }
           if (result.status === 'created') outcome.created += 1;
@@ -520,10 +638,15 @@ export class SyncService {
             isAppError(error) ? error.code : 'upsert_failed',
             error instanceof Error ? error.message : String(error),
           );
+          if (unprocessedOnly) await this.deps.rawRecords.markProcessed({ id: record.id });
         }
       }
 
       skip += page.items.length;
+      if (unprocessedOnly) {
+        if (page.items.length < NORMALIZE_PAGE_SIZE) break;
+        continue;
+      }
       if (skip >= page.total) break;
     }
 

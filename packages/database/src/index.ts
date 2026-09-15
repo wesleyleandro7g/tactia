@@ -9,6 +9,8 @@ export type {
   PaymentStatus,
   DataSourceStatus,
   SyncJobStatus,
+  SyncJobTrigger,
+  SyncJobMode,
   ImportStatus,
   InsightType,
   InsightSeverity,

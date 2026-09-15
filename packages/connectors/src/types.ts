@@ -32,9 +32,14 @@ export type DiscoveryResult = {
   resources: DiscoveryResource[];
 };
 
+export type SyncMode = 'full' | 'incremental';
+
 export type FetchOptions = {
   limit?: number;
   offset?: number;
+  /** Source column used as the incremental watermark (quoted by the connector). */
+  dateColumn?: string;
+  since?: Date;
 };
 
 export type RawRow = Record<string, unknown>;
@@ -48,6 +53,8 @@ export type SyncContext = {
     targetEntity: string;
     configuration: MappingConfig;
   }>;
+  mode?: SyncMode;
+  since?: Date;
   onProgress?: (counters: {
     read: number;
     created: number;
@@ -56,11 +63,18 @@ export type SyncContext = {
   }) => void;
 };
 
+export type SkippedMapping = {
+  sourceEntity: string;
+  targetEntity: string;
+  reason: 'incremental_missing_date_column';
+};
+
 export type SyncResult = {
   recordsRead: number;
   recordsCreated: number;
   recordsUpdated: number;
   recordsFailed: number;
+  skippedMappings?: SkippedMapping[];
 };
 
 export interface Connector {

@@ -76,17 +76,20 @@ export class RawRecordRepository {
     entityType,
     skip,
     take,
+    unprocessedOnly,
   }: {
     tenantId: string;
     dataSourceId: string;
     entityType?: string;
     skip: number;
     take: number;
+    unprocessedOnly?: boolean;
   }) {
     const where = {
       tenantId,
       dataSourceId,
       ...(entityType ? { entityType } : {}),
+      ...(unprocessedOnly ? { processedAt: null } : {}),
     };
     const [items, total] = await Promise.all([
       this.db.rawRecord.findMany({ where, skip, take, orderBy: { createdAt: 'desc' } }),

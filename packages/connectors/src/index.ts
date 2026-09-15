@@ -1,4 +1,4 @@
-export type { Connector, FieldMapping, FieldTransform, MappingConfig, ConnectionTestResult, DiscoveryResult, DiscoveryResource, DiscoveryColumn, FetchOptions, RawRow, SyncContext, SyncResult } from './types';
+export type { Connector, FieldMapping, FieldTransform, MappingConfig, ConnectionTestResult, DiscoveryResult, DiscoveryResource, DiscoveryColumn, FetchOptions, RawRow, SyncContext, SyncResult, SyncMode, SkippedMapping } from './types';
 export { applyTransform } from './transforms';
 export { computeChecksum } from './checksum';
 export { CsvConnector } from './csv-connector';
@@ -20,7 +20,19 @@ export {
   quoteMysqlIdent,
   quotePgIdent,
   resourcesFromInformationSchema,
+  buildSqlFetchQuery,
 } from './sql-helpers';
+export type { SqlFetchQuery } from './sql-helpers';
+export {
+  DIMENSION_ENTITY_TYPES,
+  FACT_DATE_TARGETS,
+  INCREMENTAL_LOOKBACK_MONTHS,
+  incrementalDateColumn,
+  incrementalFetchDecision,
+  incrementalLookbackSince,
+  isFactEntity,
+} from './incremental';
+export type { IncrementalFetchDecision } from './incremental';
 export { McpConnector, rowsFromToolResult, MCP_HTTP_ACCEPT } from './mcp-connector';
 export type { McpConnectorConfig, McpRpc } from './mcp-connector';
 export { runDataQualityChecks } from './data-quality';

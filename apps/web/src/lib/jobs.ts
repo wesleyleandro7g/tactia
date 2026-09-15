@@ -28,7 +28,12 @@ export type SyncJob = {
   syncJobId: string;
   requestId: string;
   userId: string | null;
+  timezone?: string;
+  now?: string;
 };
+
+/** Sync + snapshots + insights can exceed the default 15 min job TTL. */
+export const DAILY_JOB_EXPIRE_SECONDS = 2 * 60 * 60;
 
 export function jobsEnabled(): boolean {
   return process.env['JOBS_ENABLED'] === 'true';
@@ -114,7 +119,13 @@ export async function runMemoryEmbed(tenantId: string) {
 }
 
 export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
-  const { intelligencePipelineService, snapshotService } = await import('./services');
+  const { intelligencePipelineService, snapshotService, syncService, tenantRepository } =
+    await import('./services');
+  const tenant = await tenantRepository.findById({ tenantId });
+  const syncJobs = await syncService.syncTenantSources(tenantId, {
+    now,
+    timezone: tenant?.timezone || 'America/Sao_Paulo',
+  });
   const snapshots = await snapshotService.runForTenant(tenantId, { now });
   const pipeline = await intelligencePipelineService.runWindows({
     tenantId,
@@ -127,9 +138,10 @@ export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
     tenant_id: tenantId,
     operation: 'intelligence_daily',
     snapshot_days: snapshots.days,
+    sync_sources: syncJobs.length,
     ...pipeline,
   });
-  return { snapshots, pipeline, memory };
+  return { snapshots, pipeline, memory, sync: { sources: syncJobs.length } };
 }
 
 export async function enqueueDailyForDueTenants(now = new Date()) {
@@ -144,7 +156,7 @@ export async function enqueueDailyForDueTenants(now = new Date()) {
     await jobQueue.publish<DailyJob>(
       JOBS.daily,
       { tenantId: tenant.id, now: now.toISOString() },
-      { singletonKey: `${tenant.id}:${local.dateKey}` },
+      { singletonKey: `${tenant.id}:${local.dateKey}`, expireInSeconds: DAILY_JOB_EXPIRE_SECONDS },
     );
     if (local.weekday === 1) {
       await jobQueue.publish<WeeklyBriefingJob>(
@@ -191,6 +203,8 @@ export async function startJobWorkers(): Promise<void> {
     await syncService.executeSync(data.tenantId, data.syncJobId, {
       requestId: data.requestId,
       userId: data.userId,
+      timezone: data.timezone,
+      now: data.now,
     });
   });
 

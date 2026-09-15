@@ -12,8 +12,8 @@ import type {
 import type { RawRecordRepository } from '@tactia/database';
 import {
   SQL_BATCH_SIZE,
+  buildSqlFetchQuery,
   normalizeSqlRow,
-  quotePgIdent,
   resourcesFromInformationSchema,
   syncSqlMappings,
 } from './sql-helpers';
@@ -91,10 +91,16 @@ export class PostgresConnector implements Connector {
     const client = this.newClient();
     try {
       await client.connect();
-      const limit = options?.limit ?? SQL_BATCH_SIZE;
-      const offset = options?.offset ?? 0;
-      const qualified = `${quotePgIdent(this.schema)}.${quotePgIdent(resource)}`;
-      const { rows } = await client.query(`SELECT * FROM ${qualified} LIMIT $1 OFFSET $2`, [limit, offset]);
+      const { sql, values } = buildSqlFetchQuery({
+        dialect: 'postgres',
+        schema: this.schema,
+        table: resource,
+        limit: options?.limit ?? SQL_BATCH_SIZE,
+        offset: options?.offset ?? 0,
+        dateColumn: options?.dateColumn,
+        since: options?.since,
+      });
+      const { rows } = await client.query(sql, values);
       return rows as RawRow[];
     } finally {
       await client.end().catch(() => undefined);

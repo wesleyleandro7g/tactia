@@ -89,6 +89,7 @@ export { createApiKeySchema, API_KEY_SCOPES } from './schemas/api-keys';
 export type { ApiKeyScope } from './schemas/api-keys';
 export { DataSourceService } from './services/data-source-service';
 export { SyncService } from './services/sync-service';
+export type { StartSyncOptions, SyncTenantSourcesOptions } from './services/sync-service';
 export { ImportService } from './services/import-service';
 export { MetricService } from './services/metric-service';
 export { AnalyticsService } from './services/analytics-service';

@@ -94,6 +94,8 @@ let operatorAuthId: string;
 let ctx: RequestContext;
 let dataSourceId: string;
 let email: string;
+let credentialId: string;
+let saleSourceId: string;
 
 function connectionFromEnv() {
   const url = new URL(process.env['DATABASE_URL']!);
@@ -122,6 +124,19 @@ beforeAll(async () => {
     `INSERT INTO ${SOURCE_SCHEMA}.clientes (id, nome, email, telefone) VALUES
        ('EXT-1', 'Bar do Zé', 'ze@example.com', '11999990001'),
        ('EXT-2', 'Loja Aurora', 'aurora@example.com', '11999990002')`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE TABLE ${SOURCE_SCHEMA}.pedidos (
+       id text PRIMARY KEY,
+       cliente_id text NOT NULL,
+       total numeric NOT NULL,
+       vendido_em timestamptz NOT NULL
+     )`,
+  );
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO ${SOURCE_SCHEMA}.pedidos (id, cliente_id, total, vendido_em) VALUES
+       ('OLD-1', 'EXT-1', 50, '2025-01-15T12:00:00Z'),
+       ('NEW-1', 'EXT-1', 200, '2026-08-20T12:00:00Z')`,
   );
 
   tenantId = createId();
@@ -192,6 +207,7 @@ describe('PostgresConnector', () => {
       credentialId: credential.id,
     });
     dataSourceId = ds.id;
+    credentialId = credential.id;
   });
 
   it('tests the connection', async () => {
@@ -294,5 +310,166 @@ describe('PostgresConnector', () => {
     const result = await dataSourceService.testConnection(ctx, broken.id);
     expect(result.success).toBe(false);
     expect(result.message.length).toBeGreaterThan(0);
+    await dataSourceService.remove(ctx, broken.id);
+  });
+
+  it('does not rewrite unchanged cadastros on incremental sync', async () => {
+    const job = await syncService.startSync(ctx, dataSourceId, {
+      mode: 'incremental',
+      now: new Date('2026-09-15T18:00:00.000Z'),
+    });
+    expect(job?.status).toBe('completed');
+    expect(job?.mode).toBe('incremental');
+    expect(job?.recordsRead).toBe(2);
+    expect(job?.recordsCreated).toBe(0);
+    expect(job?.recordsUpdated).toBe(0);
+  });
+
+  it('reads only the last three months of sales and writes only what changed', async () => {
+    const connection = connectionFromEnv();
+    const saleSource = await dataSourceService.create(ctx, {
+      name: 'Pedidos',
+      type: 'database',
+      configuration: {
+        dialect: 'postgres',
+        host: connection.host,
+        port: connection.port,
+        database: connection.database,
+        schema: SOURCE_SCHEMA,
+      },
+      credentialId,
+    });
+    saleSourceId = saleSource.id;
+
+    await dataSourceService.createMapping(ctx, saleSourceId, {
+      sourceEntity: 'pedidos',
+      targetEntity: 'sale',
+      configuration: {
+        fields: [
+          { source: 'id', target: 'external_id' },
+          { source: 'cliente_id', target: 'customer_external_id' },
+          { source: 'total', target: 'total_amount' },
+          { source: 'vendido_em', target: 'sold_at' },
+        ],
+      },
+    });
+
+    const job = await syncService.startSync(ctx, saleSourceId, {
+      mode: 'incremental',
+      now: new Date('2026-09-15T18:00:00.000Z'),
+    });
+    expect(job?.status).toBe('completed');
+    expect(job?.recordsRead).toBe(1);
+    expect(job?.recordsCreated).toBe(1);
+    expect(job?.recordsFailed).toBe(0);
+
+    const sales = await saleRepo.list({ tenantId, skip: 0, take: 10 });
+    expect(sales.items.map((sale) => sale.externalId).sort()).toEqual(['NEW-1']);
+    expect(Number(sales.items[0]!.totalAmount)).toBe(200);
+  });
+
+  it('skips canonical writes when the sale has not changed', async () => {
+    const job = await syncService.startSync(ctx, saleSourceId, {
+      mode: 'incremental',
+      now: new Date('2026-09-15T18:00:00.000Z'),
+    });
+    expect(job?.status).toBe('completed');
+    expect(job?.recordsRead).toBe(1);
+    expect(job?.recordsCreated).toBe(0);
+    expect(job?.recordsUpdated).toBe(0);
+  });
+
+  it('updates only the sale that changed in the window', async () => {
+    await prisma.$executeRawUnsafe(
+      `UPDATE ${SOURCE_SCHEMA}.pedidos SET total = 250 WHERE id = 'NEW-1'`,
+    );
+    const job = await syncService.startSync(ctx, saleSourceId, {
+      mode: 'incremental',
+      now: new Date('2026-09-15T18:00:00.000Z'),
+    });
+    expect(job?.status).toBe('completed');
+    expect(job?.recordsUpdated).toBe(1);
+    expect(job?.recordsCreated).toBe(0);
+
+    const sales = await saleRepo.list({ tenantId, skip: 0, take: 10 });
+    expect(sales.total).toBe(1);
+    expect(Number(sales.items[0]!.totalAmount)).toBe(250);
+  });
+
+  it('records a quality error when an incremental fact mapping has no date column', async () => {
+    const connection = connectionFromEnv();
+    const undated = await dataSourceService.create(ctx, {
+      name: 'Pedidos sem data',
+      type: 'database',
+      configuration: {
+        dialect: 'postgres',
+        host: connection.host,
+        port: connection.port,
+        database: connection.database,
+        schema: SOURCE_SCHEMA,
+      },
+      credentialId,
+    });
+    await dataSourceService.createMapping(ctx, undated.id, {
+      sourceEntity: 'pedidos',
+      targetEntity: 'sale',
+      configuration: {
+        fields: [
+          { source: 'id', target: 'external_id' },
+          { source: 'cliente_id', target: 'customer_external_id' },
+          { source: 'total', target: 'total_amount' },
+        ],
+      },
+    });
+
+    const job = await syncService.startSync(ctx, undated.id, {
+      mode: 'incremental',
+      now: new Date('2026-09-15T18:00:00.000Z'),
+    });
+    expect(job?.status).toBe('completed');
+    expect(job?.recordsRead).toBe(0);
+
+    const { items } = await qualityRepo.list({
+      tenantId,
+      dataSourceId: undated.id,
+      skip: 0,
+      take: 10,
+    });
+    const errors = items.flatMap((report) => report.errors as Array<{ rule: string }>);
+    expect(errors.some((error) => error.rule === 'incremental_missing_date_column')).toBe(true);
+  });
+
+  it('syncTenantSources skips CSV and runs SQL sources in dependency order', async () => {
+    const csvId = (
+      await dataSourceService.create(ctx, {
+        name: 'CSV one-off',
+        type: 'csv',
+        configuration: { filePath: '/tmp/does-not-matter.csv' },
+      })
+    ).id;
+    await dataSourceService.createMapping(ctx, csvId, {
+      sourceEntity: 'data',
+      targetEntity: 'customer',
+      configuration: { fields: [{ source: 'id', target: 'external_id' }] },
+    });
+
+    const before = await syncJobRepo.list({ tenantId, skip: 0, take: 50 });
+    const jobs = await syncService.syncTenantSources(tenantId, {
+      now: new Date('2026-09-15T18:00:00.000Z'),
+      timezone: 'America/Sao_Paulo',
+    });
+
+    expect(jobs.every((job) => job && job.trigger === 'scheduled')).toBe(true);
+    expect(jobs.every((job) => job && job.dataSourceId !== csvId)).toBe(true);
+    expect(jobs.map((job) => job?.dataSourceId)).toContain(dataSourceId);
+    expect(jobs.map((job) => job?.dataSourceId)).toContain(saleSourceId);
+
+    const customerIndex = jobs.findIndex((job) => job?.dataSourceId === dataSourceId);
+    const saleIndex = jobs.findIndex((job) => job?.dataSourceId === saleSourceId);
+    expect(customerIndex).toBeGreaterThanOrEqual(0);
+    expect(saleIndex).toBeGreaterThan(customerIndex);
+
+    const after = await syncJobRepo.list({ tenantId, skip: 0, take: 50 });
+    expect(after.total).toBe(before.total + jobs.length);
   });
 });

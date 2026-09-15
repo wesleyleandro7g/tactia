@@ -66,6 +66,17 @@ export class DataSourceRepository {
     return { items, total };
   }
 
+  async listActiveForSync(tenantId: string) {
+    return this.db.dataSource.findMany({
+      where: {
+        tenantId,
+        status: { not: 'inactive' },
+        type: { in: ['postgres', 'mysql', 'database'] },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   async update({
     tenantId,
     id,

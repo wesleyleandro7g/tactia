@@ -248,7 +248,15 @@ Antes de pedir ajuda, colete:
 
 Com `JOBS_ENABLED=true` o `instrumentation.ts` sobe o worker. O tick horário
 `intelligence.tick` enfileira `intelligence.daily` às **03:00 no fuso do tenant**.
-Segundas também geram `briefing.weekly`.
+Esse job **primeiro** sincroniza as fontes SQL ativas (incremental: cadastros
+completos, fatos dos últimos 3 meses, só o que mudou) e depois roda snapshots,
+insights e embed. Segundas também geram `briefing.weekly`. O job diário expira
+em 2h (sync + pipeline).
+
+CSV/MCP ficam de fora do cron — use **Disparar sync** no Ops. Vendas (e outros
+fatos) com mais de 3 meses só entram no sync **completo** do Ops. Sem coluna de
+data mapeada (`sold_at`, `occurred_at`…), o fato é pulado e o relatório de
+qualidade traz `incremental_missing_date_column`.
 
 Fallback sem fila: `POST /api/v1/intelligence/daily` com
 `Authorization: Bearer $CRON_SECRET` (ou header `x-cron-secret`).
