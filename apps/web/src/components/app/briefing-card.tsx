@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { ChatMessageContent } from '@/components/app/chat-message-content';
 import { Card } from '@/components/ui/card';
-import { formatDate } from '@/lib/format';
+import { briefingNarrative, formatDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 export function BriefingCard({
   briefing,
+  compact = false,
 }: {
   briefing: {
     id: string;
@@ -13,17 +15,22 @@ export function BriefingCard({
     content: string;
     model: string;
   } | null;
+  compact?: boolean;
 }) {
+  const body = briefing ? (compact ? briefingNarrative(briefing.content) : briefing.content) : null;
+
   return (
-    <section aria-labelledby="briefing" className="flex flex-col gap-3">
+    <section aria-labelledby="briefing" className={cn('flex h-full flex-col gap-3', compact && 'gap-2')}>
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 id="briefing" className="font-display text-xl tracking-tight">
             Briefing da semana
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Narrativa a partir dos fatos numéricos do período.
-          </p>
+          {compact ? null : (
+            <p className="text-sm text-muted-foreground">
+              Narrativa a partir dos fatos numéricos do período.
+            </p>
+          )}
         </div>
         <Link
           href="/briefings"
@@ -32,14 +39,14 @@ export function BriefingCard({
           Ver todos
         </Link>
       </div>
-      <Card className="p-5">
-        {briefing ? (
+      <Card className={cn('flex flex-1 flex-col p-5', compact && 'border-primary/20 bg-accent-soft/40')}>
+        {briefing && body ? (
           <>
             <p className="mb-2 text-xs text-muted-foreground">
               {formatDate(briefing.periodFrom)} a {formatDate(briefing.periodTo)}
             </p>
-            <div className="line-clamp-8">
-              <ChatMessageContent content={briefing.content} variant="assistant" />
+            <div className={compact ? 'line-clamp-6 text-sm leading-relaxed' : 'line-clamp-8'}>
+              <ChatMessageContent content={body} variant="assistant" />
             </div>
           </>
         ) : (

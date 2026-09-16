@@ -264,6 +264,35 @@ export function currentMonthRange(now = new Date()): { from: Date; to: Date } {
   };
 }
 
+/** Janela imediatamente anterior, com a mesma duração. */
+export function previousPeriodRange(period: { from: Date; to: Date }): { from: Date; to: Date } {
+  const duration = period.to.getTime() - period.from.getTime();
+  return {
+    from: new Date(period.from.getTime() - duration),
+    to: new Date(period.to.getTime() - duration),
+  };
+}
+
+export function periodLengthDays(period: { from: Date; to: Date }): number {
+  return Math.round((period.to.getTime() - period.from.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+export function isSameRange(
+  left: { from: Date; to: Date },
+  right: { from: Date; to: Date },
+): boolean {
+  return left.from.getTime() === right.from.getTime() && left.to.getTime() === right.to.getTime();
+}
+
+/** Tira a lista de números que duplica os KPIs e o título da semana. */
+export function briefingNarrative(content: string): string {
+  const stripped = content
+    .replace(/^##[^\n]*\n+/, '')
+    .replace(/### Números[\s\S]*?(?=\n## |\n### |$)/, '')
+    .trim();
+  return stripped || content;
+}
+
 /** Interpreta ?from=&to= da URL, caindo no mês corrente quando ausente/inválido. */
 export function resolveRangeParam(
   params: { from?: string; to?: string },

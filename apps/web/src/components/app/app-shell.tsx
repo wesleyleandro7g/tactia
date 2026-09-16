@@ -33,6 +33,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const isChat = pathname.startsWith('/chat');
+  const isDashboard = pathname.startsWith('/dashboard');
 
   return (
     <SidebarProvider defaultOpen>
@@ -69,7 +70,7 @@ export function AppShell({
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
+      <SidebarInset className="flex h-svh min-h-0 min-w-0 flex-col overflow-hidden bg-background">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 lg:px-6">
           <SidebarTrigger className="lg:hidden" />
           <div className="min-w-0 flex-1">
@@ -97,7 +98,9 @@ export function AppShell({
           className={
             isChat
               ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-              : 'mx-auto flex w-full max-w-6xl min-h-0 flex-1 animate-page-enter flex-col overflow-y-auto px-5 py-8 lg:px-8'
+              : isDashboard
+                ? 'flex min-h-0 w-full min-w-0 flex-1 animate-page-enter flex-col overflow-x-hidden overflow-y-auto px-5 py-8 lg:px-8'
+                : 'mx-auto flex w-full max-w-6xl min-h-0 flex-1 animate-page-enter flex-col overflow-y-auto px-5 py-8 lg:px-8'
           }
         >
           {children}

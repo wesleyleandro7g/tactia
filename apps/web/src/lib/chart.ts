@@ -65,3 +65,60 @@ export function buildChartGeometry(
 function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+export type NamedChartItem = {
+  key: string;
+  label: string;
+  value: number;
+};
+
+export function toNamedItems(
+  items: Array<{ key: string; label?: string; value: number }>,
+): NamedChartItem[] {
+  return items.map((item) => ({
+    key: item.key,
+    label: item.label?.trim() || item.key,
+    value: item.value,
+  }));
+}
+
+/** Mantém os N maiores e agrupa o restante em “Outros”. */
+export function topNWithOthers(items: NamedChartItem[], n: number): NamedChartItem[] {
+  const ranked = [...items].sort((a, b) => b.value - a.value);
+  if (ranked.length <= n) return ranked;
+  const head = ranked.slice(0, n);
+  const rest = ranked.slice(n);
+  const othersValue = rest.reduce((sum, item) => sum + item.value, 0);
+  if (othersValue <= 0) return head;
+  return [...head, { key: '__others__', label: 'Outros', value: othersValue }];
+}
+
+export type OverlayPoint = {
+  key: string;
+  current: number;
+  previous: number | null;
+};
+
+/** Alinha a série anterior no eixo do período atual, deslocando pela duração. */
+export function overlayTimeSeries(
+  current: ChartPoint[],
+  previous: ChartPoint[],
+  shiftMs: number,
+): OverlayPoint[] {
+  const previousByDay = new Map<string, number>();
+  for (const point of previous) {
+    const shifted = new Date(new Date(point.key).getTime() + shiftMs);
+    if (Number.isNaN(shifted.getTime())) continue;
+    previousByDay.set(shifted.toISOString().slice(0, 10), point.value);
+  }
+
+  return current.map((point) => {
+    const day = new Date(point.key);
+    const dayKey = Number.isNaN(day.getTime()) ? point.key.slice(0, 10) : day.toISOString().slice(0, 10);
+    return {
+      key: point.key,
+      current: point.value,
+      previous: previousByDay.get(dayKey) ?? null,
+    };
+  });
+}

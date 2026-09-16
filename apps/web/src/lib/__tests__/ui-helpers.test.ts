@@ -4,8 +4,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildChartGeometry } from '../chart';
+import { buildChartGeometry, overlayTimeSeries, topNWithOthers } from '../chart';
 import {
+  briefingNarrative,
   currentMonthRange,
   errorMessage,
   formatCurrency,
@@ -112,6 +113,49 @@ describe('buildChartGeometry', () => {
     expect(geometry.coords).toHaveLength(0);
     expect(geometry.total).toBe(0);
     expect(geometry.linePath).toBe('');
+  });
+});
+
+describe('topNWithOthers', () => {
+  it('agrupa o restante em Outros', () => {
+    const items = [
+      { key: 'a', label: 'A', value: 50 },
+      { key: 'b', label: 'B', value: 30 },
+      { key: 'c', label: 'C', value: 10 },
+      { key: 'd', label: 'D', value: 10 },
+    ];
+    const result = topNWithOthers(items, 2);
+    expect(result.map((item) => item.label)).toEqual(['A', 'B', 'Outros']);
+    expect(result[2]?.value).toBe(20);
+  });
+});
+
+describe('overlayTimeSeries', () => {
+  it('desloca a série anterior para o eixo atual', () => {
+    const day = 24 * 60 * 60 * 1000;
+    const current = [{ key: '2026-09-10T00:00:00.000Z', value: 80 }];
+    const previous = [{ key: '2026-08-11T00:00:00.000Z', value: 40 }];
+    const overlay = overlayTimeSeries(current, previous, 30 * day);
+    expect(overlay[0]?.current).toBe(80);
+    expect(overlay[0]?.previous).toBe(40);
+  });
+});
+
+describe('briefingNarrative', () => {
+  it('remove a lista de números do briefing', () => {
+    const content = [
+      '## Semana 2026-09-03 a 2026-09-10',
+      '',
+      '### Números',
+      '- Receita (7d): R$ 261.366',
+      '- Vendas (7d): 34',
+      '',
+      '### O que mais importa',
+      '- Ticket médio subiu com mix premium.',
+    ].join('\n');
+    const narrative = briefingNarrative(content);
+    expect(narrative).not.toContain('Receita (7d)');
+    expect(narrative).toContain('Ticket médio subiu');
   });
 });
 

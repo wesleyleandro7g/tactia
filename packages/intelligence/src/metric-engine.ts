@@ -373,9 +373,11 @@ async function breakdownByTime(
   tenantId: string,
   period: MetricPeriod,
   granularity: PeriodGranularity,
+  metricKey?: MetricKey,
 ): Promise<MetricBreakdownItem[]> {
   // Use raw SQL via $queryRaw for date_trunc
   const trunc = granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month';
+  const useCount = metricKey === 'sales_count';
 
   type BucketRow = { bucket: Date; revenue: string; count: string };
 
@@ -396,7 +398,7 @@ async function breakdownByTime(
 
   return (rows as BucketRow[]).map((r) => ({
     key: r.bucket.toISOString(),
-    value: parseFloat(r.revenue),
+    value: useCount ? parseInt(r.count, 10) : parseFloat(r.revenue),
   }));
 }
 
@@ -464,7 +466,13 @@ export class MetricEngine {
 
     let breakdownResult: MetricResult['breakdown'];
     if (breakdown) {
-      const items = await this.computeBreakdown(breakdown.dimension, tenantId, period, breakdown.granularity);
+      const items = await this.computeBreakdown(
+        breakdown.dimension,
+        tenantId,
+        period,
+        breakdown.granularity,
+        key,
+      );
       breakdownResult = {
         dimension: breakdown.dimension,
         granularity: breakdown.granularity,
@@ -581,6 +589,7 @@ export class MetricEngine {
     tenantId: string,
     period: MetricPeriod,
     granularity?: PeriodGranularity,
+    metricKey?: MetricKey,
   ): Promise<MetricBreakdownItem[]> {
     switch (dimension) {
       case 'product':
@@ -588,7 +597,7 @@ export class MetricEngine {
       case 'seller':
         return breakdownBySeller(this.db, tenantId, period);
       case 'time':
-        return breakdownByTime(this.db, tenantId, period, granularity ?? 'day');
+        return breakdownByTime(this.db, tenantId, period, granularity ?? 'day', metricKey);
       case 'category':
         return breakdownByCategory(this.db, tenantId, period);
       case 'customer':

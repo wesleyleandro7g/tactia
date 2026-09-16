@@ -266,6 +266,33 @@ describe('MetricEngine — breakdown by product', () => {
   });
 });
 
+describe('MetricEngine — breakdown by time', () => {
+  it('returns revenue buckets for the revenue metric', async () => {
+    const result = await engine.calculate('revenue', {
+      tenantId,
+      period: periodJan,
+      breakdown: { dimension: 'time', granularity: 'day' },
+    });
+    expect(result.breakdown).toBeDefined();
+    expect(result.breakdown!.items).toHaveLength(4);
+    const total = result.breakdown!.items.reduce((sum, item) => sum + item.value, 0);
+    expect(total).toBeCloseTo(700, 2);
+  });
+
+  it('returns sale counts for the sales_count metric', async () => {
+    const result = await engine.calculate('sales_count', {
+      tenantId,
+      period: periodJan,
+      breakdown: { dimension: 'time', granularity: 'day' },
+    });
+    expect(result.breakdown).toBeDefined();
+    expect(result.breakdown!.items).toHaveLength(4);
+    expect(result.breakdown!.items.every((item) => item.value === 1)).toBe(true);
+    const total = result.breakdown!.items.reduce((sum, item) => sum + item.value, 0);
+    expect(total).toBe(4);
+  });
+});
+
 describe('MetricEngine — calculateAll', () => {
   it('returns all built-in metrics', async () => {
     const results = await engine.calculateAll({ tenantId, period: periodJan });
