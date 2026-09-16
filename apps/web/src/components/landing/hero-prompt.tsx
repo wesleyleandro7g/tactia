@@ -149,10 +149,10 @@ export function HeroPrompt() {
           placeholder=""
           autoComplete="off"
           spellCheck={false}
-          className="relative z-[1] min-h-24 w-full resize-none bg-transparent px-5 py-4 pr-16 text-base leading-relaxed font-normal text-white outline-none placeholder:text-transparent sm:text-lg"
+          className="relative z-[1] min-h-36 w-full resize-none bg-transparent px-5 py-5 pr-16 text-base leading-relaxed font-normal text-white outline-none placeholder:text-transparent sm:text-lg"
         />
         {value.length === 0 ? (
-          <p aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] px-5 py-4 pr-16 text-base leading-relaxed font-normal text-white sm:text-lg">
+          <p aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] px-5 py-5 pr-16 text-base leading-relaxed font-normal text-white sm:text-lg">
             {ghost}
             <span className="ml-0.5 inline-block h-[1.05em] w-px translate-y-[3px] bg-primary align-middle motion-safe:animate-pulse" />
           </p>
@@ -170,14 +170,14 @@ export function HeroPrompt() {
       ? createPortal(
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute z-[2] rounded-2xl border border-white/20 bg-[#131212]/45 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.28)] backdrop-blur-2xl backdrop-saturate-150"
+            className="pointer-events-none absolute z-[2] rounded-2xl border border-white/20 bg-[#131212]/45 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.28)] backdrop-blur-3xl backdrop-saturate-150"
             style={{
               top: glass.top,
               left: glass.left,
               width: glass.width,
               height: glass.height,
-              backdropFilter: 'blur(20px) saturate(1.4)',
-              WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
+              backdropFilter: 'blur(32px) saturate(1.4)',
+              WebkitBackdropFilter: 'blur(32px) saturate(1.4)',
             }}
           />,
           glass.parent,
