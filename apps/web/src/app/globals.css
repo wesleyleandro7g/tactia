@@ -177,8 +177,8 @@
   --animate-page-enter: page-enter 0.28s var(--ease-smooth) both;
   --animate-landing-enter: landing-enter 0.7s var(--ease-smooth) both;
   --animate-landing-fade: landing-fade 0.7s var(--ease-smooth) both;
-  --animate-landing-float: landing-float 5.6s ease-in-out infinite;
   --animate-landing-pulse: landing-pulse 3.8s ease-in-out infinite;
+  --animate-landing-flow: landing-flow 1.15s linear infinite;
 }
 
 @keyframes page-enter {
@@ -212,16 +212,6 @@
   }
 }
 
-@keyframes landing-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
 @keyframes landing-pulse {
   0%,
   100% {
@@ -229,6 +219,12 @@
   }
   50% {
     opacity: 0.85;
+  }
+}
+
+@keyframes landing-flow {
+  to {
+    stroke-dashoffset: -92;
   }
 }
 
