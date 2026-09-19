@@ -1,0 +1,23 @@
+# Static Astro application; build context is the repository root.
+FROM node:22-alpine AS builder
+RUN corepack enable
+WORKDIR /repo
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/landing/package.json apps/landing/
+COPY packages/shared/package.json packages/shared/
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && pnpm install --frozen-lockfile --filter @tactia/landing...
+COPY apps/landing apps/landing
+COPY packages/shared/src packages/shared/src
+ARG PUBLIC_SITE_URL
+ENV PUBLIC_SITE_URL=${PUBLIC_SITE_URL}
+ENV ASTRO_TELEMETRY_DISABLED=1
+RUN pnpm --filter @tactia/landing build
+
+FROM nginx:stable-alpine AS runner
+ENV LANDING_TRUSTED_PROXY=127.0.0.1
+ENV LANDING_API_ORIGIN=http://web:3000
+COPY docker/landing.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=builder /repo/apps/landing/dist /usr/share/nginx/html
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -q -O /dev/null http://127.0.0.1/_health || exit 1

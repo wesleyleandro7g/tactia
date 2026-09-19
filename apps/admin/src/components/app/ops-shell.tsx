@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, LayoutTemplate, LogOut, Shield } from 'lucide-react';
+import { Building2, LayoutTemplate, LogOut, Shield, Users } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const NAV = [
   { href: '/', label: 'Empresas', icon: Building2 },
+  { href: '/leads', label: 'Leads', icon: Users },
   { href: '/operators', label: 'Operadores', icon: Shield },
   { href: '/infographics', label: 'Infográficos', icon: LayoutTemplate },
 ];
@@ -32,11 +33,11 @@ export function OpsShell({
 
   return (
     <div className="flex min-h-svh">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
+      <aside className="flex w-16 shrink-0 flex-col border-r border-sidebar-border bg-sidebar sm:w-56">
         <div className="border-b border-sidebar-border px-4 py-4">
           <Link href="/" className="flex flex-col gap-0.5">
-            <span className="font-mono text-sm font-semibold tracking-[0.18em] text-primary">TACTIA</span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Ops</span>
+            <span className="font-mono text-sm font-semibold tracking-[0.18em] text-primary"><span className="sm:hidden">T</span><span className="hidden sm:inline">TACTIA</span></span>
+            <span className="hidden font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground sm:inline">Ops</span>
           </Link>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-2">
@@ -56,21 +57,21 @@ export function OpsShell({
                 )}
               >
                 <Icon className="size-4 shrink-0" />
-                {item.label}
+                <span className="sr-only sm:not-sr-only">{item.label}</span>
               </Link>
             );
           })}
         </nav>
         <div className="border-t border-sidebar-border p-3">
-          <p className="truncate font-mono text-xs text-foreground">{operatorName}</p>
-          <p className="truncate font-mono text-[11px] text-muted-foreground">{operatorEmail}</p>
+          <p className="hidden truncate font-mono text-xs text-foreground sm:block">{operatorName}</p>
+          <p className="hidden truncate font-mono text-[11px] text-muted-foreground sm:block">{operatorEmail}</p>
           <Button variant="ghost" size="sm" className="mt-2 w-full justify-start" onClick={() => void signOut()}>
             <LogOut className="size-3.5" />
-            Sair
+            <span className="sr-only sm:not-sr-only">Sair</span>
           </Button>
         </div>
       </aside>
-      <main id="conteudo" className="min-w-0 flex-1 overflow-auto p-6 lg:p-8">
+      <main id="conteudo" className="min-w-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
         {children}
       </main>
     </div>

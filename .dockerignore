@@ -24,3 +24,6 @@ docs
 **/.env
 **/.env.*
 !**/.env.example
+
+.pnpm-store
+**/.astro

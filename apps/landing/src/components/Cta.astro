@@ -1,0 +1,14 @@
+---
+import Arrow from './Arrow.astro';
+interface Props {
+  label?: string;
+  location: string;
+  compact?: boolean;
+}
+const { label = 'Agendar minha consultoria gratuita', location, compact = false } = Astro.props;
+---
+
+<a href="#consultoria" class:list={['button', { compact }]} data-cta={location}>
+  {label}
+  <Arrow />
+</a>

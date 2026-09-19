@@ -117,7 +117,7 @@ export function HeroPrompt() {
 
   function submit(event?: React.FormEvent) {
     event?.preventDefault();
-    const asked = value.trim() || PROMPTS[promptIndex];
+    const asked = value.trim() || PROMPTS[promptIndex] || PROMPTS[0];
     const query = new URLSearchParams({ pergunta: asked });
     router.push(`/signup?${query.toString()}`);
   }
@@ -159,7 +159,7 @@ export function HeroPrompt() {
         ) : null}
         <button
           type="submit"
-          aria-label="Começar com essa pergunta"
+          aria-label="Solicitar consultoria gratuita com essa pergunta"
           className="absolute right-3 bottom-3 z-[1] grid size-10 place-items-center rounded-full bg-brand text-white shadow-[0_8px_24px_rgba(254,114,0,0.4)] transition-opacity hover:opacity-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <ArrowRight className="size-4" aria-hidden="true" />

@@ -18,6 +18,7 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/
 COPY apps/admin/package.json apps/admin/
+COPY apps/landing/package.json apps/landing/
 COPY packages/ai/package.json packages/ai/
 COPY packages/connectors/package.json packages/connectors/
 COPY packages/database/package.json packages/database/

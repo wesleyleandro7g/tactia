@@ -16,3 +16,6 @@ apps/admin/next-env.d.ts
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 *.playwright-mcp 
+
+# Astro generated types and cache
+.astro

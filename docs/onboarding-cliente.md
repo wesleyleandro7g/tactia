@@ -1,9 +1,9 @@
 # Onboarding de um cliente real
 
 Guia do operador para colocar uma empresa dentro da Tactia, do zero até o primeiro
-insight. A conexão das fontes de dados é feita **só no Tactia Ops**
-(`/tenants/:id/data-sources`). O app do cliente (`/onboarding`) registra a empresa
-quando o próprio usuário cria a conta — não importa CSV nem Postgres. Tempo esperado:
+insight. Empresas, usuários e conexões de dados são cadastrados **só no Tactia Ops**.
+A página pública `/signup` captura interessados na consultoria gratuita; ela não cria
+credenciais, empresa ou sessão. Tempo esperado para preparar o acesso:
 **20 a 40 minutos**, sendo a maior parte a preparação dos dados do cliente.
 
 > Se o ambiente ainda não estiver no ar, comece por [deploy-producao.md](./deploy-producao.md).
@@ -79,6 +79,16 @@ momento de conectar. Nenhuma rota devolve a senha.
 
 ## 1. Criar a conta do owner
 
+Os interessados que preenchem `/signup` aparecem em **Leads** (`/leads`) no Ops.
+O contato é salvo antes da agenda. Consulte seus dados, atualize a etapa do atendimento
+e use **Cadastrar cliente** para abrir o cadastro com nome, empresa e e-mail preenchidos.
+A conversão salva empresa, credenciais, owner e vínculo ao lead em uma única transação;
+um lead convertido passa a exibir **Ver empresa cadastrada**.
+
+O botão “Agendar um compromisso” abre a agenda Google em popup. A disponibilidade
+e a confirmação ficam no Google; marque **Consultoria agendada** manualmente após
+conferir a reserva. Não há sincronização automática nem envio de e-mail ou WhatsApp.
+
 Abra o Tactia Ops (`https://ops.SEU-HOST` ou `http://localhost:3001`) e use
 **Nova empresa**. Informe o nome da empresa e o owner (nome, e-mail, senha
 provisória). Isso cria o `Tenant` e o usuário `owner` no app dos clientes.
@@ -89,17 +99,23 @@ com `actorType: 'operator'`.
 O cliente entra em `https://SEU-HOST/login` com o e-mail/senha do owner — não
 no backoffice.
 
-Também é possível o próprio cliente criar a empresa em `/signup`.
+Usuários adicionais também são criados pelo Ops. Os POSTs de criação de empresas,
+usuários e memberships no aplicativo cliente retornam 403; o signup de e-mail/senha
+está desabilitado no Better Auth. O login dos clientes existentes continua disponível.
+
+### Publicação do fluxo de leads
+
+Execute `pnpm db:generate` e aplique `pnpm db:migrate:deploy` no ambiente de destino
+antes de atualizar web e admin. A migração `20260917120000_acquisition_leads` é aditiva
+e mantém os leads do CRM dos clientes separados dos contatos comerciais da Tactia.
+O endpoint público aceita até 16 KiB e cinco envios por IP a cada dez minutos.
+O limite é por processo, seguindo a infraestrutura atual do piloto.
 
 ## 2. Convidar o resto do time
 
-`/api/v1/users` (owner/admin):
-
-```bash
-curl -X POST https://SEU-HOST/api/v1/users -b cookies.txt \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Analista","email":"analista@cliente.com","password":"provisoria123","role":"member"}'
-```
+No Tactia Ops, abra a empresa e adicione os usuários com nome, e-mail, papel
+e senha provisória. A API correspondente é
+`POST /api/v1/tenants/:id/users` no host administrativo, com sessão de operador.
 
 Papéis: `owner` > `admin` > `member` > `viewer`. Só `owner`/`admin` aprovam ações.
 Não há e-mail de convite na V0.1 — combine a senha provisória por outro canal.

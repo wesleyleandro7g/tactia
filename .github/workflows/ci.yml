@@ -74,3 +74,12 @@ jobs:
             APP_PORT=3001
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build da imagem de produção (landing)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.landing
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

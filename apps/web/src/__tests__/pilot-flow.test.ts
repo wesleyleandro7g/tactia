@@ -339,7 +339,7 @@ async function configureCsvSource(input: {
 beforeAll(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'tactia-e2e-'));
 
-  // The owner signs up through the auth provider, exactly like /signup.
+  // Internal fixture provisioning; public signup is disabled (covered by registration tests).
   const created = await authProvider.createCredentialsUser({
     email: ownerEmail,
     name: 'Operador Piloto',

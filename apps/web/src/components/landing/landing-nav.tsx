@@ -18,8 +18,8 @@ export function LandingNav() {
           >
             Entrar
           </Link>
-          <LandingCta href="/signup" className="h-10 px-4 text-sm sm:px-5">
-            Comece agora
+          <LandingCta href="/signup" className="h-10 px-3 text-xs sm:px-5 sm:text-sm">
+            Consultoria gratuita
           </LandingCta>
         </div>
       </div>

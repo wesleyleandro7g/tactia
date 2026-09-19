@@ -111,6 +111,21 @@ services:
       retries: 10
       start_period: 20s
 
+  landing:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.landing
+      args:
+        PUBLIC_SITE_URL: ${LANDING_SITE_URL:-}
+    restart: unless-stopped
+    ports:
+      - '${LANDING_BIND:-127.0.0.1}:${LANDING_PORT:-3002}:80'
+    environment:
+      LANDING_TRUSTED_PROXY: ${LANDING_TRUSTED_PROXY:-127.0.0.1}
+    depends_on:
+      web:
+        condition: service_healthy
+
   admin:
     build:
       context: ..

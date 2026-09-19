@@ -103,7 +103,7 @@ export function createApiHandler(
   options: { auth: AuthMode; roles?: MembershipRole[]; rateLimit?: RateLimitPolicy },
   handler: Handler,
 ) {
-  return async (request: Request, segment?: { params: Promise<Record<string, string>> }) => {
+  return async (request: Request, segment: { params: Promise<Record<string, string>> }) => {
     const started = Date.now();
     const params = segment ? await segment.params : {};
     let ctx: RequestContext = {
@@ -117,7 +117,7 @@ export function createApiHandler(
     try {
       if (options.auth === 'api_key') {
         ctx = await resolveApiKeyContext(request);
-      } else {
+      } else if (options.auth !== 'none') {
         ctx = await resolveRequestContext(request);
 
         if (options.auth === 'user' || options.auth === 'tenant') {

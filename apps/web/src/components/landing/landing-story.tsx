@@ -93,7 +93,7 @@ export function LandingClose() {
   return (
     <section className="relative z-10 mx-auto w-full max-w-6xl px-5 pt-10 pb-24 text-center sm:px-8">
       <LandingCta href="/signup" className="h-12 px-8 text-base">
-        Comece agora
+        Consultoria gratuita
       </LandingCta>
       <p className="mt-5 text-sm text-muted-foreground">Mais controle. Mais resultado. Com IA.</p>
       <ul className="mt-10 flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-12">

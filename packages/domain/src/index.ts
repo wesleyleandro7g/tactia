@@ -11,6 +11,7 @@ export { CustomDataValidationService } from './services/custom-data-validation-s
 export { DataCatalogService } from './services/data-catalog-service';
 export { StructuredQueryService } from './services/structured-query-service';
 export { LeadService } from './services/lead-service';
+export { AcquisitionLeadService } from './services/acquisition-lead-service';
 export { GoalService } from './services/goal-service';
 export { BusinessFactService } from './services/business-fact-service';
 export { EpisodeService } from './services/episode-service';

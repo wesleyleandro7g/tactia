@@ -8,46 +8,60 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { errorMessage } from '@/lib/format';
 
-export function ProvisionTenantForm() {
+export function ProvisionTenantForm({
+  lead,
+}: {
+  lead?: { id: string; company: string; name: string; email: string };
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     const form = new FormData(event.currentTarget);
     setPending(true);
     setError(null);
-    const response = await fetch('/api/v1/tenants', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.get('name'),
-        slug: form.get('slug') || undefined,
-        timezone: form.get('timezone') || undefined,
-        currency: form.get('currency') || undefined,
-        ownerName: form.get('ownerName'),
-        ownerEmail: form.get('ownerEmail'),
-        ownerPassword: form.get('ownerPassword'),
-      }),
-    });
-    const body = (await response.json().catch(() => null)) as
-      | { data?: { tenant?: { id: string } }; error?: { code?: string; message?: string } }
-      | null;
-    setPending(false);
-    if (!response.ok) {
-      setError(errorMessage(body?.error?.code, body?.error?.message));
-      return;
+    try {
+      const response = await fetch(
+        lead ? '/api/v1/acquisition-leads/' + lead.id + '/convert' : '/api/v1/tenants',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: form.get('name'),
+            slug: form.get('slug') || undefined,
+            timezone: form.get('timezone') || undefined,
+            currency: form.get('currency') || undefined,
+            ownerName: form.get('ownerName'),
+            ownerEmail: form.get('ownerEmail'),
+            ownerPassword: form.get('ownerPassword'),
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        data?: { tenant?: { id: string } };
+        error?: { code?: string; message?: string };
+      } | null;
+      if (!response.ok) {
+        setError(errorMessage(body?.error?.code, body?.error?.message));
+        return;
+      }
+      const id = body?.data?.tenant?.id;
+      router.push(id ? `/tenants/${id}` : '/');
+      router.refresh();
+    } catch {
+      setError('Falha de conexão. Tente novamente.');
+    } finally {
+      setPending(false);
     }
-    const id = body?.data?.tenant?.id;
-    router.push(id ? `/tenants/${id}` : '/');
-    router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} className="grid max-w-xl gap-4">
       <Field htmlFor="name" label="Nome da empresa">
-        <Input id="name" name="name" required minLength={2} />
+        <Input id="name" name="name" required minLength={2} defaultValue={lead?.company} />
       </Field>
       <Field htmlFor="slug" label="Slug" hint="Opcional. Gerado a partir do nome se vazio.">
         <Input id="slug" name="slug" pattern="^[a-z0-9]+(?:-[a-z0-9]+)*$" />
@@ -61,16 +75,20 @@ export function ProvisionTenantForm() {
         </Field>
       </div>
       <Field htmlFor="ownerName" label="Nome do owner">
-        <Input id="ownerName" name="ownerName" required minLength={2} />
+        <Input id="ownerName" name="ownerName" required minLength={2} defaultValue={lead?.name} />
       </Field>
       <Field htmlFor="ownerEmail" label="E-mail do owner">
-        <Input id="ownerEmail" name="ownerEmail" type="email" required />
+        <Input id="ownerEmail" name="ownerEmail" type="email" required defaultValue={lead?.email} />
       </Field>
-      <Field htmlFor="ownerPassword" label="Senha provisória" hint="Mínimo 8 caracteres. Envie por outro canal.">
+      <Field
+        htmlFor="ownerPassword"
+        label="Senha provisória"
+        hint="Mínimo 8 caracteres. Envie por outro canal."
+      >
         <Input id="ownerPassword" name="ownerPassword" type="password" required minLength={8} />
       </Field>
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <Button type="submit" loading={pending} size="md">
+      <Button type="submit" loading={pending} disabled={pending} size="md">
         {pending ? 'Criando…' : 'Provisionar'}
       </Button>
     </form>

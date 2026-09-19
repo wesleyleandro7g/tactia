@@ -407,6 +407,7 @@ model Operator {
 // ---------------------------------------------------------------------------
 
 model Tenant {
+  acquisitionLead AcquisitionLead?
   id           String       @id @db.Uuid
   name         String
   slug         String
@@ -463,6 +464,44 @@ model Tenant {
   @@index([status])
   @@index([createdAt])
   @@map("tenants")
+}
+
+enum AcquisitionLeadStatus {
+  new
+  contacted
+  scheduled
+  qualified
+  converted
+  closed
+}
+
+// Tactia's own prospects, deliberately independent from tenant CRM leads.
+model AcquisitionLead {
+  id             String @id @db.Uuid
+  submissionId   String @unique @map("submission_id") @db.Uuid
+  name           String
+  email          String
+  whatsapp       String
+  phone          String?
+  company        String
+  segment        String?
+  segmentOther   String? @map("segment_other")
+  employeeRange  String? @map("employee_range")
+  revenueRange   String? @map("revenue_range")
+  systems        String[]
+  systemDetails  String? @map("system_details")
+  context        String?
+  source         String @default("web")
+  attribution    Json?
+  status         AcquisitionLeadStatus @default(new)
+  tenantId       String? @unique @map("tenant_id") @db.Uuid
+  tenant         Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("acquisition_leads")
 }
 
 model User {

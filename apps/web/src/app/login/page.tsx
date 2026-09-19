@@ -79,7 +79,7 @@ export default function LoginPage() {
             <p className="mt-5 text-sm text-muted-foreground">
               Não tem conta?{' '}
               <Link href="/signup" className="text-primary hover:underline">
-                Criar empresa
+                Consultoria gratuita
               </Link>
             </p>
           </CardContent>

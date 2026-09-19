@@ -34,7 +34,7 @@ export async function requireUser(returnTo?: string): Promise<RequestContext & {
 
 /**
  * Exige sessão + tenant ativo. Usuário autenticado sem empresa vai para o
- * onboarding, que é justamente a tela que resolve isso.
+ * onboarding, que orienta a aguardar a liberação pela equipe Tactia.
  */
 export async function requireTenant(returnTo?: string): Promise<TenantContext> {
   const ctx = await requireUser(returnTo);

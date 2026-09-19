@@ -1,9 +1,9 @@
-import { CreateCompanyForm } from '@/components/app/create-company-form';
+import Link from 'next/link';
 import { PageHeader } from '@/components/app/page-header';
 import { getServerContext } from '@/lib/server-context';
 import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Criar empresa · Tactia' };
+export const metadata = { title: 'Preparação do acesso · Tactia' };
 
 export default async function OnboardingPage() {
   const ctx = await getServerContext();
@@ -13,10 +13,12 @@ export default async function OnboardingPage() {
   return (
     <div className="flex flex-col gap-2">
       <PageHeader
-        title="Criar empresa"
-        description="A conexão das fontes de dados é feita pela equipe Tactia. Aqui você só registra a empresa para começar a usar o app."
+        title="Vamos preparar seu acesso"
+        description="O cadastro da empresa e dos usuários é feito pela equipe Tactia, com acompanhamento próximo. Se você já está em atendimento, aguarde a liberação do seu acesso."
       />
-      <CreateCompanyForm />
+      <Link href="/signup" className="mt-4 text-sm text-primary underline underline-offset-4">
+        Solicitar consultoria gratuita
+      </Link>
     </div>
   );
 }

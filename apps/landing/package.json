@@ -1,0 +1,26 @@
+{
+  "name": "@tactia/landing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 0.0.0.0",
+    "build": "astro build",
+    "preview": "astro preview --host 0.0.0.0",
+    "lint": "eslint src/scripts astro.config.mjs",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "astro": "7.3.3",
+    "@fontsource-variable/bricolage-grotesque": "^5.2.0",
+    "@fontsource/ibm-plex-sans": "^5.2.0",
+    "@tactia/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

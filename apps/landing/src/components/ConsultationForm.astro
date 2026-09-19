@@ -1,0 +1,127 @@
+---
+import { CONSULTATION_CALENDAR_URL } from '@tactia/shared/acquisition';
+import Arrow from './Arrow.astro';
+const fields = [
+  {
+    name: 'name',
+    label: 'Seu nome',
+    type: 'text',
+    autocomplete: 'name',
+    placeholder: 'Como podemos chamar você?',
+    max: 120,
+  },
+  {
+    name: 'company',
+    label: 'Empresa',
+    type: 'text',
+    autocomplete: 'organization',
+    placeholder: 'Nome da sua empresa',
+    max: 120,
+  },
+  {
+    name: 'email',
+    label: 'E-mail',
+    type: 'email',
+    autocomplete: 'email',
+    placeholder: 'voce@empresa.com.br',
+    max: 254,
+  },
+  {
+    name: 'whatsapp',
+    label: 'WhatsApp com DDD',
+    type: 'tel',
+    autocomplete: 'tel',
+    placeholder: '(11) 99999-9999',
+    max: 30,
+  },
+] as const;
+---
+
+<div class="form-card">
+  <div id="form-content">
+    <div class="form-step">
+      <span class="step-active">01 · Seu contato</span>
+      <span>02 · Escolha do horário</span>
+    </div>
+    <h3>Vamos conhecer seu negócio?</h3>
+    <p class="form-intro">
+      Preencha seus dados. No próximo passo, você escolhe um horário na agenda.
+    </p>
+    <form id="consultation-form" novalidate>
+      <fieldset id="form-fields" disabled>
+        {fields.map((field) => (
+          <div class="field">
+            <label for={field.name}>
+              {field.label} <span aria-hidden="true">*</span>
+            </label>
+            <input
+              id={field.name}
+              name={field.name}
+              type={field.type}
+              autocomplete={field.autocomplete}
+              placeholder={field.placeholder}
+              maxlength={field.max}
+              required
+              aria-describedby={`${field.name}-error`}
+            />
+            <p class="field-error" id={`${field.name}-error`} hidden></p>
+          </div>
+        ))}
+        <div class="field">
+          <label for="context">
+            Qual é seu principal desafio? <span class="optional">Opcional</span>
+          </label>
+          <textarea
+            id="context"
+            name="context"
+            rows="3"
+            maxlength="2000"
+            placeholder="Uma tarefa que toma tempo, uma decisão difícil…"
+            aria-describedby="context-error"
+          ></textarea>
+          <p class="field-error" id="context-error" hidden></p>
+        </div>
+        <div hidden aria-hidden="true">
+          <label for="website">Website</label>
+          <input id="website" name="website" tabindex="-1" autocomplete="off" maxlength="200" />
+        </div>
+        <p class="privacy" id="data-use">
+          Ao continuar, você solicita o contato da Tactia. Usaremos os dados para preparar e atender
+          sua consultoria. Campos com * são obrigatórios.
+        </p>
+        <button class="button form-submit" type="submit">
+          <span id="submit-label">Continuar para escolher horário</span>
+          <Arrow />
+        </button>
+      </fieldset>
+      <p id="form-error" class="form-error" role="alert" hidden></p>
+      <p class="form-footnote">Consultoria gratuita · Sem criar uma conta</p>
+    </form>
+    <noscript>
+      <div class="no-script">
+        Ative o JavaScript para enviar seus dados por aqui ou{' '}
+        <a href={CONSULTATION_CALENDAR_URL}>acesse diretamente a agenda do Google</a>.
+      </div>
+    </noscript>
+  </div>
+  <div id="form-success" class="form-success" hidden>
+    <div class="success-icon" aria-hidden="true">
+      ✓
+    </div>
+    <p class="eyebrow">Contato recebido</p>
+    <h3 id="success-title" tabindex="-1">
+      Agora, escolha o melhor horário para sua consultoria.
+    </h3>
+    <p>
+      Falta só reservar um espaço na agenda. A disponibilidade e a confirmação da reunião são feitas
+      pelo Google.
+    </p>
+    <a id="calendar-link" class="button" href={CONSULTATION_CALENDAR_URL}>
+      Escolher horário no Google
+      <Arrow />
+    </a>
+    <p class="form-footnote">
+      Seus dados já estão salvos. A reunião estará marcada quando você concluir a reserva na agenda.
+    </p>
+  </div>
+</div>

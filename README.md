@@ -18,11 +18,12 @@ Camada de inteligência operacional para empresas. **Entenda. Decida. Execute.**
 | Rota | O que faz |
 |---|---|
 | `/dashboard` | Receita, vendas, clientes e ticket médio; séries no tempo; insights por severidade; recomendações pendentes |
-| `/onboarding` | Criar empresa (sem conectar fontes — isso é no Ops) |
+| `/signup` | Captação de leads e agendamento opcional de consultoria gratuita |
+| `/onboarding` | Orientação para usuários que aguardam liberação do acesso pela equipe |
 | `/chat` | Conversa com a Tactia com streaming, fonte de cada número e proposta de ação |
 | `/approvals` | Fila de aprovações e execuções recentes |
 
-Backoffice (`apps/admin`, http://localhost:3001): login de operador, empresas, usuários, **fontes de dados** (conexão, mapeamento, sync) e audit. Identidade separada do app dos clientes.
+Backoffice (`apps/admin`, http://localhost:3001): login de operador, **leads** (`/leads`, atendimento e conversão em cliente), empresas, usuários, **fontes de dados** (conexão, mapeamento, sync) e audit. Identidade separada do app dos clientes. Novas empresas e acessos são criados exclusivamente pelo Ops.
 
 ## Setup
 
@@ -106,3 +107,7 @@ packages/ai             Tool registry, context builder, LLM adapter, orchestrato
 docker/                 docker-compose de dev, Dockerfile e compose de produção
 docs/                   Documento por etapa + onboarding e runbook
 ```
+
+## Landing de consultoria
+
+Nova campanha independente em `apps/landing` (Astro), com captura curta integrada ao Tactia Ops. Desenvolvimento: `pnpm --filter @tactia/landing dev` (porta 4321). A LP atual permanece em `apps/web`. Veja [configuração, publicação e funil](docs/landing-consultoria.md).
