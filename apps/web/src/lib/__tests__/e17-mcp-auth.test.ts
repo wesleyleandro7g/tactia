@@ -34,7 +34,7 @@ describe('E17 MCP route auth', () => {
       const POST = createApiHandler({ auth: 'api_key', rateLimit: RATE_LIMITS.mcp }, async () => {
         throw new Error('MCP handler must not run for CRON_SECRET');
       });
-      const response = await POST(request.clone());
+      const response = await POST(request.clone(), { params: Promise.resolve({}) });
       expect(response.status).toBe(401);
       const body = (await response.json()) as { error?: { code?: string } };
       expect(body.error?.code).toBe(ErrorCode.AUTHENTICATION_ERROR);

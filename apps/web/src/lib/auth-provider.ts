@@ -1,10 +1,9 @@
 import type { AuthProvider } from '@tactia/domain';
 import { createId } from '@tactia/shared';
 import { prisma } from '@tactia/database';
-import { createLocalAccountIssuer } from 'better-auth/db';
 import { auth } from './auth';
 
-const CREDENTIAL_ISSUER = createLocalAccountIssuer('credential');
+const CREDENTIAL_ISSUER = 'local:credential';
 
 export const betterAuthProvider: AuthProvider = {
   async createCredentialsUser(input) {

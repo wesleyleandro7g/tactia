@@ -16,6 +16,10 @@ export const MCP_SERVER_VERSION = '0.1.0';
 export const TOOLS_READ_SCOPE = 'tools:read';
 export const TOOLS_PROPOSE_SCOPE = 'tools:propose';
 export const PROPOSE_ACTION_TOOL = 'propose_action';
+export const GET_PROFILE_TOOL = 'get_profile';
+
+/** Direct-write tools stay off the ChatGPT surface; propose_action is the only mutation path. */
+const MCP_HIDDEN_TOOLS = new Set(['remember_fact', 'generate_infographic']);
 
 export type McpToolCallAudit = {
   tool: string;
@@ -23,10 +27,19 @@ export type McpToolCallAudit = {
   error?: string;
 };
 
+export type McpProfile = {
+  id: string;
+  name: string;
+  email: string;
+  nickname: string;
+};
+
 export type HandleMcpHttpOptions = {
   registry: ToolRegistry;
   ctx: ToolContext;
   scopes: string[];
+  /** When set, publishes the ChatGPT `get_profile` tool for the authorized membership. */
+  profile?: McpProfile;
   onToolCall?: (event: McpToolCallAudit) => void;
 };
 
@@ -62,21 +75,51 @@ function createRegistryMcpServer(options: HandleMcpHttpOptions): Server {
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const names = new Set(mcpVisibleToolNames(options.registry, options.ctx.role, options.scopes));
-    return {
-      tools: options.registry.definitions(options.ctx.role)
-        .filter((tool) => names.has(tool.name))
-        .map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: zodSchemaToJsonSchema(tool.inputSchema),
-        })),
-    };
+    const tools = options.registry
+      .definitions(options.ctx.role)
+      .filter((tool) => names.has(tool.name))
+      .map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: zodSchemaToJsonSchema(tool.inputSchema),
+      }));
+
+    if (options.profile && options.scopes.includes(TOOLS_READ_SCOPE)) {
+      tools.unshift({
+        name: GET_PROFILE_TOOL,
+        description: 'Perfil da membership autorizada nesta conexão MCP.',
+        inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
+      });
+    }
+
+    return { tools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const name = request.params.name;
     const args = request.params.arguments ?? {};
     const started = Date.now();
+
+    if (name === GET_PROFILE_TOOL) {
+      if (!options.profile || !options.scopes.includes(TOOLS_READ_SCOPE)) {
+        options.onToolCall?.({
+          tool: name,
+          durationMs: Date.now() - started,
+          error: ErrorCode.AUTHORIZATION_ERROR,
+        });
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: `AUTHORIZATION_ERROR: Tool '${name}' is not allowed for this key` }],
+        };
+      }
+      options.onToolCall?.({ tool: name, durationMs: Date.now() - started });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(options.profile) }],
+        structuredContent: options.profile,
+        _meta: { 'openai/profile': options.profile },
+      };
+    }
+
     const allowed = mcpVisibleToolNames(options.registry, options.ctx.role, options.scopes);
     if (!allowed.includes(name)) {
       const code = options.registry.has(name) ? ErrorCode.AUTHORIZATION_ERROR : ErrorCode.NOT_FOUND;
@@ -133,6 +176,7 @@ export function mcpVisibleToolNames(
   const canRead = scopes.includes(TOOLS_READ_SCOPE);
   const canPropose = scopes.includes(TOOLS_PROPOSE_SCOPE);
   return names.filter((name) => {
+    if (MCP_HIDDEN_TOOLS.has(name)) return false;
     if (name === PROPOSE_ACTION_TOOL) return canPropose;
     return canRead;
   });

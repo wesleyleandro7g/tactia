@@ -16,6 +16,7 @@ import {
   LogOut,
   MessageCircle,
   MessageSquare,
+  PlugZap,
   Target,
 } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
@@ -44,6 +45,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/settings/memory': History,
   '/settings/playbooks': ListChecks,
   '/settings/documents': Files,
+  '/settings/connections': PlugZap,
   '/settings/api-keys': Key,
   '/settings/whatsapp': MessageCircle,
 };

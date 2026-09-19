@@ -153,7 +153,12 @@ export class ExecutionEngine {
    */
   async proposeFromAi(
     ctx: RequestContext,
-    input: { actionType: string; input: unknown; reason?: string | null },
+    input: {
+      actionType: string;
+      input: unknown;
+      reason?: string | null;
+      idempotencyKey?: string | null;
+    },
   ) {
     return this.proposeFromOrigin(ctx, input, 'ai');
   }
@@ -164,14 +169,24 @@ export class ExecutionEngine {
    */
   async proposeFromMcp(
     ctx: RequestContext,
-    input: { actionType: string; input: unknown; reason?: string | null },
+    input: {
+      actionType: string;
+      input: unknown;
+      reason?: string | null;
+      idempotencyKey?: string | null;
+    },
   ) {
     return this.proposeFromOrigin(ctx, input, 'mcp');
   }
 
   private async proposeFromOrigin(
     ctx: RequestContext,
-    input: { actionType: string; input: unknown; reason?: string | null },
+    input: {
+      actionType: string;
+      input: unknown;
+      reason?: string | null;
+      idempotencyKey?: string | null;
+    },
     origin: 'ai' | 'mcp',
   ) {
     const type = input.actionType as ActionType;
@@ -184,7 +199,12 @@ export class ExecutionEngine {
 
     const execution = await this.propose(
       ctx,
-      { actionType: type, input: input.input, reason: input.reason ?? null },
+      {
+        actionType: type,
+        input: input.input,
+        reason: input.reason ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+      },
       { origin },
     );
 

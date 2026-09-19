@@ -88,6 +88,7 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 | [docs/deploy-producao.md](docs/deploy-producao.md) | Deploy em produção com Docker Compose e TLS |
 | [docs/onboarding-cliente.md](docs/onboarding-cliente.md) | Passo a passo para colocar um cliente real |
 | [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
+| [docs/integracao-chatgpt-mcp.md](docs/integracao-chatgpt-mcp.md) | OAuth 2.1, deploy e publicação do app MCP no ChatGPT |
 
 Logs são JSON estruturado com `request_id`, `tenant_id`, `user_id`, `operation`,
 `duration_ms` e `status`. Toda resposta traz o header `x-request-id`, que é a chave

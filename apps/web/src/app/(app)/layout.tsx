@@ -14,6 +14,7 @@ const BASE_NAV: NavItem[] = [
   { href: '/settings/memory', label: 'Memória' },
   { href: '/settings/playbooks', label: 'Playbooks' },
   { href: '/settings/documents', label: 'Documentos' },
+  { href: '/settings/connections', label: 'Conexões' },
 ];
 
 /**

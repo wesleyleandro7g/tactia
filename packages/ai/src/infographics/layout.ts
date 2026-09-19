@@ -14,7 +14,7 @@ import {
   type ThemePalette,
 } from './tokens';
 
-type NodeProps = Record<string, string | number | boolean | undefined> & {
+type NodeProps = Record<string, unknown> & {
   style?: Record<string, string | number | undefined>;
   children?: string | Node | Array<string | Node | null | undefined | false>;
 };

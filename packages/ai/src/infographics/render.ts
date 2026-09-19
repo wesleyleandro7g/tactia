@@ -23,8 +23,8 @@ type ResvgCtor = typeof import('@resvg/resvg-js').Resvg;
 const require = createRequire(import.meta.url);
 
 function loadSatori(): SatoriFn {
-  const mod = require('satori') as { default?: SatoriFn } & SatoriFn;
-  return typeof mod === 'function' ? mod : (mod.default as SatoriFn);
+  const mod = require('satori') as unknown;
+  return typeof mod === 'function' ? (mod as SatoriFn) : (mod as { default: SatoriFn }).default;
 }
 
 function loadResvg(): ResvgCtor {

@@ -15,7 +15,12 @@ export const PROPOSABLE_ACTION_TYPES = ['create_task', 'send_email'] as const;
 export type ActionProposalPort = {
   propose(
     ctx: ToolContext,
-    input: { actionType: string; input: Record<string, unknown>; reason?: string | null },
+    input: {
+      actionType: string;
+      input: Record<string, unknown>;
+      reason?: string | null;
+      idempotencyKey?: string | null;
+    },
   ): Promise<ActionProposal>;
 };
 
@@ -35,6 +40,13 @@ const inputSchema = z.object({
     .max(500)
     .optional()
     .describe('Justificativa da proposta, mostrada a quem aprova.'),
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(8)
+    .max(200)
+    .optional()
+    .describe('Chave estável para impedir propostas duplicadas em novas tentativas.'),
 });
 
 /**
@@ -56,6 +68,7 @@ export function createProposeActionTool(proposer: ActionProposalPort): Tool {
         actionType: input.actionType,
         input: input.input,
         reason: input.reason ?? null,
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       });
 
       return {

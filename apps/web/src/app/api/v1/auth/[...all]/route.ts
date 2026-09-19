@@ -15,6 +15,9 @@ const handler = toNextJsHandler(auth);
 
 /** Brute-force guard on the credential endpoints (spec §49): 30 req/min por IP. */
 function rateLimited(request: Request): Response | null {
+  // Discovery and JWKS must remain available independently of login attempts.
+  const path = new URL(request.url).pathname;
+  if (request.method === 'GET' && (path.endsWith('/jwks') || path.includes('/.well-known/'))) return null;
   const ip = getClientIp(request) ?? 'unknown';
   const allowed = consumeRateLimit(`auth:${ip}`, 30, 60_000);
   if (allowed) return null;

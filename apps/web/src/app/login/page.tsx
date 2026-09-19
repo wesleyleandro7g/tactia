@@ -29,6 +29,17 @@ export default function LoginPage() {
       setError(result.error.message ?? 'Não foi possível entrar');
       return;
     }
+    // The OAuth client plugin forwards the signed query during sign-in; the
+    // provider returns the next authorization step in this same response.
+    if (new URLSearchParams(window.location.search).has('sig')) {
+      const data = result.data as { url?: string; redirect?: boolean } | null;
+      if (data?.redirect && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+      setError('Não foi possível continuar a conexão. Inicie novamente pelo ChatGPT.');
+      return;
+    }
     router.push('/app');
     router.refresh();
   }
