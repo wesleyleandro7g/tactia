@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth';
 import { toolRegistry, toToolContext } from '@/lib/ai';
 import { MCP_AUTH_ISSUER, MCP_RESOURCE_URL, MCP_SCOPES } from '@/lib/mcp-auth';
 import { resolveOAuthMcpContext } from '@/lib/mcp-oauth-context';
+import { describeMcpAuth, logMcpAuth } from '@/lib/mcp-oauth-debug';
 import { enforceDistributedMcpRateLimit } from '@/lib/mcp-rate-limit';
 import { RATE_LIMITS } from '@/lib/rate-limit';
 import { auditLogService } from '@/lib/services';
@@ -76,9 +77,17 @@ const protectedHandler = requireMcpAuth(
 async function handleRequest(request: Request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(MCP_RESOURCE_URL).origin && origin !== 'https://chatgpt.com') {
-    return Response.json({ error: 'Origem não permitida' }, { status: 403 });
+    const response = Response.json({ error: 'Origem não permitida' }, { status: 403 });
+    logMcpAuth(describeMcpAuth(response.status, request.headers.get('authorization'), null));
+    return response;
   }
-  return protectedHandler(request);
+  const response = await protectedHandler(request);
+  logMcpAuth(describeMcpAuth(
+    response.status,
+    request.headers.get('authorization'),
+    response.headers.get('WWW-Authenticate'),
+  ));
+  return response;
 }
 
 export const POST = handleRequest;

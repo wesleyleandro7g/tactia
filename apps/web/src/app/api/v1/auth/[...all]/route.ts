@@ -9,15 +9,32 @@ import {
 import { toNextJsHandler } from 'better-auth/next-js';
 import { auth } from '@/lib/auth';
 import { getClientIp } from '@/lib/api';
+import {
+  describeAuthorizeCallback,
+  describeTokenRequest,
+  describeTokenResponse,
+  logAuthorizeCallback,
+  logTokenExchange,
+  parseOAuthQuery,
+  readFormParams,
+} from '@/lib/mcp-oauth-debug';
 import { consumeRateLimit } from '@/lib/rate-limit';
 
 const handler = toNextJsHandler(auth);
 
+function authPath(request: Request): string {
+  return new URL(request.url).pathname;
+}
+
+function skipCredentialRateLimit(request: Request): boolean {
+  const path = authPath(request);
+  if (path.endsWith('/jwks') || path.includes('/.well-known/')) return true;
+  return path.endsWith('/oauth2/token') || path.endsWith('/oauth2/introspect') || path.endsWith('/oauth2/revoke');
+}
+
 /** Brute-force guard on the credential endpoints (spec §49): 30 req/min por IP. */
 function rateLimited(request: Request): Response | null {
-  // Discovery and JWKS must remain available independently of login attempts.
-  const path = new URL(request.url).pathname;
-  if (request.method === 'GET' && (path.endsWith('/jwks') || path.includes('/.well-known/'))) return null;
+  if (skipCredentialRateLimit(request)) return null;
   const ip = getClientIp(request) ?? 'unknown';
   const allowed = consumeRateLimit(`auth:${ip}`, 30, 60_000);
   if (allowed) return null;
@@ -52,5 +69,23 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const blocked = rateLimited(request);
   if (blocked) return blocked;
+  const path = authPath(request);
+  if (path.endsWith('/oauth2/token')) {
+    const fields = await readFormParams(request.clone());
+    const response = await handler.POST(request);
+    const payload = await response.clone().json().catch(() => null);
+    logTokenExchange(describeTokenRequest(fields, request.headers), describeTokenResponse(response.status, payload));
+    return response;
+  }
+  if (path.endsWith('/oauth2/consent')) {
+    const fields = await readFormParams(request.clone());
+    const response = await handler.POST(request);
+    const payload = await response.clone().json().catch(() => null);
+    const url = payload && typeof payload === 'object' && 'url' in payload && typeof payload.url === 'string'
+      ? payload.url
+      : null;
+    if (url) logAuthorizeCallback(describeAuthorizeCallback(url, parseOAuthQuery(fields.get('oauth_query'))));
+    return response;
+  }
   return handler.POST(request);
 }

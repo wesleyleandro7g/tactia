@@ -115,6 +115,8 @@ async function authorize(oauthClientId = clientId) {
     expect(consent.status, JSON.stringify(consentBody)).toBe(200);
     const callback = new URL(consentBody.url);
     expect(callback.searchParams.get('state')).toBe('test-state');
+    expect(callback.searchParams.get('iss')).toBe(MCP_AUTH_ISSUER);
+    expect([...callback.searchParams.keys()]).toEqual(expect.arrayContaining(['code', 'state', 'iss']));
     const tokens = await request('/oauth2/token', {
       grant_type: 'authorization_code', client_id: oauthClientId, redirect_uri: redirectUri,
       code: callback.searchParams.get('code'), code_verifier: verifier, resource: MCP_RESOURCE_URL,
@@ -128,10 +130,23 @@ async function authorize(oauthClientId = clientId) {
     expect(tokenBody.access_token).toBeTruthy();
     expect(tokenBody.refresh_token).toBeTruthy();
     const claims = JSON.parse(Buffer.from(tokenBody.access_token.split('.')[1], 'base64url').toString());
+    expect(claims.iss).toBe(MCP_AUTH_ISSUER);
+    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    expect(audiences).toContain(MCP_RESOURCE_URL);
     return { tokenBody, claims };
 }
 
 describe('MCP OAuth authorization flow', () => {
+  it('advertises RFC 9207 iss support and CIMD-compatible token auth methods', async () => {
+    const response = await request('/.well-known/oauth-authorization-server');
+    const metadata = await response.json();
+    expect(response.status).toBe(200);
+    expect(metadata.issuer).toBe(MCP_AUTH_ISSUER);
+    expect(metadata.authorization_response_iss_parameter_supported).toBe(true);
+    expect(metadata.code_challenge_methods_supported).toEqual(['S256']);
+    expect(metadata.token_endpoint_auth_methods_supported).toEqual(expect.arrayContaining(['none', 'private_key_jwt']));
+  });
+
   it('authorizes with PKCE, rotates tokens, and keeps revoked JWTs invalid after reconnection', async () => {
     const { tokenBody, claims } = await authorize();
     const ctx = await resolveOAuthMcpContext(new Request(MCP_RESOURCE_URL), claims);
