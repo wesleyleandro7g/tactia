@@ -24,7 +24,12 @@ const require = createRequire(import.meta.url);
 
 function loadSatori(): SatoriFn {
   const mod = require('satori') as unknown;
-  return typeof mod === 'function' ? (mod as SatoriFn) : (mod as { default: SatoriFn }).default;
+  const loaded =
+    typeof mod === 'function' ? (mod as SatoriFn) : (mod as { default: SatoriFn }).default;
+  if (typeof loaded !== 'function') {
+    throw new Error('satori export is not a function');
+  }
+  return loaded;
 }
 
 function loadResvg(): ResvgCtor {

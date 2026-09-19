@@ -39,7 +39,7 @@ function el(
       style,
       ...(extra ?? {}),
       ...(cleaned !== undefined ? { children: cleaned } : {}),
-    },
+    } as NodeProps,
   };
 }
 
@@ -57,7 +57,7 @@ function svgEl(
     props: {
       ...attrs,
       ...(cleaned !== undefined ? { children: cleaned } : {}),
-    },
+    } as NodeProps,
   };
 }
 

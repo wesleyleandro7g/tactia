@@ -1,7 +1,18 @@
 import path from 'path';
 import type { NextConfig } from 'next';
 
+const buildCpus = Number(process.env.NEXT_BUILD_CPUS || 0);
+
 const nextConfig: NextConfig = {
+  ...(buildCpus > 0
+    ? {
+        experimental: {
+          cpus: buildCpus,
+          webpackBuildWorker: true,
+          webpackMemoryOptimizations: true,
+        },
+      }
+    : {}),
   transpilePackages: [
     '@tactia/shared',
     '@tactia/domain',

@@ -35,6 +35,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM base AS builder
 ARG APP_PACKAGE=@tactia/web
 ENV NEXT_TELEMETRY_DISABLED=1
+# Teto do processo Node. O Rust do Turbopack ainda pode passar disso; o teto
+# real do host é `docker compose build --memory` no scripts/deploy.sh.
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 COPY --from=deps /repo/ ./
 COPY . .
 RUN pnpm --filter @tactia/database generate
