@@ -1,12 +1,13 @@
 import { requireMcpAuth } from '@better-auth/mcp';
 import { AuditAction } from '@tactia/domain';
-import { handleMcpHttpRequest } from '@tactia/ai';
+import { handleMcpHttpRequest, isPublicMcpMethod } from '@tactia/ai';
 import { ErrorCode, isAppError, logger } from '@tactia/shared';
 import { auth } from '@/lib/auth';
 import { toolRegistry, toToolContext } from '@/lib/ai';
 import { MCP_AUTH_ISSUER, MCP_RESOURCE_URL, MCP_SCOPES } from '@/lib/mcp-auth';
 import { resolveOAuthMcpContext } from '@/lib/mcp-oauth-context';
-import { describeMcpAuth, logMcpAuth } from '@/lib/mcp-oauth-debug';
+import { describeMcpAuth } from '@/lib/mcp-oauth-debug';
+import { peekMcpRpcMethod, publicMcpCatalogContext } from '@/lib/mcp-public';
 import { enforceDistributedMcpRateLimit } from '@/lib/mcp-rate-limit';
 import { RATE_LIMITS } from '@/lib/rate-limit';
 import { auditLogService } from '@/lib/services';
@@ -76,18 +77,39 @@ const protectedHandler = requireMcpAuth(
 
 async function handleRequest(request: Request) {
   const origin = request.headers.get('origin');
+  const authorization = request.headers.get('authorization');
+  const method = await peekMcpRpcMethod(request);
   if (origin && origin !== new URL(MCP_RESOURCE_URL).origin && origin !== 'https://chatgpt.com') {
     const response = Response.json({ error: 'Origem não permitida' }, { status: 403 });
-    logMcpAuth(describeMcpAuth(response.status, request.headers.get('authorization'), null));
+    logMcpRequest(method, authorization, response);
     return response;
   }
+
+  // ChatGPT lists tools before it attaches the bearer. Keep initialize/tools/list
+  // public (with oauth2 securitySchemes) and require a token only for tools/call.
+  if (!authorization && isPublicMcpMethod(method)) {
+    const catalog = publicMcpCatalogContext();
+    const response = await handleMcpHttpRequest(request, {
+      registry: toolRegistry,
+      ctx: catalog.ctx,
+      scopes: catalog.scopes,
+      profile: catalog.profile,
+    });
+    logMcpRequest(method, authorization, response);
+    return response;
+  }
+
   const response = await protectedHandler(request);
-  logMcpAuth(describeMcpAuth(
-    response.status,
-    request.headers.get('authorization'),
-    response.headers.get('WWW-Authenticate'),
-  ));
+  logMcpRequest(method, authorization, response);
   return response;
+}
+
+function logMcpRequest(method: string | null, authorization: string | null, response: Response): void {
+  logger.info({
+    method,
+    has_authorization: Boolean(authorization),
+    ...describeMcpAuth(response.status, authorization, response.headers.get('WWW-Authenticate')),
+  }, '[MCP AUTH]');
 }
 
 export const POST = handleRequest;

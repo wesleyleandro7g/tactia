@@ -1,0 +1,37 @@
+diff --git a/dist/authorize-riRRCSbC.mjs b/dist/authorize-riRRCSbC.mjs
+index 3242d48eb31e844240b0cd9f5931580f3c5367c2..df82da0d2f3a2ad12b6b167b2d001d3a010ee40d 100644
+--- a/dist/authorize-riRRCSbC.mjs
++++ b/dist/authorize-riRRCSbC.mjs
+@@ -1518,17 +1518,30 @@ async function verifyClientAssertion(ctx, opts, clientAssertion, clientAssertion
+ 		issuer: clientId,
+ 		subject: clientId,
+ 		audience: acceptedAudiences,
+-		algorithms: ALGORITHMS_LIST
++		algorithms: ALGORITHMS_LIST,
++		// Small skew tolerance for ChatGPT nbf (observed ~3s; NTP on host).
++		clockTolerance: 10
+ 	};
+ 	let payload;
+ 	try {
+ 		({payload} = await jwtVerify(clientAssertion, createLocalJWKSet(jwks), verifyOpts));
+ 	} catch (verifyErr) {
++		console.error("[BETTER AUTH JWT VERIFY ERROR]", {
++			name: verifyErr instanceof Error ? verifyErr.name : null,
++			message: verifyErr instanceof Error ? verifyErr.message : String(verifyErr),
++			code: typeof verifyErr === "object" && verifyErr !== null && "code" in verifyErr ? verifyErr.code : null
++		});
+ 		if (verifyErr instanceof Error && /no matching key|no applicable key/i.test(verifyErr.message)) {
+ 			const refreshed = await refetchClientJwks(opts, client);
+ 			if (refreshed) try {
+ 				({payload} = await jwtVerify(clientAssertion, createLocalJWKSet(refreshed), verifyOpts));
+-			} catch {
++			} catch (retryErr) {
++				console.error("[BETTER AUTH JWT VERIFY ERROR]", {
++					name: retryErr instanceof Error ? retryErr.name : null,
++					message: retryErr instanceof Error ? retryErr.message : String(retryErr),
++					code: typeof retryErr === "object" && retryErr !== null && "code" in retryErr ? retryErr.code : null,
++					retried: true
++				});
+ 				throw new APIError$1("UNAUTHORIZED", {
+ 					error_description: "client assertion signature verification failed",
+ 					error: "invalid_client"

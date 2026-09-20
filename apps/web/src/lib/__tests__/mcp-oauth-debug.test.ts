@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { MCP_AUTH_ISSUER, MCP_RESOURCE_URL } from '../mcp-auth';
 import {
   describeAuthorizeCallback,
+  describeClientAssertion,
   describeMcpAuth,
   describeTokenRequest,
   describeTokenResponse,
 } from '../mcp-oauth-debug';
+
+function signedPart(value: Record<string, unknown>): string {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
 
 describe('MCP OAuth diagnostic logs', () => {
   it('records RFC 9207 callback param names without leaking the authorization code', () => {
@@ -38,6 +43,7 @@ describe('MCP OAuth diagnostic logs', () => {
       client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
       client_assertion: assertion,
     }), new Headers({ origin: 'https://chatgpt.com' }));
+    expect(log.has_code).toBe(true);
     expect(log.has_code_verifier).toBe(true);
     expect(log.has_client_assertion).toBe(true);
     expect(log.client_assertion_type).toBe('urn:ietf:params:oauth:client-assertion-type:jwt-bearer');
@@ -51,11 +57,59 @@ describe('MCP OAuth diagnostic logs', () => {
     expect(describeTokenResponse(200, { access_token: 'SECRET_TOKEN', token_type: 'Bearer' })).toEqual({
       status: 200,
       oauth_error: null,
+      error_description: null,
+      token_type: 'Bearer',
+      expires_in: null,
+      scope: null,
+      has_access_token: true,
+      has_refresh_token: false,
+      has_id_token: false,
+      access_token_alg: null,
+      id_token_alg: null,
     });
     expect(describeTokenResponse(400, { error: 'invalid_client', error_description: 'jwks' })).toEqual({
       status: 400,
       oauth_error: 'invalid_client',
+      error_description: 'jwks',
+      token_type: null,
+      expires_in: null,
+      scope: null,
+      has_access_token: false,
+      has_refresh_token: false,
+      has_id_token: false,
+      access_token_alg: null,
+      id_token_alg: null,
     });
+  });
+
+  it('decodes client assertion header and payload without logging jti or the JWT', () => {
+    const jti = 'SECRET_JTI_VALUE';
+    const assertion = [
+      signedPart({ alg: 'RS256', kid: 'openai-kid-1', typ: 'JWT' }),
+      signedPart({
+        iss: 'https://chatgpt.com/oauth/client.json',
+        sub: 'https://chatgpt.com/oauth/client.json',
+        aud: `${MCP_AUTH_ISSUER}/oauth2/token`,
+        exp: 1_700_000_000,
+        iat: 1_699_999_700,
+        jti,
+      }),
+      'signature',
+    ].join('.');
+    const log = describeClientAssertion(assertion);
+    expect(log).toEqual({
+      alg: 'RS256',
+      kid: 'openai-kid-1',
+      iss: 'https://chatgpt.com/oauth/client.json',
+      sub: 'https://chatgpt.com/oauth/client.json',
+      aud: `${MCP_AUTH_ISSUER}/oauth2/token`,
+      has_exp: true,
+      has_iat: true,
+      has_jti: true,
+    });
+    const serialized = JSON.stringify(log);
+    expect(serialized).not.toContain(assertion);
+    expect(serialized).not.toContain(jti);
   });
 
   it('extracts MCP bearer claims without logging the JWT', () => {

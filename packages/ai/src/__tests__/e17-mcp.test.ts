@@ -95,6 +95,23 @@ describe('E17 MCP adapter', () => {
     const names = tools.map((tool) => tool.name);
     expect(names).toContain('get_revenue');
     expect(names).not.toContain(PROPOSE_ACTION_TOOL);
+    expect(tools.find((tool) => tool.name === 'get_revenue')).toMatchObject({
+      securitySchemes: [{ type: 'oauth2', scopes: ['tools:read'] }],
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    });
+  });
+
+  it('E17: propose_action advertises oauth2 tools:propose for ChatGPT discovery', async () => {
+    const { port } = recordingProposer();
+    const registry = new ToolRegistry(
+      createDefaultTools({} as ToolDeps, { actionProposer: port }),
+    );
+    const { body } = await mcpRpc(registry, toolContext(), ['tools:read', 'tools:propose'], 'tools/list');
+    const tools = (resultOf(body)['tools'] ?? []) as Array<{ name: string }>;
+    expect(tools.find((tool) => tool.name === PROPOSE_ACTION_TOOL)).toMatchObject({
+      securitySchemes: [{ type: 'oauth2', scopes: ['tools:propose'] }],
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    });
   });
 
   it('E17: tools/call get_revenue uses tenant from key not body', async () => {

@@ -14,6 +14,16 @@ export const MCP_SCOPES = {
   propose: 'tools:propose',
 } as const;
 
+/** Identity scopes ChatGPT always requests. Must be allowed on the MCP resource
+ *  or Better Auth intersects them away, skips `id_token`, and `/userinfo` 400s. */
+export const MCP_OIDC_SCOPES = ['openid', 'profile', 'email', 'offline_access'] as const;
+
+export const MCP_GRANT_SCOPES = [
+  ...MCP_OIDC_SCOPES,
+  MCP_SCOPES.read,
+  MCP_SCOPES.propose,
+] as const;
+
 export const MCP_TENANT_CLAIM = 'https://tactia.com/claims/tenant_id';
 export const MCP_ROLE_CLAIM = 'https://tactia.com/claims/role';
 export const MCP_DOMAIN_USER_CLAIM = 'https://tactia.com/claims/user_id';

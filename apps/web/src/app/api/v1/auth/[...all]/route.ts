@@ -11,6 +11,7 @@ import { auth } from '@/lib/auth';
 import { getClientIp } from '@/lib/api';
 import {
   describeAuthorizeCallback,
+  describeClientAssertion,
   describeTokenRequest,
   describeTokenResponse,
   logAuthorizeCallback,
@@ -29,7 +30,12 @@ function authPath(request: Request): string {
 function skipCredentialRateLimit(request: Request): boolean {
   const path = authPath(request);
   if (path.endsWith('/jwks') || path.includes('/.well-known/')) return true;
-  return path.endsWith('/oauth2/token') || path.endsWith('/oauth2/introspect') || path.endsWith('/oauth2/revoke');
+  return (
+    path.endsWith('/oauth2/token') ||
+    path.endsWith('/oauth2/userinfo') ||
+    path.endsWith('/oauth2/introspect') ||
+    path.endsWith('/oauth2/revoke')
+  );
 }
 
 /** Brute-force guard on the credential endpoints (spec §49): 30 req/min por IP. */
@@ -63,7 +69,19 @@ function rateLimited(request: Request): Response | null {
 export async function GET(request: Request) {
   const blocked = rateLimited(request);
   if (blocked) return blocked;
-  return handler.GET(request);
+  const response = await handler.GET(request);
+  if (authPath(request).endsWith('/oauth2/userinfo')) {
+    const payload = await response.clone().json().catch(() => null);
+    const record = payload && typeof payload === 'object' ? payload as Record<string, unknown> : null;
+    logger.info({
+      status: response.status,
+      has_authorization: request.headers.has('authorization'),
+      oauth_error: typeof record?.error === 'string' ? record.error : null,
+      error_description: typeof record?.error_description === 'string' ? record.error_description : null,
+      has_sub: typeof record?.sub === 'string',
+    }, '[OAUTH USERINFO]');
+  }
+  return response;
 }
 
 export async function POST(request: Request) {
@@ -74,7 +92,11 @@ export async function POST(request: Request) {
     const fields = await readFormParams(request.clone());
     const response = await handler.POST(request);
     const payload = await response.clone().json().catch(() => null);
-    logTokenExchange(describeTokenRequest(fields, request.headers), describeTokenResponse(response.status, payload));
+    logTokenExchange(
+      describeTokenRequest(fields, request.headers),
+      describeTokenResponse(response.status, payload),
+      describeClientAssertion(fields.get('client_assertion')),
+    );
     return response;
   }
   if (path.endsWith('/oauth2/consent')) {
@@ -85,6 +107,19 @@ export async function POST(request: Request) {
       ? payload.url
       : null;
     if (url) logAuthorizeCallback(describeAuthorizeCallback(url, parseOAuthQuery(fields.get('oauth_query'))));
+    return response;
+  }
+  if (path.endsWith('/oauth2/userinfo')) {
+    const response = await handler.POST(request);
+    const payload = await response.clone().json().catch(() => null);
+    const record = payload && typeof payload === 'object' ? payload as Record<string, unknown> : null;
+    logger.info({
+      status: response.status,
+      has_authorization: request.headers.has('authorization'),
+      oauth_error: typeof record?.error === 'string' ? record.error : null,
+      error_description: typeof record?.error_description === 'string' ? record.error_description : null,
+      has_sub: typeof record?.sub === 'string',
+    }, '[OAUTH USERINFO]');
     return response;
   }
   return handler.POST(request);

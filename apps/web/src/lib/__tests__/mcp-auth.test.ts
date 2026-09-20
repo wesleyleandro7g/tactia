@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isChatGptClientMetadataUrl, parseOAuthScopes } from '../mcp-auth';
+import { isChatGptClientMetadataUrl, MCP_GRANT_SCOPES, parseOAuthScopes } from '../mcp-auth';
 
 describe('MCP OAuth helpers', () => {
   it('allows only the ChatGPT HTTPS client metadata documents', () => {
@@ -19,6 +19,17 @@ describe('MCP OAuth helpers', () => {
       'tools:propose',
     ]);
     expect(parseOAuthScopes(['tools:read', 7, 'tools:propose'])).toEqual([
+      'tools:read',
+      'tools:propose',
+    ]);
+  });
+
+  it('keeps OIDC scopes on the MCP resource grant list', () => {
+    expect(MCP_GRANT_SCOPES).toEqual([
+      'openid',
+      'profile',
+      'email',
+      'offline_access',
       'tools:read',
       'tools:propose',
     ]);

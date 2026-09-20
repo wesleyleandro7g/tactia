@@ -135,7 +135,13 @@ export {
   type InfographicTheme,
   type RenderedInfographic,
 } from './infographics/index';
-export { handleMcpHttpRequest, MCP_HTTP_ACCEPT, MCP_SERVER_NAME, MCP_SERVER_VERSION } from './mcp/server';
+export {
+  handleMcpHttpRequest,
+  isPublicMcpMethod,
+  MCP_HTTP_ACCEPT,
+  MCP_SERVER_NAME,
+  MCP_SERVER_VERSION,
+} from './mcp/server';
 export type { HandleMcpHttpOptions, McpToolCallAudit } from './mcp/server';
 export type {
   ActionProposal,

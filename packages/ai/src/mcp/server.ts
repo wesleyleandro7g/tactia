@@ -82,6 +82,7 @@ function createRegistryMcpServer(options: HandleMcpHttpOptions): Server {
         name: tool.name,
         description: tool.description,
         inputSchema: zodSchemaToJsonSchema(tool.inputSchema),
+        ...mcpToolAuthMetadata(tool.name),
       }));
 
     if (options.profile && options.scopes.includes(TOOLS_READ_SCOPE)) {
@@ -89,6 +90,7 @@ function createRegistryMcpServer(options: HandleMcpHttpOptions): Server {
         name: GET_PROFILE_TOOL,
         description: 'Perfil da membership autorizada nesta conexão MCP.',
         inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
+        ...mcpToolAuthMetadata(GET_PROFILE_TOOL),
       });
     }
 
@@ -165,6 +167,36 @@ function createRegistryMcpServer(options: HandleMcpHttpOptions): Server {
   });
 
   return server;
+}
+
+/** ChatGPT discovers tools before attaching a bearer; these RPCs stay public. */
+export const PUBLIC_MCP_METHODS = new Set([
+  'initialize',
+  'notifications/initialized',
+  'tools/list',
+  'ping',
+]);
+
+export function isPublicMcpMethod(method: string | null | undefined): boolean {
+  return Boolean(method && PUBLIC_MCP_METHODS.has(method));
+}
+
+function mcpToolAuthMetadata(name: string): {
+  securitySchemes: Array<{ type: 'oauth2'; scopes: string[] }>;
+  annotations: { readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean };
+} {
+  const write = name === PROPOSE_ACTION_TOOL;
+  return {
+    securitySchemes: [{
+      type: 'oauth2',
+      scopes: [write ? TOOLS_PROPOSE_SCOPE : TOOLS_READ_SCOPE],
+    }],
+    annotations: {
+      readOnlyHint: !write,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  };
 }
 
 export function mcpVisibleToolNames(
