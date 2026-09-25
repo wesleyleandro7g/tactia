@@ -27,6 +27,11 @@ export function Badge({ className, tone, ...props }: HTMLAttributes<HTMLSpanElem
 const STATUS_TONES: Record<string, BadgeTone> = {
   active: 'success',
   completed: 'success',
+  succeeded: 'success',
+  partial: 'warning',
+  needs_attention: 'warning',
+  draft: 'neutral',
+  paused: 'warning',
   suspended: 'warning',
   disabled: 'warning',
   running: 'info',

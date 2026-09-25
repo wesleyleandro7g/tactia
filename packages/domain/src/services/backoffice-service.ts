@@ -2,6 +2,8 @@ import type {
   AuditLogRepository,
   DataSourceRepository,
   ImportRepository,
+  IntegrationModuleRunRepository,
+  IntegrationArtifactRepository,
   InsightRepository,
   MembershipRepository,
   SyncJobRepository,
@@ -13,6 +15,7 @@ import {
   ErrorCode,
   paginationArgs,
   type RequestContext,
+  type ObjectStorage,
 } from '@tactia/shared';
 import { assertOperator } from '../authz';
 import type { AuthProvider } from '../ports/auth-provider';
@@ -69,6 +72,9 @@ export class BackofficeService {
     private readonly dataSourceService: DataSourceService,
     private readonly credentialService: CredentialService,
     private readonly customFields?: CustomFieldDefinitionService,
+    private readonly moduleRuns?: IntegrationModuleRunRepository,
+    private readonly integrationArtifacts?: IntegrationArtifactRepository,
+    private readonly objectStorage?: ObjectStorage,
   ) {}
 
   async listTenants(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -367,6 +373,11 @@ export class BackofficeService {
     return this.syncService.startSync(operatorCtx, dataSourceId);
   }
 
+  async cancelSync(ctx: RequestContext, tenantId: string, syncJobId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.syncService.cancelSyncJob(scoped, syncJobId);
+  }
+
   async reprocessImport(ctx: RequestContext, tenantId: string, importId: string) {
     assertOperator(ctx);
     const tenant = await this.tenants.findByIdForOperator(tenantId);
@@ -387,10 +398,12 @@ export class BackofficeService {
   async getDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string) {
     const scoped = await this.operatorScope(ctx, tenantId);
     const dataSource = await this.dataSourceService.get(scoped, dataSourceId);
-    const mappings = await this.dataSourceService.listMappings(scoped, dataSourceId, {
-      page: '1',
-      pageSize: '50',
-    });
+    const [mappings, moduleRuns] = await Promise.all([
+      this.dataSourceService.listMappings(scoped, dataSourceId, { page: '1', pageSize: '50' }),
+      this.moduleRuns
+        ? this.moduleRuns.listByDataSource({ tenantId, dataSourceId, take: 100 })
+        : Promise.resolve([]),
+    ]);
     const { credential, ...rest } = dataSource;
     return {
       dataSource: {
@@ -400,6 +413,7 @@ export class BackofficeService {
           : null,
       },
       mappings: mappings.items,
+      moduleRuns,
       connectorAvailable: sourceKindHasConnector(dataSource.type),
     };
   }
@@ -470,6 +484,23 @@ export class BackofficeService {
     const scoped = await this.operatorScope(ctx, tenantId);
     const credential = await this.credentialService.create(scoped, raw);
     return { id: credential.id, provider: credential.provider, createdAt: credential.createdAt };
+  }
+
+  async getIntegrationArtifact(ctx: RequestContext, tenantId: string, artifactId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    if (!this.integrationArtifacts || !this.objectStorage) {
+      throw new AppError(ErrorCode.INTERNAL_ERROR, 'Integration artifact storage is not configured');
+    }
+    const artifact = await this.integrationArtifacts.findById({ tenantId, id: artifactId });
+    if (!artifact) throw new AppError(ErrorCode.NOT_FOUND, 'Artifact not found');
+    const object = await this.objectStorage.get(artifact.storageKey);
+    await this.auditLogs.record(scoped, {
+      action: AuditAction.INTEGRATION_ARTIFACT_ACCESSED,
+      entityType: 'integration_artifact',
+      entityId: artifact.id,
+      metadata: { dataSourceId: artifact.dataSourceId, moduleKey: artifact.moduleKey },
+    });
+    return { body: object.body, contentType: artifact.mimeType || object.contentType };
   }
 
   async listCustomFields(ctx: RequestContext, tenantId: string, entityType?: string) {

@@ -1,6 +1,9 @@
 import {
   ActivityRepository,
   AuditLogRepository,
+  BrowserExecutorInstanceRepository,
+  BrowserWorkflowBindingRepository,
+  BrowserWorkflowRepository,
   CampaignRepository,
   CredentialRepository,
   CustomFieldDefinitionRepository,
@@ -12,6 +15,8 @@ import {
   InsightRepository,
   InteractionRepository,
   InventoryLevelRepository,
+  IntegrationArtifactRepository,
+  IntegrationModuleRunRepository,
   LeadRepository,
   MappingRepository,
   MembershipRepository,
@@ -29,6 +34,7 @@ import {
 import {
   AuditLogService,
   BackofficeService,
+  BrowserIntegrationService,
   CredentialService,
   CustomDataValidationService,
   CustomFieldDefinitionService,
@@ -38,6 +44,8 @@ import {
   SyncService,
 } from '@tactia/domain';
 import { clientAuthProvider, operatorAuthProvider } from './auth-provider';
+import { createObjectStorageFromEnv } from '@tactia/shared/storage';
+import { DEFAULT_JOB_RETRY_LIMIT, PgBossJobQueue } from '@tactia/execution';
 
 const tenantRepository = new TenantRepository(prisma);
 const userRepository = new UserRepository(prisma);
@@ -58,18 +66,30 @@ const interactionRepository = new InteractionRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
 const dataSourceRepository = new DataSourceRepository(prisma);
 const syncJobRepository = new SyncJobRepository(prisma);
+const integrationModuleRunRepository = new IntegrationModuleRunRepository(prisma);
+const integrationArtifactRepository = new IntegrationArtifactRepository(prisma);
 const rawRecordRepository = new RawRecordRepository(prisma);
 const mappingRepository = new MappingRepository(prisma);
 const importRepository = new ImportRepository(prisma);
 const dataQualityReportRepository = new DataQualityReportRepository(prisma);
 const insightRepository = new InsightRepository(prisma);
 const customFieldDefinitionRepository = new CustomFieldDefinitionRepository(prisma);
+const browserExecutorInstanceRepository = new BrowserExecutorInstanceRepository(prisma);
+const browserWorkflowRepository = new BrowserWorkflowRepository(prisma);
+const browserWorkflowBindingRepository = new BrowserWorkflowBindingRepository(prisma);
 
 export const auditLogService = new AuditLogService(auditLogRepository);
 
 export const operatorService = new OperatorService(operatorRepository, operatorAuthProvider);
 
 export const credentialService = new CredentialService(credentialRepository);
+
+export const browserIntegrationService = new BrowserIntegrationService({
+  instances: browserExecutorInstanceRepository,
+  workflows: browserWorkflowRepository,
+  bindings: browserWorkflowBindingRepository,
+  credentials: credentialRepository,
+});
 
 export const dataSourceService = new DataSourceService(
   dataSourceRepository,
@@ -88,12 +108,21 @@ export const customFieldDefinitionService = new CustomFieldDefinitionService(
   dataCatalogService,
 );
 
+const objectStorage = createObjectStorageFromEnv();
+const adminJobQueue = process.env['JOBS_ENABLED'] === 'true' && process.env['DATABASE_URL']
+  ? new PgBossJobQueue({ connectionString: process.env['DATABASE_URL'], retryLimit: DEFAULT_JOB_RETRY_LIMIT })
+  : null;
+
 export const syncService = new SyncService({
   dataSources: dataSourceRepository,
   syncJobs: syncJobRepository,
   rawRecords: rawRecordRepository,
   imports: importRepository,
   qualityReports: dataQualityReportRepository,
+  moduleRuns: integrationModuleRunRepository,
+  artifacts: integrationArtifactRepository,
+  objectStorage,
+  maxSyncAttempts: DEFAULT_JOB_RETRY_LIMIT + 1,
   mappings: mappingRepository,
   credentials: credentialRepository,
   auditLogs: auditLogService,
@@ -108,6 +137,11 @@ export const syncService = new SyncService({
   payments: paymentRepository,
   inventoryLevels: inventoryLevelRepository,
   campaigns: campaignRepository,
+  enqueueSync: adminJobQueue
+    ? async (job) => {
+        await adminJobQueue.publish('sync.execute', job, { singletonKey: job.syncJobId, expireInSeconds: 2 * 60 * 60 });
+      }
+    : undefined,
   customData: customDataValidationService,
 });
 
@@ -126,4 +160,7 @@ export const backofficeService = new BackofficeService(
   dataSourceService,
   credentialService,
   customFieldDefinitionService,
+  integrationModuleRunRepository,
+  integrationArtifactRepository,
+  objectStorage,
 );

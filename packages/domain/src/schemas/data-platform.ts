@@ -14,7 +14,7 @@ export const updateDataSourceSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   configuration: z.record(z.unknown()).optional().nullable(),
   credentialId: z.string().uuid().optional().nullable(),
-  status: z.enum(['active', 'inactive', 'error']).optional(),
+  status: z.enum(['active', 'draft', 'paused', 'needs_attention', 'inactive', 'error']).optional(),
 });
 
 export const createMappingSchema = z.object({

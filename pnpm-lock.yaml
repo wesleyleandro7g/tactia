@@ -32,6 +32,9 @@ importers:
       '@tactia/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@tactia/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@tactia/database':
         specifier: workspace:*
         version: link:../../packages/database

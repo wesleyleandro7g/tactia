@@ -14,17 +14,23 @@ export class ImportRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async create(input: CreateImportInput) {
-    return this.db.import.create({
-      data: {
-        id: createId(),
-        tenantId: input.tenantId,
-        dataSourceId: input.dataSourceId,
-        syncJobId: input.syncJobId ?? null,
-        entityType: input.entityType,
-        totalRecords: input.totalRecords ?? 0,
-        idempotencyKey: input.idempotencyKey ?? null,
-      },
-    });
+    const data = {
+      id: createId(),
+      tenantId: input.tenantId,
+      dataSourceId: input.dataSourceId,
+      syncJobId: input.syncJobId ?? null,
+      entityType: input.entityType,
+      totalRecords: input.totalRecords ?? 0,
+      idempotencyKey: input.idempotencyKey ?? null,
+    };
+    if (input.idempotencyKey) {
+      return this.db.import.upsert({
+        where: { idempotencyKey: input.idempotencyKey },
+        create: data,
+        update: { totalRecords: data.totalRecords, syncJobId: data.syncJobId, status: 'pending' },
+      });
+    }
+    return this.db.import.create({ data });
   }
 
   async findById({ tenantId, id }: { tenantId: string; id: string }) {

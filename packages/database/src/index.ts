@@ -11,6 +11,7 @@ export type {
   SyncJobStatus,
   SyncJobTrigger,
   SyncJobMode,
+  IntegrationModuleRunStatus,
   ImportStatus,
   InsightType,
   InsightSeverity,
@@ -71,6 +72,11 @@ export { PlaybookRepository } from './repositories/playbook-repository';
 export { CredentialRepository } from './repositories/credential-repository';
 export { DataSourceRepository } from './repositories/data-source-repository';
 export { SyncJobRepository } from './repositories/sync-job-repository';
+export { IntegrationModuleRunRepository } from './repositories/integration-module-run-repository';
+export { IntegrationArtifactRepository } from './repositories/integration-artifact-repository';
+export { BrowserWorkflowBindingRepository } from './repositories/browser-workflow-binding-repository';
+export { BrowserExecutorInstanceRepository } from './repositories/browser-executor-instance-repository';
+export { BrowserWorkflowRepository } from './repositories/browser-workflow-repository';
 export { RawRecordRepository } from './repositories/raw-record-repository';
 export { MappingRepository } from './repositories/mapping-repository';
 export { ImportRepository } from './repositories/import-repository';
@@ -121,6 +127,17 @@ export type {
 export type { CreateDataSourceInput, DataSourceType } from './repositories/data-source-repository';
 export type { CreateCredentialInput } from './repositories/credential-repository';
 export type { CreateSyncJobInput } from './repositories/sync-job-repository';
+export type { StartIntegrationModuleRunInput, FinishIntegrationModuleRunInput } from './repositories/integration-module-run-repository';
+export type { CreateIntegrationArtifactInput } from './repositories/integration-artifact-repository';
+export type { UpsertBrowserWorkflowBindingInput } from './repositories/browser-workflow-binding-repository';
+export type {
+  CreateBrowserExecutorInstanceInput,
+  UpdateBrowserExecutorInstanceInput,
+} from './repositories/browser-executor-instance-repository';
+export type {
+  BrowserWorkflowIdentity,
+  AddRevisionInput,
+} from './repositories/browser-workflow-repository';
 export type { UpsertRawRecordInput } from './repositories/raw-record-repository';
 export type { CreateMappingInput } from './repositories/mapping-repository';
 export type { CreateImportInput } from './repositories/import-repository';

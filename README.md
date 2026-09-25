@@ -88,6 +88,8 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 | [docs/deploy-producao.md](docs/deploy-producao.md) | Deploy em produção com Docker Compose e TLS |
 | [docs/onboarding-cliente.md](docs/onboarding-cliente.md) | Passo a passo para colocar um cliente real |
 | [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
+| [docs/integrations/torge/operations.md](docs/integrations/torge/operations.md) | Implantação, workflows, segurança e operação Torge/Figranium |
+| [docs/integrations/torge/acceptance-report.md](docs/integrations/torge/acceptance-report.md) | Cobertura, evidências, bloqueios e estado de produção |
 | [docs/integracao-chatgpt-mcp.md](docs/integracao-chatgpt-mcp.md) | OAuth 2.1, deploy e publicação do app MCP no ChatGPT |
 
 Logs são JSON estruturado com `request_id`, `tenant_id`, `user_id`, `operation`,

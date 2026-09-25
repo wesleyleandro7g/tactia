@@ -1,11 +1,12 @@
 import { AppError, ErrorCode } from '../errors';
 
-export const STORAGE_KINDS = ['document', 'image', 'audio'] as const;
+export const STORAGE_KINDS = ['document', 'image', 'audio', 'integration-artifact'] as const;
 export type StorageKind = (typeof STORAGE_KINDS)[number];
 
 export const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
 export const AUDIO_MAX_BYTES = 25 * 1024 * 1024;
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const INTEGRATION_ARTIFACT_MAX_BYTES = 100 * 1024 * 1024;
 
 export const ALLOWED_DOC_MIME = ['application/pdf', 'text/plain', 'text/markdown'] as const;
 export const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -101,5 +102,6 @@ export function mimeKind(mime: string): StorageKind | 'csv' | null {
 export function maxBytesForKind(kind: StorageKind): number {
   if (kind === 'audio') return AUDIO_MAX_BYTES;
   if (kind === 'image') return IMAGE_MAX_BYTES;
+  if (kind === 'integration-artifact') return INTEGRATION_ARTIFACT_MAX_BYTES;
   return DOCUMENT_MAX_BYTES;
 }

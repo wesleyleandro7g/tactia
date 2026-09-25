@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/app/page-header';
 import { CustomFieldsPanel } from '@/components/app/custom-fields-panel';
 import {
   AddUserForm,
+  CancelSyncButton,
   MembershipControls,
   ReprocessButton,
   ResetPasswordButton,
@@ -25,17 +26,26 @@ import {
 import { requireOperator } from '@/lib/server-context';
 import { backofficeService } from '@/lib/services';
 import { sourceKindDisplayLabel, sourceKindHasConnector } from '@tactia/domain';
+import { ErrorCode, isAppError, type RequestContext } from '@tactia/shared';
 
 export const metadata = { title: 'Empresa · Tactia Ops' };
+
+async function loadTenantPage(ctx: RequestContext, id: string) {
+  try {
+    return await Promise.all([
+      backofficeService.getTenant(ctx, id),
+      backofficeService.listCustomFields(ctx, id),
+    ]);
+  } catch (error) {
+    if (isAppError(error) && error.code === ErrorCode.NOT_FOUND) notFound();
+    throw error;
+  }
+}
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { ctx } = await requireOperator(`/tenants/${id}`);
-  const [detail, customFields] = await Promise.all([
-    backofficeService.getTenant(ctx, id).catch(() => null),
-    backofficeService.listCustomFields(ctx, id).catch(() => ({ items: [] })),
-  ]);
-  if (!detail) notFound();
+  const [detail, customFields] = await loadTenantPage(ctx, id);
 
   const { tenant, users, dataSources, syncJobs, imports, insights, auditLogs } = detail;
 
@@ -181,6 +191,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               key: 'created',
               header: 'Início',
               render: (row) => formatDateTime(row.createdAt),
+            },
+            {
+              key: 'actions',
+              header: 'Ações',
+              render: (row) => row.status === 'pending' || row.status === 'running'
+                ? <CancelSyncButton tenantId={tenant.id} syncJobId={row.id} />
+                : '—',
             },
           ]}
           rows={syncJobs}

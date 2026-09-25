@@ -87,6 +87,7 @@ services:
       LLM_CLASSIFIER_MODEL: ${LLM_CLASSIFIER_MODEL:-}
       JOBS_ENABLED: ${JOBS_ENABLED:-true}
       CRON_SECRET: ${CRON_SECRET:-}
+      FIGRANIUM_INSTANCES_JSON: ${FIGRANIUM_INSTANCES_JSON:-{}}
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
       EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
@@ -153,6 +154,8 @@ services:
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
+      JOBS_ENABLED: ${JOBS_ENABLED:-true}
+      FIGRANIUM_INSTANCES_JSON: ${FIGRANIUM_INSTANCES_JSON:-{}}
     volumes:
       - uploads_data:/data/uploads
     depends_on:
@@ -173,7 +176,29 @@ services:
       retries: 10
       start_period: 20s
 
+  figranium-torge:
+    image: ghcr.io/figranium/figranium:0.18.4
+    restart: unless-stopped
+    environment:
+      PORT: 11345
+      NODE_ENV: production
+      SESSION_SECRET: ${FIGRANIUM_SESSION_SECRET:?defina FIGRANIUM_SESSION_SECRET}
+      ALLOWED_IPS: ${FIGRANIUM_ALLOWED_IPS:-}
+      SKIP_LOCAL_CAPTCHA_MODEL: "true"
+    ports:
+      - '127.0.0.1:${FIGRANIUM_PORT:-11345}:11345'
+    volumes:
+      - figranium_torge_data:/app/data
+      - figranium_torge_captures:/app/public/captures
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:11345/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:
   minio_data:
   uploads_data:
+  figranium_torge_data:
+  figranium_torge_captures:

@@ -8,7 +8,14 @@ import { AppError, ErrorCode, paginationArgs, type RequestContext } from '@tacti
 import {
   CsvConnector,
   McpConnector,
+  TorgeConnector,
+  assertTorgeModulesEnableable,
+  createFigraniumExecutorFromEnv,
+  createFigraniumExecutorFromResolved,
+  figraniumConfigFromEnv,
+  parseTorgeConnectionConfig,
   sqlConnectorFromSource,
+  type BrowserCredentialResolver,
   type ConnectionTestResult,
   type DiscoveryResult,
   type DiscoveryResource,
@@ -24,6 +31,7 @@ import {
 } from '../schemas/data-platform';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import { CredentialService } from './credential-service';
+import type { BrowserIntegrationService } from './browser-integration-service';
 import { listQuerySchema } from '../schemas/business';
 
 export class DataSourceService {
@@ -32,6 +40,7 @@ export class DataSourceService {
     private readonly mappings: MappingRepository,
     private readonly credentials: CredentialRepository,
     private readonly auditLogs: AuditLogService,
+    private readonly browserIntegration?: BrowserIntegrationService,
   ) {}
 
   async list(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -58,12 +67,42 @@ export class DataSourceService {
   async create(ctx: RequestContext, raw: unknown) {
     assertCanManageConnections(ctx);
     const input = createDataSourceSchema.parse(raw);
+    if (input.credentialId) {
+      const credential = await this.credentials.findById({ tenantId: ctx.tenantId!, id: input.credentialId });
+      if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Credential not found');
+    }
+    const torgeConfig = input.type === 'torge'
+      ? this.parseTorgeConfiguration(input.configuration)
+      : null;
     const ds = await this.dataSources.create({
       tenantId: ctx.tenantId!,
       ...input,
+      status: input.type === 'torge' ? 'draft' : undefined,
       configuration: input.configuration ?? null,
       credentialId: input.credentialId ?? null,
     });
+    if (torgeConfig?.enabledModules.includes('products')) {
+      await this.mappings.create({
+        tenantId: ctx.tenantId!,
+        dataSourceId: ds.id,
+        sourceEntity: 'products',
+        targetEntity: 'product',
+        configuration: {
+          fields: [
+            { source: 'external_id', target: 'external_id' },
+            { source: 'name', target: 'name' },
+            { source: 'sku', target: 'sku' },
+            { source: 'price', target: 'price', transform: 'currency' },
+            { source: 'cost', target: 'cost', transform: 'currency' },
+            { source: 'status', target: 'status' },
+            { source: 'source_barcode', target: 'custom:barcode' },
+            { source: 'source_quantity', target: 'custom:source_quantity' },
+            { source: 'source_unit', target: 'custom:unit' },
+            { source: 'source_group', target: 'custom:group' },
+          ],
+        },
+      });
+    }
     await this.auditLogs.record(ctx, {
       action: AuditAction.DATA_SOURCE_CREATED,
       entityType: 'data_source',
@@ -76,6 +115,36 @@ export class DataSourceService {
   async update(ctx: RequestContext, id: string, raw: unknown) {
     assertCanManageConnections(ctx);
     const input = updateDataSourceSchema.parse(raw);
+    if (input.credentialId) {
+      const credential = await this.credentials.findById({ tenantId: ctx.tenantId!, id: input.credentialId });
+      if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Credential not found');
+    }
+    const current = await this.get(ctx, id);
+    if (current.type === 'torge') {
+      const configuration = input.configuration === undefined ? current.configuration : input.configuration;
+      const parsed = this.parseTorgeConfiguration(configuration);
+      if (input.status === 'active') {
+        const credentialId = input.credentialId === undefined ? current.credentialId : input.credentialId;
+        if (!credentialId) throw new AppError(ErrorCode.VALIDATION_ERROR, 'Credencial Torge obrigatória.');
+        try {
+          const executorConfig = await this.resolveExecutorConfig(ctx, parsed.instanceKey);
+          if (executorConfig.dedicatedConnectionId !== id) {
+            throw new Error('A instância Figranium não está dedicada a esta conexão.');
+          }
+          const modules = assertTorgeModulesEnableable(parsed.enabledModules);
+          const bindings = new Set(
+            executorConfig.workflows.map((binding) => `${binding.workflowKey}@${binding.workflowVersion}`),
+          );
+          for (const module of modules) {
+            if (!module.workflowKey || !module.workflowVersion || !bindings.has(`${module.workflowKey}@${module.workflowVersion}`)) {
+              throw new Error(`Fluxo do módulo ${module.id} não está publicado nesta instância.`);
+            }
+          }
+        } catch (error) {
+          throw new AppError(ErrorCode.VALIDATION_ERROR, error instanceof Error ? error.message : 'Instância Figranium inválida.');
+        }
+      }
+    }
     const ds = await this.dataSources.update({
       tenantId: ctx.tenantId!,
       id,
@@ -207,7 +276,7 @@ export class DataSourceService {
     return mapping;
   }
 
-  private async _buildConnector(ctx: RequestContext, ds: { type: string; configuration: unknown; credentialId: string | null }) {
+  private async _buildConnector(ctx: RequestContext, ds: { id: string; type: string; configuration: unknown; credentialId: string | null }) {
     const config = (ds.configuration ?? {}) as Record<string, unknown>;
 
     if (ds.type === 'csv') {
@@ -239,6 +308,78 @@ export class DataSourceService {
       });
     }
 
+    if (ds.type === 'torge') {
+      if (!ds.credentialId) throw new AppError(ErrorCode.VALIDATION_ERROR, 'Credencial Torge obrigatória.');
+      const decrypted = await new CredentialService(this.credentials).getDecryptedData(ctx, ds.credentialId);
+      const credentialId = ds.credentialId;
+      const resolver: BrowserCredentialResolver = {
+        resolve: async (connectionId, refs) => {
+          if (connectionId !== ds.id || refs.length !== 1 || refs[0] !== credentialId) {
+            throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'Referência de credencial inválida.');
+          }
+          return decrypted;
+        },
+      };
+      const torgeConfig = this.parseTorgeConfiguration(ds.configuration);
+      return new TorgeConnector(
+        ds.id,
+        credentialId,
+        torgeConfig,
+        await this.buildFigraniumExecutor(ctx, torgeConfig.instanceKey, resolver),
+      );
+    }
+
     throw new AppError(ErrorCode.CONNECTOR_ERROR, `Connector type '${ds.type}' not supported yet`);
+  }
+
+  /**
+   * Resolve the Figranium executor config DB-first for this tenant, falling back
+   * to FIGRANIUM_INSTANCES_JSON when no browser integration service is wired.
+   * Returns only non-secret fields needed for enablement validation.
+   */
+  private async resolveExecutorConfig(
+    ctx: RequestContext,
+    instanceKey: string,
+  ): Promise<{ dedicatedConnectionId: string; workflows: Array<{ workflowKey: string; workflowVersion: string }> }> {
+    if (this.browserIntegration) {
+      const environment = process.env['TACTIA_ENVIRONMENT'] || process.env['NODE_ENV'] || 'development';
+      const { resolved } = await this.browserIntegration.resolveFigranium(ctx, {
+        provider: 'torge',
+        environment,
+        instanceKey,
+      });
+      return { dedicatedConnectionId: resolved.dedicatedConnectionId, workflows: resolved.workflows };
+    }
+    const config = figraniumConfigFromEnv(instanceKey);
+    return { dedicatedConnectionId: config.dedicatedConnectionId, workflows: config.workflows };
+  }
+
+  private async buildFigraniumExecutor(
+    ctx: RequestContext,
+    instanceKey: string,
+    resolver: BrowserCredentialResolver,
+  ) {
+    if (this.browserIntegration) {
+      const environment = process.env['TACTIA_ENVIRONMENT'] || process.env['NODE_ENV'] || 'development';
+      const { resolved } = await this.browserIntegration.resolveFigranium(ctx, {
+        provider: 'torge',
+        environment,
+        instanceKey,
+      });
+      return createFigraniumExecutorFromResolved(resolved, resolver);
+    }
+    return createFigraniumExecutorFromEnv(instanceKey, resolver);
+  }
+
+  private parseTorgeConfiguration(value: unknown) {
+    try {
+      const parsed = parseTorgeConnectionConfig(value);
+      if ((value as Record<string, unknown> | null)?.['isolationMode'] !== 'dedicated_instance') {
+        throw new Error('Torge exige instância dedicada.');
+      }
+      return parsed;
+    } catch (error) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, error instanceof Error ? error.message : 'Configuração Torge inválida.');
+    }
   }
 }

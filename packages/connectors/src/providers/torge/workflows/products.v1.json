@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "provider": "torge",
+  "workflowKey": "torge.products",
+  "workflowVersion": "1",
+  "publishable": false,
+  "status": "requires_authorized_capture",
+  "reason": "Seletores, identidade estável e contrato do CSV ainda não foram validados em arquivo/sessão autorizados.",
+  "requiredOutput": {
+    "complete": true,
+    "sourceTotal": "number",
+    "rows": [
+      {
+        "external_id": "string",
+        "name": "string",
+        "sku": "string|null",
+        "price": "decimal-string|null",
+        "cost": "decimal-string|null",
+        "status": "active|inactive|null"
+      }
+    ]
+  },
+  "security": {
+    "readOnly": true,
+    "scheduleEnabled": false,
+    "disableRecording": true,
+    "allowedOrigin": "https://app.torge.com.br"
+  }
+}

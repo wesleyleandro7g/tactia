@@ -11,6 +11,7 @@ export { InlineJobQueue } from './job-queue';
 export {
   PgBossJobQueue,
   ACTION_EXECUTE_JOB,
+  DEFAULT_JOB_RETRY_LIMIT,
   type ActionExecuteJob,
   type JobHandler,
   type PgBossJobQueueOptions,

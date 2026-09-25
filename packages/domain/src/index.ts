@@ -89,6 +89,20 @@ export {
 export { createApiKeySchema, API_KEY_SCOPES } from './schemas/api-keys';
 export type { ApiKeyScope } from './schemas/api-keys';
 export { DataSourceService } from './services/data-source-service';
+export { BrowserIntegrationService, currentBrowserEnvironment } from './services/browser-integration-service';
+export type { BrowserIntegrationDeps, BrowserSyncSnapshot, BrowserHealthResult } from './services/browser-integration-service';
+export {
+  createBrowserExecutorInstanceSchema,
+  updateBrowserExecutorInstanceSchema,
+  importBrowserWorkflowSchema,
+  publishBrowserWorkflowSchema,
+  testBrowserExecutorHealthSchema,
+  setActiveRevisionSchema,
+} from './schemas/browser-integration';
+export type {
+  ImportBrowserWorkflowInput,
+  CreateBrowserExecutorInstanceRequest,
+} from './schemas/browser-integration';
 export { SyncService } from './services/sync-service';
 export type { StartSyncOptions, SyncTenantSourcesOptions } from './services/sync-service';
 export { ImportService } from './services/import-service';
@@ -187,7 +201,7 @@ export {
   listSelectableSourceKinds,
   groupSelectableSourceKinds,
 } from './data-sources/catalog';
-export type { SourceKind, CatalogField, SourceConnectorKind, SqlDialect } from './data-sources/catalog';
+export type { SourceKind, CatalogField, CatalogFieldOption, SourceConnectorKind, SqlDialect } from './data-sources/catalog';
 export {
   TARGET_ENTITIES,
   targetFieldsFor,

@@ -19,6 +19,8 @@ import {
   InsightRepository,
   InteractionRepository,
   InventoryLevelRepository,
+  IntegrationArtifactRepository,
+  IntegrationModuleRunRepository,
   LeadRepository,
   MappingRepository,
   MembershipRepository,
@@ -96,6 +98,7 @@ import {
   ActionService,
   ApprovalService,
   ConsoleEmailSender,
+  DEFAULT_JOB_RETRY_LIMIT,
   ExecutionEngine,
   createDefaultActionRegistry,
 } from '@tactia/execution';
@@ -109,7 +112,7 @@ import {
 } from '@tactia/ai';
 import { createObjectStorageFromEnv } from '@tactia/shared/storage';
 import { betterAuthProvider } from './auth-provider';
-import { getJobQueue, JOBS, jobsEnabled, type IngestDocumentJob, type IngestMediaJob, type SyncJob } from './jobs';
+import { DAILY_JOB_EXPIRE_SECONDS, getJobQueue, JOBS, jobsEnabled, type IngestDocumentJob, type IngestMediaJob, type SyncJob } from './jobs';
 
 // ---------------------------------------------------------------------------
 // Repositories
@@ -143,6 +146,8 @@ const interactionRepository = new InteractionRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
 const dataSourceRepository = new DataSourceRepository(prisma);
 const syncJobRepository = new SyncJobRepository(prisma);
+const integrationModuleRunRepository = new IntegrationModuleRunRepository(prisma);
+const integrationArtifactRepository = new IntegrationArtifactRepository(prisma);
 const rawRecordRepository = new RawRecordRepository(prisma);
 const mappingRepository = new MappingRepository(prisma);
 const importRepository = new ImportRepository(prisma);
@@ -443,6 +448,10 @@ export const syncService = new SyncService({
   rawRecords: rawRecordRepository,
   imports: importRepository,
   qualityReports: dataQualityReportRepository,
+  moduleRuns: integrationModuleRunRepository,
+  artifacts: integrationArtifactRepository,
+  objectStorage,
+  maxSyncAttempts: DEFAULT_JOB_RETRY_LIMIT + 1,
   mappings: mappingRepository,
   credentials: credentialRepository,
   auditLogs: auditLogService,
@@ -473,7 +482,10 @@ export const syncService = new SyncService({
           await syncService.executeSync(job.tenantId, job.syncJobId, job);
           return;
         }
-        await queue.publish<SyncJob>(JOBS.sync, job, { singletonKey: job.syncJobId });
+        await queue.publish<SyncJob>(JOBS.sync, job, {
+          singletonKey: job.syncJobId,
+          expireInSeconds: DAILY_JOB_EXPIRE_SECONDS,
+        });
       }
     : undefined,
 });

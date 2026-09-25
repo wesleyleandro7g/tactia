@@ -71,6 +71,11 @@ export function connectorScreenCopy(kind: SourceKind): { title: string; descript
         title: 'Trello',
         description: 'Quadro e tokens da API. O sync ficará bloqueado até o conector existir.',
       };
+    case 'torge':
+      return {
+        title: 'Torge',
+        description: 'Configure a conta, a filial e a instância de navegador dedicada. A fonte começa como rascunho e não dispara carga automaticamente.',
+      };
     case 'erp':
       return {
         title: 'ERP',

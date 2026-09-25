@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { logger } from '@tactia/shared';
 import { IntelligencePipelineService } from '@tactia/domain';
-import { PgBossJobQueue } from '@tactia/execution';
+import { DEFAULT_JOB_RETRY_LIMIT, PgBossJobQueue } from '@tactia/execution';
 
 /**
  * Background jobs (Etapa 11 — B4). Same Postgres as the app (`pgboss` schema).
@@ -68,7 +68,7 @@ export function getJobQueue(): PgBossJobQueue | null {
     queue = null;
     return null;
   }
-  queue = new PgBossJobQueue({ connectionString });
+  queue = new PgBossJobQueue({ connectionString, retryLimit: DEFAULT_JOB_RETRY_LIMIT });
   return queue;
 }
 
@@ -223,9 +223,14 @@ export async function startJobWorkers(): Promise<void> {
   });
 
   await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {
-    await enqueueDailyForDueTenants(data.now ? new Date(data.now) : new Date());
+    const now = data.now ? new Date(data.now) : new Date();
+    const daily = await enqueueDailyForDueTenants(now);
+    const { syncService } = await import('./services');
+    const browser = await syncService.enqueueDueBrowserSyncs(now);
+    logger.info({ operation: 'scheduler_tick', daily_enqueued: daily.enqueued, browser_enqueued: browser.enqueued });
   });
 
-  await jobQueue.schedule(JOBS.tick, '5 * * * *', {}, { tz: 'UTC', key: 'hourly' });
+  await jobQueue.unschedule(JOBS.tick, 'hourly');
+  await jobQueue.schedule(JOBS.tick, '*/5 * * * *', {}, { tz: 'UTC', key: 'integration-tick' });
   logger.info({ operation: 'job_workers_started' });
 }

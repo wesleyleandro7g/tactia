@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { guessMapping, type TargetEntity } from '@tactia/domain/data-sources/import-mapping';
 import { Alert } from '@/components/ui/alert';
@@ -36,15 +36,33 @@ type MappingRow = {
   configuration: { fields?: Array<{ source: string; target: string }> };
 };
 
+type ModuleRun = {
+  id: string;
+  moduleKey: string;
+  status: string;
+  attempt: number;
+  workflowVersion: string;
+  parserVersion: string;
+  recordsRead: number;
+  recordsFailed: number;
+  safeMessage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  artifactCount: number;
+  artifactIds: string[];
+};
+
 export function DataSourceManagePanel({
   tenantId,
   dataSource,
   mappings,
+  moduleRuns,
   connectorAvailable,
 }: {
   tenantId: string;
   dataSource: DataSource;
   mappings: MappingRow[];
+  moduleRuns: ModuleRun[];
   connectorAvailable: boolean;
 }) {
   const router = useRouter();
@@ -61,6 +79,14 @@ export function DataSourceManagePanel({
   const [targetEntity, setTargetEntity] = useState<TargetEntity>('customer');
   const [fieldMap, setFieldMap] = useState<Record<string, string>>({});
   const extraFields = useCustomMappingFields(tenantId, targetEntity);
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setNow(Date.now()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const stale = dataSource.type === 'torge' && dataSource.status === 'active' && (
+    !dataSource.lastSyncAt || (now !== null && now - new Date(dataSource.lastSyncAt).getTime() > 36 * 60 * 60 * 1000)
+  );
 
   async function saveMeta(event: React.FormEvent) {
     event.preventDefault();
@@ -80,6 +106,21 @@ export function DataSourceManagePanel({
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function setStatus(status: 'active' | 'paused') {
+    setPending(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await opsJson(base, { method: 'PATCH', body: { status } });
+      setMessage(status === 'active' ? 'Conexão habilitada.' : 'Conexão pausada.');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao alterar status');
     } finally {
       setPending(false);
     }
@@ -174,6 +215,9 @@ export function DataSourceManagePanel({
 
   return (
     <div className="flex flex-col gap-8">
+      {stale ? (
+        <Alert tone="warning">A conexão está desatualizada: nenhuma coleta completa válida nas últimas 36 horas.</Alert>
+      ) : null}
       {connectorAvailable ? null : (
         <Alert tone="warning">
           Conexão registrada. O conector desta fonte ainda não está disponível; teste e sync ficam
@@ -192,6 +236,17 @@ export function DataSourceManagePanel({
           <Button type="submit" loading={pending} variant="secondary">
             Salvar
           </Button>
+          {dataSource.type === 'torge' ? (
+            dataSource.status === 'active' ? (
+              <Button type="button" variant="secondary" loading={pending} onClick={() => void setStatus('paused')}>
+                Pausar
+              </Button>
+            ) : (
+              <Button type="button" loading={pending} onClick={() => void setStatus('active')}>
+                Habilitar
+              </Button>
+            )
+          ) : null}
           <Button type="button" variant="danger" loading={pending} onClick={() => void deactivate()}>
             Desativar
           </Button>
@@ -251,6 +306,39 @@ export function DataSourceManagePanel({
             </Button>
           </div>
         </form>
+      ) : null}
+
+      {dataSource.type === 'torge' ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-mono text-sm uppercase tracking-[0.16em] text-muted-foreground">
+            Execuções por módulo
+          </h2>
+          <DataTable
+            caption="Execuções Torge por módulo"
+            columns={[
+              { key: 'module', header: 'Módulo', render: (row: ModuleRun) => row.moduleKey },
+              { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone(row.status)}>{row.status}</Badge> },
+              { key: 'versions', header: 'Fluxo / parser', render: (row) => `v${row.workflowVersion} / v${row.parserVersion}` },
+              { key: 'counts', header: 'Lidos / falhas', numeric: true, render: (row) => `${row.recordsRead} / ${row.recordsFailed}` },
+              { key: 'attempt', header: 'Tentativa', numeric: true, render: (row) => row.attempt },
+              {
+                key: 'artifacts', header: 'Artefatos', numeric: true, render: (row) => row.artifactIds.length > 0 ? (
+                  <a
+                    className="text-primary hover:underline"
+                    href={`/api/v1/tenants/${tenantId}/integration-artifacts/${row.artifactIds[0]}`}
+                  >
+                    {row.artifactCount} arquivo(s)
+                  </a>
+                ) : '0',
+              },
+              { key: 'message', header: 'Diagnóstico', render: (row) => row.safeMessage ?? '—' },
+              { key: 'finished', header: 'Conclusão', render: (row) => row.finishedAt ? new Date(row.finishedAt).toLocaleString('pt-BR') : '—' },
+            ]}
+            rows={moduleRuns}
+            rowKey={(row) => row.id}
+            emptyLabel="Nenhuma execução modular. A fonte permanece em rascunho até ser habilitada."
+          />
+        </section>
       ) : null}
 
       <section className="flex flex-col gap-3">

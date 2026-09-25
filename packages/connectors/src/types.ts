@@ -44,6 +44,37 @@ export type FetchOptions = {
 
 export type RawRow = Record<string, unknown>;
 
+export type ModuleSyncStatus = 'succeeded' | 'failed' | 'cancelled' | 'needs_attention';
+
+export type ModuleSyncResult = {
+  moduleKey: string;
+  status: ModuleSyncStatus;
+  recordsRead: number;
+  recordsFailed: number;
+  externalExecutionId?: string;
+  artifactRefs?: string[];
+  evidence?: Record<string, unknown>;
+  errorCode?: string;
+  safeMessage?: string;
+  retryable: boolean;
+  workflowKey: string;
+  workflowVersion: string;
+  parserVersion: string;
+};
+
+export type ModuleSyncStart = Pick<
+  ModuleSyncResult,
+  'moduleKey' | 'workflowKey' | 'workflowVersion' | 'parserVersion'
+>;
+
+export type ModuleArtifact = {
+  moduleKey: string;
+  originRef: string;
+  fileName: string;
+  contentType: string;
+  body: Buffer;
+};
+
 export type SyncContext = {
   tenantId: string;
   dataSourceId: string;
@@ -60,7 +91,10 @@ export type SyncContext = {
     created: number;
     updated: number;
     failed: number;
-  }) => void;
+  }) => void | Promise<void>;
+  onModuleStart?: (module: ModuleSyncStart) => void | Promise<void>;
+  onModuleFinish?: (module: ModuleSyncResult) => void | Promise<void>;
+  onArtifact?: (artifact: ModuleArtifact) => void | Promise<void>;
 };
 
 export type SkippedMapping = {
@@ -75,6 +109,7 @@ export type SyncResult = {
   recordsUpdated: number;
   recordsFailed: number;
   skippedMappings?: SkippedMapping[];
+  moduleResults?: ModuleSyncResult[];
 };
 
 export interface Connector {
