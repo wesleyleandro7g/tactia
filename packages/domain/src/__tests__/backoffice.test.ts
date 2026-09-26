@@ -414,4 +414,80 @@ describe('backoffice operators', () => {
       backoffice.createDataSource(ctx, tenant.id, { name: 'Desconhecida', type: 'salesforce' }),
     ).rejects.toThrow();
   });
+
+  it('builds the tenant header with tab indicators', async () => {
+    const ctx = operatorCtx(ops.id);
+    const { tenant } = await backoffice.provisionTenant(ctx, {
+      name: 'Ops Co',
+      slug: SLUG,
+      ownerName: 'Owner',
+      ownerEmail: OWNER_EMAIL,
+      ownerPassword: 'password123',
+    });
+    await backoffice.addUser(ctx, tenant.id, {
+      name: 'Member',
+      email: MEMBER_EMAIL,
+      password: 'password123',
+      role: 'member',
+    });
+
+    const empty = await backoffice.getTenantHeader(ctx, tenant.id);
+    expect(empty.tenant.id).toBe(tenant.id);
+    expect(empty.indicators).toEqual({ users: 2, dataSources: 0, sync: null });
+
+    const source = await dataSources.create({ tenantId: tenant.id, type: 'csv', name: 'Vendas' });
+    const failed = await syncJobs.create({ tenantId: tenant.id, dataSourceId: source.id, status: 'failed' });
+    const afterFailure = await backoffice.getTenantHeader(ctx, tenant.id);
+    expect(afterFailure.indicators).toEqual({ users: 2, dataSources: 1, sync: 'failed' });
+
+    await syncJobs.create({ tenantId: tenant.id, dataSourceId: source.id, status: 'running' });
+    expect((await backoffice.getTenantHeader(ctx, tenant.id)).indicators.sync).toBe('running');
+
+    await prisma.syncJob.deleteMany({ where: { tenantId: tenant.id, id: { not: failed.id } } });
+    await syncJobs.create({ tenantId: tenant.id, dataSourceId: source.id, status: 'completed' });
+    expect((await backoffice.getTenantHeader(ctx, tenant.id)).indicators.sync).toBeNull();
+  });
+
+  it('serves per-tab data and keeps getTenant shape', async () => {
+    const ctx = operatorCtx(ops.id);
+    const { tenant } = await backoffice.provisionTenant(ctx, {
+      name: 'Ops Co',
+      slug: SLUG,
+      ownerName: 'Owner',
+      ownerEmail: OWNER_EMAIL,
+      ownerPassword: 'password123',
+    });
+    const source = await dataSources.create({ tenantId: tenant.id, type: 'csv', name: 'Vendas' });
+    await syncJobs.create({ tenantId: tenant.id, dataSourceId: source.id });
+
+    const users = await backoffice.listTenantUsers(ctx, tenant.id);
+    expect(users.map((row) => row.user.email)).toEqual([OWNER_EMAIL]);
+    const sources = await backoffice.listTenantDataSources(ctx, tenant.id);
+    expect(sources.map((row) => row.id)).toEqual([source.id]);
+    const history = await backoffice.getTenantSyncHistory(ctx, tenant.id);
+    expect(history.syncJobs).toHaveLength(1);
+    expect(history.imports).toEqual([]);
+    const activity = await backoffice.getTenantActivity(ctx, tenant.id);
+    expect(activity.auditLogs.length).toBeGreaterThan(0);
+    expect(activity.insights).toEqual([]);
+
+    const detail = await backoffice.getTenant(ctx, tenant.id);
+    expect(Object.keys(detail).sort()).toEqual(
+      ['auditLogs', 'dataSources', 'imports', 'insights', 'syncJobs', 'tenant', 'users'],
+    );
+  });
+
+  it('per-tab methods reject unknown tenants and non-operators', async () => {
+    const ctx = operatorCtx(ops.id);
+    const missing = createId();
+    await expect(backoffice.getTenantHeader(ctx, missing)).rejects.toMatchObject({
+      code: ErrorCode.NOT_FOUND,
+    });
+    await expect(backoffice.listTenantUsers(ctx, missing)).rejects.toMatchObject({
+      code: ErrorCode.NOT_FOUND,
+    });
+    await expect(
+      backoffice.getTenantActivity({ ...ctx, operatorId: null }, missing),
+    ).rejects.toBeInstanceOf(AppError);
+  });
 });

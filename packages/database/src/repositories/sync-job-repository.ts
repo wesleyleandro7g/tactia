@@ -37,17 +37,21 @@ export class SyncJobRepository {
   async list({
     tenantId,
     dataSourceId,
+    statuses,
     skip,
     take,
   }: {
     tenantId: string;
     dataSourceId?: string;
+    /** Optional status filter; omitted or empty means any status. */
+    statuses?: SyncJobStatus[];
     skip: number;
     take: number;
   }) {
     const where = {
       tenantId,
       ...(dataSourceId ? { dataSourceId } : {}),
+      ...(statuses && statuses.length > 0 ? { status: { in: statuses } } : {}),
     };
     const [items, total] = await Promise.all([
       this.db.syncJob.findMany({ where, skip, take, orderBy: { createdAt: 'desc' } }),

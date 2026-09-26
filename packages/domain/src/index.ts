@@ -2,7 +2,7 @@ export { assertAuthenticated, assertTenantContext, assertRole, assertOwnerOrAdmi
 export { AuditLogService, AuditAction } from './services/audit-log-service';
 export { TenantService } from './services/tenant-service';
 export { OperatorService } from './services/operator-service';
-export { BackofficeService } from './services/backoffice-service';
+export { BackofficeService, type TenantSyncIndicator } from './services/backoffice-service';
 export { UserService } from './services/user-service';
 export { MembershipService } from './services/membership-service';
 export { CustomerService } from './services/customer-service';

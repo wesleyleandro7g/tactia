@@ -10,7 +10,7 @@ export const metadata = { title: 'Nova fonte · Tactia Ops' };
 
 async function loadTenant(ctx: RequestContext, id: string) {
   try {
-    return await backofficeService.getTenant(ctx, id);
+    return await backofficeService.getTenantHeader(ctx, id);
   } catch (error) {
     if (isAppError(error) && error.code === ErrorCode.NOT_FOUND) notFound();
     throw error;
@@ -25,8 +25,8 @@ export default async function NewDataSourcePage({ params }: { params: Promise<{ 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/tenants/${id}`} className="font-mono text-xs text-primary hover:underline">
-          ← {detail.tenant.name}
+        <Link href={`/tenants/${id}/integrations`} className="font-mono text-xs text-primary hover:underline">
+          ← Integrações · {detail.tenant.name}
         </Link>
         <PageHeader
           className="mt-2"

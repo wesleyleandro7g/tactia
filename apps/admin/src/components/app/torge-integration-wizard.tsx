@@ -305,7 +305,7 @@ export function TorgeIntegrationWizard({ tenantId }: { tenantId: string }) {
     if (state.sourceId) {
       router.push(`/tenants/${tenantId}/data-sources/${state.sourceId}`);
     } else {
-      router.push(`/tenants/${tenantId}`);
+      router.push(`/tenants/${tenantId}/integrations`);
     }
     router.refresh();
   }

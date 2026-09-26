@@ -16,7 +16,7 @@ type PageProps = {
 
 async function loadTenant(ctx: RequestContext, id: string) {
   try {
-    return await backofficeService.getTenant(ctx, id);
+    return await backofficeService.getTenantHeader(ctx, id);
   } catch (error) {
     if (isAppError(error) && error.code === ErrorCode.NOT_FOUND) notFound();
     throw error;

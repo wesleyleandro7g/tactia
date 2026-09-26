@@ -132,7 +132,7 @@ export function DataSourceManagePanel({
     setError(null);
     try {
       await opsJson(base, { method: 'DELETE' });
-      router.push(`/tenants/${tenantId}`);
+      router.push(`/tenants/${tenantId}/integrations`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao desativar');

@@ -15,7 +15,7 @@ export const metadata = { title: 'Fonte de dados · Tactia Ops' };
 async function loadDataSourcePage(ctx: RequestContext, tenantId: string, sourceId: string) {
   try {
     return await Promise.all([
-      backofficeService.getTenant(ctx, tenantId),
+      backofficeService.getTenantHeader(ctx, tenantId),
       backofficeService.getDataSource(ctx, tenantId, sourceId),
     ]);
   } catch (error) {
@@ -44,8 +44,8 @@ export default async function DataSourceDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/tenants/${id}`} className="font-mono text-xs text-primary hover:underline">
-          ← {tenant.tenant.name}
+        <Link href={`/tenants/${id}/integrations`} className="font-mono text-xs text-primary hover:underline">
+          ← Integrações · {tenant.tenant.name}
         </Link>
         <PageHeader
           className="mt-2"
