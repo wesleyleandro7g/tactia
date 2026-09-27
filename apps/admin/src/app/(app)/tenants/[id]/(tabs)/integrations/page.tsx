@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { AgentSkillsPanel } from '@/components/app/agent-skills-panel';
+import { BrowserProfilesPanel } from '@/components/app/browser-profiles-panel';
 import { SyncButton } from '@/components/app/tenant-actions';
 import { TabSection } from '@/components/app/tab-section';
 import { Badge, statusTone } from '@/components/ui/badge';
@@ -68,6 +70,9 @@ export default async function TenantIntegrationsPage({ params }: { params: Promi
         />
       </TabSection>
 
+      <AgentSkillsPanel tenantId={tenant.id} />
+
+      <BrowserProfilesPanel tenantId={tenant.id} />
     </div>
   );
 }
