@@ -6,9 +6,10 @@ import type { ChatAnswer } from './types';
  * numeric claims stay out of the log line.
  */
 export function logChatTurn(
-  ctx: Pick<RequestContext, 'requestId' | 'tenantId' | 'userId'>,
+  ctx: Pick<RequestContext, 'requestId' | 'tenantId' | 'userId' | 'operatorId'>,
   data: {
-    conversationId: string;
+    /** `null` for ephemeral (non-persisted) sessions, e.g. the admin test chat. */
+    conversationId: string | null;
     startedAt: number;
     mode: 'sync' | 'stream';
     answer?: ChatAnswer | null;
@@ -19,8 +20,9 @@ export function logChatTurn(
     request_id: ctx.requestId,
     tenant_id: ctx.tenantId,
     user_id: ctx.userId,
+    ...(ctx.operatorId ? { operator_id: ctx.operatorId } : {}),
     operation: 'chat',
-    conversation_id: data.conversationId,
+    conversation_id: data.conversationId ?? null,
     mode: data.mode,
     duration_ms: Date.now() - data.startedAt,
   };

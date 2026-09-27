@@ -26,6 +26,28 @@ export class MessageRepository {
     });
   }
 
+  createBrowserResult(input: {
+    tenantId: string;
+    conversationId: string;
+    browserTaskId: string;
+    content: string;
+    metadata: unknown;
+  }) {
+    return this.db.message.upsert({
+      where: { browserTaskId: input.browserTaskId },
+      update: {},
+      create: {
+        id: createId(),
+        tenantId: input.tenantId,
+        conversationId: input.conversationId,
+        browserTaskId: input.browserTaskId,
+        role: 'assistant',
+        content: input.content,
+        metadata: input.metadata as never,
+      },
+    });
+  }
+
   async findById({ tenantId, id }: { tenantId: string; id: string }) {
     return this.db.message.findFirst({ where: { id, tenantId } });
   }

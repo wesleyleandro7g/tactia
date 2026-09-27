@@ -1,4 +1,4 @@
-export { assertAuthenticated, assertTenantContext, assertRole, assertOwnerOrAdmin, assertOperator, assertTenantScope, assertOperatorForTenant, assertCanManageConnections, hasMinRole } from './authz';
+export { assertAuthenticated, assertTenantContext, assertTenantUser, assertRole, assertOwnerOrAdmin, assertOperator, assertTenantScope, assertOperatorForTenant, assertCanManageConnections, hasMinRole } from './authz';
 export { AuditLogService, AuditAction } from './services/audit-log-service';
 export { TenantService } from './services/tenant-service';
 export { OperatorService } from './services/operator-service';
@@ -90,6 +90,8 @@ export { createApiKeySchema, API_KEY_SCOPES } from './schemas/api-keys';
 export type { ApiKeyScope } from './schemas/api-keys';
 export { DataSourceService } from './services/data-source-service';
 export { BrowserIntegrationService, currentBrowserEnvironment } from './services/browser-integration-service';
+export { AgentSkillService, SkillResourceResolverRegistry, createSkillResourceRegistry, normalizeAgentSkillMarkdown, referencedSkillSlugs, agentSkillSlugSchema, createAgentSkillSchema, updateAgentSkillSchema, createAgentSkillBindingSchema } from './services/agent-skill-service';
+export type { SkillResource, SkillResourceResolver } from './services/agent-skill-service';
 export type { BrowserIntegrationDeps, BrowserSyncSnapshot, BrowserHealthResult } from './services/browser-integration-service';
 export {
   createBrowserExecutorInstanceSchema,

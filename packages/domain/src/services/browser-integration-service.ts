@@ -73,7 +73,7 @@ export type BrowserIntegrationDeps = {
 };
 
 export function currentBrowserEnvironment(
-  env: Pick<NodeJS.ProcessEnv, 'TACTIA_ENVIRONMENT' | 'NODE_ENV'> = process.env,
+  env: Partial<Pick<NodeJS.ProcessEnv, 'TACTIA_ENVIRONMENT' | 'NODE_ENV'>> = process.env,
 ): string {
   return env.TACTIA_ENVIRONMENT?.trim() || env.NODE_ENV?.trim() || 'development';
 }

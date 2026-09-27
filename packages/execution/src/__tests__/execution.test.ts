@@ -431,6 +431,47 @@ describe('ExecutionEngine', () => {
     });
   });
 
+  it('lets a backoffice operator propose and approve without a domain user', async () => {
+    const authId = createId();
+    await prisma.operatorAuthUser.create({
+      data: { id: authId, name: 'ops', email: `ops-${authId}@exec.local`, emailVerified: true },
+    });
+    const operator = await prisma.operator.create({
+      data: { id: createId(), externalAuthId: authId, name: 'ops', email: `ops-${authId}@exec.local` },
+    });
+    const operatorCtx: RequestContext = {
+      requestId: createId(),
+      tenantId,
+      userId: null,
+      role: 'owner',
+      operatorId: operator.id,
+    };
+
+    try {
+      const proposal = await engine.proposeFromAi(operatorCtx, {
+        actionType: 'create_task',
+        input: { title: 'Tarefa de teste do operador' },
+      });
+      expect(proposal.status).toBe('awaiting_approval');
+
+      const executed = await approvalService.approve(operatorCtx, proposal.approvalId!, {});
+      expect(executed.status).toBe('completed');
+      expect(executed.requestedBy).toBeNull();
+
+      const approval = await approvalRepository.findById({ tenantId, id: proposal.approvalId! });
+      expect(approval?.approvedBy).toBeNull();
+
+      const audit = await auditLogRepository.list({ tenantId, skip: 0, take: 50 });
+      const approved = audit.items.find((entry) => entry.action === 'ACTION_APPROVED');
+      expect(approved?.operatorId).toBe(operator.id);
+      expect(approved?.userId).toBeNull();
+    } finally {
+      await prisma.auditLog.deleteMany({ where: { operatorId: operator.id } });
+      await prisma.operator.delete({ where: { id: operator.id } });
+      await prisma.operatorAuthUser.delete({ where: { id: authId } });
+    }
+  });
+
   it('always requires approval for AI-originated proposals', async () => {
     // Even with an action configured to skip approval
     await actionRepository.create({

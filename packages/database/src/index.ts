@@ -33,6 +33,7 @@ export type {
   MediaAssetStatus,
   MediaAssetPurpose,
   Metric,
+  AgentSkillKind,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
 export { OperatorRepository } from './repositories/operator-repository';
@@ -77,6 +78,9 @@ export { IntegrationArtifactRepository } from './repositories/integration-artifa
 export { BrowserWorkflowBindingRepository } from './repositories/browser-workflow-binding-repository';
 export { BrowserExecutorInstanceRepository } from './repositories/browser-executor-instance-repository';
 export { BrowserWorkflowRepository } from './repositories/browser-workflow-repository';
+export { BrowserAutomationRepository } from './repositories/browser-automation-repository';
+export { AgentSkillRepository } from './repositories/agent-skill-repository';
+export type { CreateAgentSkillInput } from './repositories/agent-skill-repository';
 export { RawRecordRepository } from './repositories/raw-record-repository';
 export { MappingRepository } from './repositories/mapping-repository';
 export { ImportRepository } from './repositories/import-repository';
@@ -180,4 +184,3 @@ export type {
   CreateMediaAssetInput,
   MediaAssetRecord,
 } from './repositories/media-asset-repository';
-

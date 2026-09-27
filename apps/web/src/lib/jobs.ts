@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { logger } from '@tactia/shared';
 import { IntelligencePipelineService } from '@tactia/domain';
 import { DEFAULT_JOB_RETRY_LIMIT, PgBossJobQueue } from '@tactia/execution';
+import { BROWSER_TASK_JOB } from '@tactia/chat/server';
 
 /**
  * Background jobs (Etapa 11 — B4). Same Postgres as the app (`pgboss` schema).
@@ -16,6 +17,8 @@ export const JOBS = {
   embedFacts: 'memory.embed_facts',
   ingestDocument: 'knowledge.ingest',
   ingestMedia: 'knowledge.ingest_media',
+  /** Same name the chat package publishes (`BROWSER_TASK_JOB`). */
+  browserTask: BROWSER_TASK_JOB,
 } as const;
 
 export type DailyJob = { tenantId: string; now?: string };
@@ -222,12 +225,19 @@ export async function startJobWorkers(): Promise<void> {
     await mediaIngestService.ingest(data);
   });
 
+  await jobQueue.register<{ tenantId: string; taskId: string }>(JOBS.browserTask, async (data) => {
+    const { browserAutomationService } = await import('./browser-automation');
+    await browserAutomationService.run(data.tenantId, data.taskId);
+  });
+
   await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {
     const now = data.now ? new Date(data.now) : new Date();
     const daily = await enqueueDailyForDueTenants(now);
     const { syncService } = await import('./services');
+    const { browserAutomationService } = await import('./browser-automation');
     const browser = await syncService.enqueueDueBrowserSyncs(now);
-    logger.info({ operation: 'scheduler_tick', daily_enqueued: daily.enqueued, browser_enqueued: browser.enqueued });
+    const expiredBrowserSessions = await browserAutomationService.cleanupExpiredSessions();
+    logger.info({ operation: 'scheduler_tick', daily_enqueued: daily.enqueued, browser_enqueued: browser.enqueued, expired_browser_sessions: expiredBrowserSessions });
   });
 
   await jobQueue.unschedule(JOBS.tick, 'hourly');

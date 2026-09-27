@@ -43,6 +43,11 @@ export type OrchestratorConfig = {
   historyLimit?: number;
   /** Replace numeric answers that carry no evidence (spec §43). Default: true. */
   enforceSources?: boolean;
+  /** Optionally force the first tool call for deterministic intent routing. */
+  initialToolChoice?: (
+    request: ChatRequest,
+    availableToolNames: string[],
+  ) => 'required' | { type: 'tool'; toolName: string } | undefined;
 };
 
 export type ChatRequest = {
@@ -183,6 +188,7 @@ export class Orchestrator {
   private readonly maxIterations: number;
   private readonly historyLimit: number;
   private readonly enforceSources: boolean;
+  private readonly initialToolChoice: NonNullable<OrchestratorConfig['initialToolChoice']> | undefined;
 
   constructor(
     private readonly deps: OrchestratorDeps,
@@ -191,6 +197,7 @@ export class Orchestrator {
     this.maxIterations = config.maxIterations ?? 8;
     this.historyLimit = config.historyLimit ?? 12;
     this.enforceSources = config.enforceSources ?? true;
+    this.initialToolChoice = config.initialToolChoice;
   }
 
   /** Single-shot answer (no streaming). */
@@ -202,12 +209,17 @@ export class Orchestrator {
     const attachments: ChatAttachment[] = [];
     let usage: LLMUsage | undefined;
     const tools = this.deps.tools.definitions(request.ctx.role);
+    const initialToolChoice = this.initialToolChoice?.(
+      request,
+      tools.map((tool) => tool.name),
+    );
 
     for (let round = 0; round < this.maxIterations; round += 1) {
       const completion = await this.deps.llm.complete({
         system,
         messages,
         tools,
+        ...(round === 0 && initialToolChoice ? { toolChoice: initialToolChoice } : {}),
       });
       usage = sumUsage(usage, completion.usage);
 
@@ -267,9 +279,18 @@ export class Orchestrator {
     const attachments: ChatAttachment[] = [];
     let usage: LLMUsage | undefined;
     const tools = this.deps.tools.definitions(request.ctx.role);
+    const initialToolChoice = this.initialToolChoice?.(
+      request,
+      tools.map((tool) => tool.name),
+    );
 
     for (let round = 0; round < this.maxIterations; round += 1) {
-      const request$ = { system, messages, tools };
+      const request$ = {
+        system,
+        messages,
+        tools,
+        ...(round === 0 && initialToolChoice ? { toolChoice: initialToolChoice } : {}),
+      };
 
       let text = '';
       const toolCalls: LLMToolCall[] = [];
@@ -332,6 +353,7 @@ export class Orchestrator {
           durationMs: outcome.executed.durationMs,
           ...(outcome.proposal ? { proposal: outcome.proposal } : {}),
           ...(outcome.attachment ? { attachment: outcome.attachment } : {}),
+          ...(outcome.executed.browserTaskId ? { browserTaskId: outcome.executed.browserTaskId } : {}),
           ...(outcome.executed.error ? { error: outcome.executed.error } : {}),
         };
       }
@@ -397,6 +419,7 @@ export class Orchestrator {
           input: toolCall.input,
           durationMs: Date.now() - started,
           sources: result.sources,
+          ...(result.browserTaskId ? { browserTaskId: result.browserTaskId } : {}),
         },
         ...(result.proposal ? { proposal: result.proposal } : {}),
         ...(result.attachment ? { attachment: result.attachment } : {}),
@@ -477,6 +500,7 @@ export class Orchestrator {
       toolCalls: redactToolCalls(toolCalls),
       proposals,
       attachments,
+      browserTaskIds: toolCalls.flatMap((call) => call.browserTaskId ? [call.browserTaskId] : []),
       provider: this.deps.llm.provider,
       model: this.deps.llm.model,
       ...(usage ? { usage } : {}),

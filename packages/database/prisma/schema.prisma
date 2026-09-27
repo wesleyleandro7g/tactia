@@ -161,6 +161,7 @@ enum ActionType {
   send_email
   send_whatsapp
   generate_report
+  browser_action
 }
 
 enum ActionExecutionStatus {
@@ -256,6 +257,11 @@ enum MediaAssetPurpose {
   knowledge
   interaction
   auto
+}
+
+enum AgentSkillKind {
+  global
+  secondary
 }
 
 // ---------------------------------------------------------------------------
@@ -624,6 +630,7 @@ model Tenant {
   status       TenantStatus @default(active)
   timezone     String       @default("America/Sao_Paulo")
   currency     String       @default("BRL")
+  browserAgentSkillMarkdown String @default("") @map("browser_agent_skills") @db.Text
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
   memberships  Membership[]
@@ -674,6 +681,12 @@ model Tenant {
   browserExecutorInstances BrowserExecutorInstance[]
   browserWorkflows      BrowserWorkflow[]
   browserWorkflowBindings BrowserWorkflowBinding[]
+  browserAutomationProfiles BrowserAutomationProfile[]
+  browserAutomationTasks BrowserAutomationTask[]
+  browserAutomationSessions BrowserAutomationSession[]
+  browserAutomationArtifacts BrowserAutomationArtifact[]
+  browserAutomationActionLogs BrowserAutomationActionLog[]
+  agentSkills AgentSkill[]
 
   @@unique([slug])
   @@index([status])
@@ -1117,6 +1130,7 @@ model Credential {
   tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   dataSources   DataSource[]
   browserExecutorInstances BrowserExecutorInstance[]
+  browserAutomationProfiles BrowserAutomationProfile[]
 
   @@index([tenantId])
   @@map("credentials")
@@ -1432,6 +1446,158 @@ model BrowserWorkflowRevision {
   @@index([workflowId])
   @@index([tenantId])
   @@map("browser_workflow_revisions")
+}
+
+model AgentSkill {
+  id          String         @id @db.Uuid
+  tenantId    String         @map("tenant_id") @db.Uuid
+  kind        AgentSkillKind
+  slug        String
+  title       String
+  description String
+  markdown    String         @db.Text
+  enabled     Boolean        @default(true)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bindings    AgentSkillBinding[]
+
+  @@unique([tenantId, slug])
+  @@unique([id, tenantId])
+  @@index([tenantId, kind, enabled])
+  @@map("agent_skills")
+}
+
+model AgentSkillBinding {
+  id           String   @id @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  skillId      String   @map("skill_id") @db.Uuid
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  skill        AgentSkill @relation(fields: [skillId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([skillId, resourceType, resourceId])
+  @@index([tenantId, resourceType, resourceId])
+  @@map("agent_skill_bindings")
+}
+
+// Interactive browser capability. Kept separate from the published Figranium
+// workflows above so a task cannot accidentally reuse their shared state.
+model BrowserAutomationProfile {
+  id              String   @id @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  name            String
+  startUrl        String   @map("start_url")
+  allowedDomains  Json     @map("allowed_domains")
+  skillMarkdown   String   @default("") @map("skills") @db.Text
+  credentialId    String?  @map("credential_id") @db.Uuid
+  encryptedState  String?  @map("encrypted_state")
+  lastValidatedAt DateTime? @map("last_validated_at")
+  lastUsedAt      DateTime? @map("last_used_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  credential      Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  tasks           BrowserAutomationTask[]
+  sessions        BrowserAutomationSession[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, credentialId])
+  @@map("browser_automation_profiles")
+}
+
+model BrowserAutomationTask {
+  id            String   @id @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  profileId     String   @map("profile_id") @db.Uuid
+  conversationId String? @map("conversation_id") @db.Uuid
+  requestedBy   String?  @map("requested_by") @db.Uuid
+  objective     String
+  status        String   @default("QUEUED")
+  stepCount     Int      @default(0) @map("step_count")
+  result        Json?
+  safeError     String?  @map("safe_error")
+  pendingAction Json?    @map("pending_action")
+  approvalExecutionId String? @map("approval_execution_id") @db.Uuid
+  startedAt     DateTime? @map("started_at")
+  finishedAt    DateTime? @map("finished_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile       BrowserAutomationProfile @relation(fields: [profileId], references: [id])
+  sessions      BrowserAutomationSession[]
+  artifacts     BrowserAutomationArtifact[]
+  actionLogs    BrowserAutomationActionLog[]
+  resultMessage Message? @relation("BrowserTaskResultMessage")
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, conversationId])
+  @@map("browser_automation_tasks")
+}
+
+model BrowserAutomationSession {
+  id             String   @id @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  taskId         String   @map("task_id") @db.Uuid
+  profileId      String   @map("profile_id") @db.Uuid
+  runtimeId      String   @map("runtime_id")
+  status         String   @default("STARTING")
+  currentUrl     String?  @map("current_url")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+  expiresAt      DateTime @map("expires_at")
+  closedAt       DateTime? @map("closed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task           BrowserAutomationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  profile        BrowserAutomationProfile @relation(fields: [profileId], references: [id])
+  artifacts      BrowserAutomationArtifact[]
+  actionLogs     BrowserAutomationActionLog[]
+
+  @@index([tenantId, taskId])
+  @@index([status, expiresAt])
+  @@map("browser_automation_sessions")
+}
+
+model BrowserAutomationArtifact {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  type       String
+  filename   String
+  mimeType   String   @map("mime_type")
+  storageKey String   @map("storage_key")
+  byteSize   Int      @map("byte_size")
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task       BrowserAutomationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  session    BrowserAutomationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, taskId])
+  @@map("browser_automation_artifacts")
+}
+
+model BrowserAutomationActionLog {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  actionType String   @map("action_type")
+  actionInput Json?   @map("action_input")
+  result     Json?
+  urlBefore  String?  @map("url_before")
+  urlAfter   String?  @map("url_after")
+  durationMs Int      @map("duration_ms")
+  status     String
+  errorCode  String?  @map("error_code")
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task       BrowserAutomationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  session    BrowserAutomationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, taskId, createdAt])
+  @@map("browser_automation_action_logs")
 }
 
 // ---------------------------------------------------------------------------
@@ -1764,8 +1930,10 @@ model Message {
   role           MessageRole
   content        String
   metadata       Json?
+  browserTaskId  String?      @unique @map("browser_task_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at")
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  browserTask    BrowserAutomationTask? @relation("BrowserTaskResultMessage", fields: [browserTaskId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt])
   @@index([tenantId, createdAt])

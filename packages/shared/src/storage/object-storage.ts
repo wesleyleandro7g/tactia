@@ -1,6 +1,6 @@
 import { AppError, ErrorCode } from '../errors';
 
-export const STORAGE_KINDS = ['document', 'image', 'audio', 'integration-artifact'] as const;
+export const STORAGE_KINDS = ['document', 'image', 'audio', 'integration-artifact', 'browser-artifact'] as const;
 export type StorageKind = (typeof STORAGE_KINDS)[number];
 
 export const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
@@ -102,6 +102,6 @@ export function mimeKind(mime: string): StorageKind | 'csv' | null {
 export function maxBytesForKind(kind: StorageKind): number {
   if (kind === 'audio') return AUDIO_MAX_BYTES;
   if (kind === 'image') return IMAGE_MAX_BYTES;
-  if (kind === 'integration-artifact') return INTEGRATION_ARTIFACT_MAX_BYTES;
+  if (kind === 'integration-artifact' || kind === 'browser-artifact') return INTEGRATION_ARTIFACT_MAX_BYTES;
   return DOCUMENT_MAX_BYTES;
 }

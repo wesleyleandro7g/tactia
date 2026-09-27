@@ -16,6 +16,8 @@ export type ContextProviders = {
   playbooks?: (ctx: ToolContext, query: string) => Promise<ContextPlaybook[]>;
   /** Compact custom-field catalog summary (keys only — details via get_data_catalog). */
   customFields?: (ctx: ToolContext) => Promise<ContextCustomFields | null | undefined>;
+  /** Optional company-wide guidance plus progressive-disclosure skill catalog. */
+  agentSkills?: (ctx: ToolContext) => Promise<ContextAgentSkills>;
 };
 
 export type ContextBuilderDeps = {
@@ -87,6 +89,16 @@ export type ContextPlaybook = {
   trigger: string;
 };
 
+export type ContextAgentSkills = {
+  globalMarkdown: string | null;
+  catalog: Array<{
+    slug: string;
+    title: string;
+    description: string;
+    resourceTypes: string[];
+  }>;
+};
+
 export type ContextCustomFields = {
   total: number;
   byEntity: Array<{ entityType: string; label: string; count: number; keys: string[] }>;
@@ -120,6 +132,7 @@ export type AiContext = {
   briefing: ContextBriefing | null;
   /** Compact list of tenant-defined fields; omitted when none exist. */
   customFields?: ContextCustomFields | null;
+  agentSkills?: ContextAgentSkills;
   /** Evidence for everything above — carried into the answer metadata (spec §43). */
   sources: MessageSource[];
 };
@@ -229,7 +242,7 @@ export class ContextBuilder {
 
     const tenant = await this.deps.tenants.get(ctx, ctx.tenantId);
 
-    const [mtd, trailing, insightPage, goals, facts, briefing, playbooks, customFields] = await Promise.all([
+    const [mtd, trailing, insightPage, goals, facts, briefing, playbooks, customFields, agentSkills] = await Promise.all([
       this.metricsFor(ctx, period),
       this.metricsFor(ctx, trailingPeriod),
       this.deps.insights.list(ctx, { status: 'open', page: '1', pageSize: '5', orderBy: 'score' }),
@@ -238,6 +251,7 @@ export class ContextBuilder {
       this.safe(ctx, 'briefing', () => this.deps.providers?.briefing?.(ctx) ?? Promise.resolve(null)),
       this.safe(ctx, 'playbooks', () => this.deps.providers?.playbooks?.(ctx, query) ?? Promise.resolve([])),
       this.safe(ctx, 'customFields', () => this.deps.providers?.customFields?.(ctx) ?? Promise.resolve(null)),
+      this.safe(ctx, 'agentSkills', () => this.deps.providers?.agentSkills?.(ctx) ?? Promise.resolve({ globalMarkdown: null, catalog: [] })),
     ]);
 
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -280,6 +294,7 @@ export class ContextBuilder {
       playbooks: playbooks ?? [],
       briefing: briefing ?? null,
       customFields: customFields && customFields.total > 0 ? customFields : null,
+      agentSkills: agentSkills ?? { globalMarkdown: null, catalog: [] },
       sources: [
         ...mtd.map((result) => sourceFromMetric(result, 'context')),
         ...trailing.map((result) => sourceFromMetric(result, 'context')),

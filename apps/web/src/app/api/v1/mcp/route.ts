@@ -15,7 +15,7 @@ async function handle(request: Request, ctx: Parameters<typeof toToolContext>[0]
       void auditLogService.record(ctx, {
         action: AuditAction.MCP_TOOL_CALLED,
         entityType: 'tenant_api_key',
-        entityId: ctx.apiKeyId ?? toolCtx.userId,
+        entityId: ctx.apiKeyId ?? toolCtx.userId ?? toolCtx.tenantId,
         actorType: 'mcp',
         metadata: {
           tool: event.tool,

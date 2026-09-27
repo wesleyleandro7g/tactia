@@ -23,15 +23,34 @@ export function assertOperator(ctx: RequestContext): asserts ctx is RequestConte
   }
 }
 
+/**
+ * Tenant-scoped principal: either a client user with an active membership or a
+ * backoffice operator acting on a tenant (`operatorTenantContext` in apps/admin,
+ * which sets `userId: null`, `operatorId` and `role`). Operators have no domain
+ * user, so `userId` is nullable here; use `assertTenantUser` where a real user
+ * is required (e.g. persisted conversations, personal data).
+ */
 export function assertTenantContext(ctx: RequestContext): asserts ctx is RequestContext & {
+  userId: string | null;
+  tenantId: string;
+  role: MembershipRole;
+} {
+  if (!ctx.userId && !ctx.operatorId) {
+    throw new AppError(ErrorCode.AUTHENTICATION_ERROR, 'Authentication required');
+  }
+  if (!ctx.tenantId || !ctx.role) {
+    throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+  }
+}
+
+/** Tenant context that must belong to a client user (operators are rejected). */
+export function assertTenantUser(ctx: RequestContext): asserts ctx is RequestContext & {
   userId: string;
   tenantId: string;
   role: MembershipRole;
 } {
   assertAuthenticated(ctx);
-  if (!ctx.tenantId || !ctx.role) {
-    throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
-  }
+  assertTenantContext(ctx);
 }
 
 export function hasMinRole(role: MembershipRole | null, min: MembershipRole): boolean {
@@ -43,7 +62,7 @@ export function assertRole(
   ctx: RequestContext,
   min: MembershipRole,
 ): asserts ctx is RequestContext & {
-  userId: string;
+  userId: string | null;
   tenantId: string;
   role: MembershipRole;
 } {
@@ -54,7 +73,7 @@ export function assertRole(
 }
 
 export function assertOwnerOrAdmin(ctx: RequestContext): asserts ctx is RequestContext & {
-  userId: string;
+  userId: string | null;
   tenantId: string;
   role: MembershipRole;
 } {
