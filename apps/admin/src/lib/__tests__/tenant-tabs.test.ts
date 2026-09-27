@@ -8,13 +8,19 @@ import {
 } from '../tenant-tabs';
 
 describe('tenant tabs', () => {
-  it('lists the five tabs in order with Cadastro as default', () => {
+  it('lists the tabs in order with Cadastro as default', () => {
     expect(TENANT_TABS.map((tab) => tab.label)).toEqual([
       'Cadastro',
       'Usuários',
       'Integrações',
       'Sincronização',
       'Atividade',
+      'Chat',
+      'WhatsApp',
+      'API keys',
+      'Conexões',
+      'Documentos',
+      'Playbooks',
     ]);
     expect(TENANT_TABS[0]?.segment).toBe('');
   });
@@ -22,6 +28,10 @@ describe('tenant tabs', () => {
   it('builds hrefs', () => {
     expect(tenantTabHref('t1', '')).toBe('/tenants/t1');
     expect(tenantTabHref('t1', 'users')).toBe('/tenants/t1/users');
+    expect(tenantTabHref('t1', 'chat')).toBe('/tenants/t1/chat');
+    expect(tenantTabHref('t1', 'whatsapp')).toBe('/tenants/t1/whatsapp');
+    expect(tenantTabHref('t1', 'api-keys')).toBe('/tenants/t1/api-keys');
+    expect(tenantTabHref('t1', 'documents')).toBe('/tenants/t1/documents');
   });
 
   it('activates Cadastro only on the exact tenant path', () => {
@@ -35,6 +45,8 @@ describe('tenant tabs', () => {
     expect(isTenantTabActive('/tenants/t1/integrations/x', 't1', 'integrations')).toBe(true);
     expect(isTenantTabActive('/tenants/t1/integrations-foo', 't1', 'integrations')).toBe(false);
     expect(isTenantTabActive('/tenants/t2/users', 't1', 'users')).toBe(false);
+    expect(isTenantTabActive('/tenants/t1/chat', 't1', 'chat')).toBe(true);
+    expect(isTenantTabActive('/tenants/t1/chat', 't1', '')).toBe(false);
   });
 
   it('maps counts to tabs', () => {

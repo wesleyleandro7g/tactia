@@ -1,12 +1,36 @@
 import type { TenantSyncIndicator } from '@tactia/domain';
 
-export type TenantTabKey = 'profile' | 'users' | 'integrations' | 'sync' | 'activity';
+export type TenantTabKey =
+  | 'profile'
+  | 'users'
+  | 'integrations'
+  | 'sync'
+  | 'activity'
+  | 'chat'
+  | 'whatsapp'
+  | 'api-keys'
+  | 'connections'
+  | 'documents'
+  | 'playbooks';
+
+export type TenantTabSegment =
+  | ''
+  | 'users'
+  | 'integrations'
+  | 'sync'
+  | 'activity'
+  | 'chat'
+  | 'whatsapp'
+  | 'api-keys'
+  | 'connections'
+  | 'documents'
+  | 'playbooks';
 
 export type TenantTab = {
   key: TenantTabKey;
   label: string;
   /** Path segment after `/tenants/{id}`; empty string is the default tab. */
-  segment: '' | 'users' | 'integrations' | 'sync' | 'activity';
+  segment: TenantTabSegment;
 };
 
 export const TENANT_TABS: readonly TenantTab[] = [
@@ -15,6 +39,12 @@ export const TENANT_TABS: readonly TenantTab[] = [
   { key: 'integrations', label: 'Integrações', segment: 'integrations' },
   { key: 'sync', label: 'Sincronização', segment: 'sync' },
   { key: 'activity', label: 'Atividade', segment: 'activity' },
+  { key: 'chat', label: 'Chat', segment: 'chat' },
+  { key: 'whatsapp', label: 'WhatsApp', segment: 'whatsapp' },
+  { key: 'api-keys', label: 'API keys', segment: 'api-keys' },
+  { key: 'connections', label: 'Conexões', segment: 'connections' },
+  { key: 'documents', label: 'Documentos', segment: 'documents' },
+  { key: 'playbooks', label: 'Playbooks', segment: 'playbooks' },
 ];
 
 export type TenantTabIndicators = {
