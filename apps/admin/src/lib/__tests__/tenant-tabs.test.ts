@@ -22,6 +22,7 @@ describe('tenant tabs', () => {
       'Conexões',
       'Documentos',
       'Playbooks',
+      'Agendamentos',
     ]);
     expect(TENANT_TABS[0]?.segment).toBe('');
   });

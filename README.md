@@ -91,6 +91,7 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 | [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
 | [docs/browser-agent-p0-operacao.md](docs/browser-agent-p0-operacao.md) | Skills Markdown, snapshots, recuperação, erros e gates do Browser Agent interativo |
 | [docs/skills-hierarquicas-empresa.md](docs/skills-hierarquicas-empresa.md) | Skill global, catálogo secundário, vínculos, segurança e migração por empresa |
+| [docs/agendamento-acoes.md](docs/agendamento-acoes.md) | Agendamento de ações por empresa: recorrência, resiliência/reset, targets e criação pelo chat |
 | [docs/integrations/torge/operations.md](docs/integrations/torge/operations.md) | Implantação, workflows, segurança e operação Torge/Figranium |
 | [docs/integrations/torge/acceptance-report.md](docs/integrations/torge/acceptance-report.md) | Cobertura, evidências, bloqueios e estado de produção |
 | [docs/integracao-chatgpt-mcp.md](docs/integracao-chatgpt-mcp.md) | OAuth 2.1, deploy e publicação do app MCP no ChatGPT |

@@ -145,6 +145,27 @@ export { ThresholdCalibrator, RULE_THRESHOLD_KEY, loosenThreshold } from './serv
 export { RecommendationService } from './services/recommendation-service';
 export { IntelligencePipelineService } from './services/intelligence-pipeline-service';
 export { ConversationService } from './services/conversation-service';
+export {
+  ScheduleService,
+  createScheduleSchema,
+  updateScheduleSchema,
+  type ScheduleServiceDeps,
+  type CreateScheduleRequest,
+  type UpdateScheduleRequest,
+} from './services/schedule-service';
+export {
+  isDue,
+  computePeriodKey,
+  recurrenceConfigSchema,
+  nthBusinessDayOfMonth,
+  daysInMonth,
+  isoWeek,
+  localParts,
+  scheduleFrequencyValues,
+  type RecurrenceConfig,
+  type ScheduleRecurrence,
+  type ScheduleFrequencyValue,
+} from './services/schedule-recurrence';
 export type { AuthProvider } from './ports/auth-provider';
 export {
   createTenantSchema,

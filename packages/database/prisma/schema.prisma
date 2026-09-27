@@ -180,6 +180,38 @@ enum ApprovalStatus {
   rejected
 }
 
+enum ScheduleTarget {
+  ai_agent
+  action
+  automation
+}
+
+enum ScheduleEffectMode {
+  propose
+  auto_execute
+}
+
+enum ScheduleFrequency {
+  daily
+  weekly
+  monthly
+  custom
+  manual
+}
+
+enum ScheduleRepeatMode {
+  infinite
+  count
+}
+
+enum ScheduleOccurrenceStatus {
+  pending
+  running
+  completed
+  failed
+  cancelled
+}
+
 enum EpisodeKind {
   decision
   action_outcome
@@ -687,6 +719,8 @@ model Tenant {
   browserAutomationArtifacts BrowserAutomationArtifact[]
   browserAutomationActionLogs BrowserAutomationActionLog[]
   agentSkills AgentSkill[]
+  schedules            Schedule[]
+  scheduleOccurrences  ScheduleOccurrence[]
 
   @@unique([slug])
   @@index([status])
@@ -2008,6 +2042,82 @@ model Approval {
   @@index([tenantId, createdAt])
   @@index([actionExecutionId])
   @@map("approvals")
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling — agendamento de ações por empresa
+// ---------------------------------------------------------------------------
+
+/// A recurring (or manual) schedule that triggers the AI agent or a catalog
+/// action for a tenant. Recurrence is hybrid: a structured `frequency` +
+/// `recurrenceConfig` covers the common cases and an optional `cronExpression`
+/// covers the custom trigger. `manual` never fires automatically.
+model Schedule {
+  id               String             @id @db.Uuid
+  tenantId         String             @map("tenant_id") @db.Uuid
+  name             String
+  description      String?
+  enabled          Boolean            @default(true)
+  target           ScheduleTarget
+  effectMode       ScheduleEffectMode @default(propose) @map("effect_mode")
+  frequency        ScheduleFrequency
+  /// Structured recurrence: { weekdays?: number[], dayOfMonth?: number,
+  /// nthBusinessDay?: number, localTime?: "HH:mm" }.
+  recurrenceConfig Json               @default("{}") @map("recurrence_config")
+  /// Optional cron string used when frequency = custom.
+  cronExpression   String?            @map("cron_expression")
+  /// Overrides tenant timezone when set.
+  timezone         String?
+  repeatMode       ScheduleRepeatMode @default(infinite) @map("repeat_mode")
+  /// Total successful occurrences allowed when repeatMode = count.
+  maxOccurrences   Int?               @map("max_occurrences")
+  /// Successful occurrences so far (failures do not count — spec resiliência).
+  successCount     Int                @default(0) @map("success_count")
+  /// Payload for target = ai_agent: { systemPrompt?, instruction, tools?: string[], skillIds?: string[] }.
+  aiConfig         Json?              @map("ai_config")
+  /// Payload for target = action.
+  actionType       ActionType?        @map("action_type")
+  actionInput      Json?              @map("action_input")
+  lastRunAt        DateTime?          @map("last_run_at")
+  createdBy        String?            @map("created_by") @db.Uuid
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  occurrences      ScheduleOccurrence[]
+
+  @@index([tenantId, enabled])
+  @@index([tenantId, createdAt])
+  @@map("schedules")
+}
+
+/// One firing of a schedule for a given period. `periodKey` makes each period
+/// idempotent: the tick may retry, but only one occurrence exists per period,
+/// so work already done is never repeated (spec resiliência §5.1). A reset
+/// (§5.2) is the only way to re-run a completed period.
+model ScheduleOccurrence {
+  id                String                   @id @db.Uuid
+  tenantId          String                   @map("tenant_id") @db.Uuid
+  scheduleId        String                   @map("schedule_id") @db.Uuid
+  /// Stable key per period: e.g. "2026-01-15", "2026-W03", "manual:<ts>".
+  periodKey         String                   @map("period_key")
+  status            ScheduleOccurrenceStatus @default(pending)
+  /// user | ai | system — who originated the occurrence.
+  origin            String                   @default("system")
+  actionExecutionId String?                  @map("action_execution_id") @db.Uuid
+  output            Json?
+  error             String?
+  startedAt         DateTime?                @map("started_at")
+  finishedAt        DateTime?                @map("finished_at")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schedule          Schedule                 @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, scheduleId, periodKey])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([scheduleId])
+  @@map("schedule_occurrences")
 }
 
 // ---------------------------------------------------------------------------

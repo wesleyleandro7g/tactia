@@ -109,6 +109,12 @@ export {
   createProposeActionTool,
   createSendEmailTool,
   createGenerateInfographicTool,
+  createScheduleTools,
+  createCreateScheduleTool,
+  createListSchedulesTool,
+  createUpdateScheduleTool,
+  createDisableScheduleTool,
+  createTriggerScheduleTool,
   currentMonthPeriod,
   periodInputSchema,
   periodLabel,
@@ -120,6 +126,7 @@ export {
   type DirectEmailPort,
   type CreateToolsOptions,
   type InfographicStore,
+  type SchedulePort,
   type ToolDeps,
 } from './tools/index';
 export {

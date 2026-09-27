@@ -144,6 +144,22 @@ preservados; só o resultado canônico é reescrito.
 | `RATE_LIMITED` (429) | Mais de 20 mensagens/min no tenant | Esperado; ajustar em `apps/web/src/lib/rate-limit.ts` se necessário |
 | Chat responde, mas sem números | Tenant sem dados no período | Importar dados / conferir o período |
 
+## 7. Agendamentos (agendamento de ações)
+
+Ver também [docs/agendamento-acoes.md](agendamento-acoes.md).
+
+| Sintoma | Causa | Ação |
+|---|---|---|
+| Agendamento não dispara | `JOBS_ENABLED != true` ou tick parado | Conferir `grep '"operation":"scheduler_tick"'` (deve aparecer a cada 5 min com `schedules_enqueued`) |
+| Não dispara no horário esperado | `localTime`/timezone; `manual`/`custom` não disparam automático | Conferir `recurrenceConfig` e o timezone do agendamento/empresa |
+| Disparou uma vez e parou | `repeatMode=count` atingiu `maxOccurrences` (desativa) | Esperado; reativar ou aumentar `maxOccurrences` |
+| Ocorrência `failed` | Erro no alvo (ex.: SMTP, input inválido, `automation`) | `grep '"operation":"schedule_run"' \| grep 500` mostra o erro; corrigir e disparar de novo |
+| Preciso reexecutar um período já concluído | Idempotência por ocorrência (§5.1) | Fazer **reset** da ocorrência (UI ou `POST /schedules/{id}/reset`) — única via sancionada (§5.2) |
+| `ai_agent` falha com "Runner do agente não configurado" | Ambiente sem LLM/orchestrator | Configurar `LLM_API_KEY` (ou `LLM_PROVIDER=mock` em teste) |
+
+Consultas úteis (logs JSON): `schedule_run` (execução da ocorrência),
+`schedule_agent_run` (turno do agente), `scheduler_tick` (enfileiramento).
+
 O chat nunca executa nada: uma proposta de ação sempre cai em `/approvals`.
 
 ### 6.1 Chat de teste no admin (`/tenants/{id}/chat`)

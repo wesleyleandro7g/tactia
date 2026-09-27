@@ -17,6 +17,8 @@ export const JOBS = {
   embedFacts: 'memory.embed_facts',
   ingestDocument: 'knowledge.ingest',
   ingestMedia: 'knowledge.ingest_media',
+  /** One firing of a Schedule occurrence (agendamento de ações). */
+  scheduleRun: 'schedule.run',
   /** Same name the chat package publishes (`BROWSER_TASK_JOB`). */
   browserTask: BROWSER_TASK_JOB,
 } as const;
@@ -26,6 +28,13 @@ export type WeeklyBriefingJob = { tenantId: string; now?: string };
 export type EmbedFactsJob = { tenantId: string };
 export type IngestDocumentJob = { tenantId: string; documentId: string };
 export type IngestMediaJob = { tenantId: string; mediaId: string };
+export type ScheduleRunJob = {
+  tenantId: string;
+  scheduleId: string;
+  occurrenceId: string;
+  periodKey: string;
+  requestId: string;
+};
 export type SyncJob = {
   tenantId: string;
   syncJobId: string;
@@ -230,14 +239,28 @@ export async function startJobWorkers(): Promise<void> {
     await browserAutomationService.run(data.tenantId, data.taskId);
   });
 
+  await jobQueue.register<ScheduleRunJob>(JOBS.scheduleRun, async (data) => {
+    const { scheduleRunner } = await import('./schedules');
+    await scheduleRunner.run(data.tenantId, data.occurrenceId, data.requestId);
+  });
+
   await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {
     const now = data.now ? new Date(data.now) : new Date();
     const daily = await enqueueDailyForDueTenants(now);
     const { syncService } = await import('./services');
+    const { scheduleService } = await import('./schedules');
     const { browserAutomationService } = await import('./browser-automation');
     const browser = await syncService.enqueueDueBrowserSyncs(now);
+    const scheduled = await scheduleService.enqueueDueSchedules(now);
     const expiredBrowserSessions = await browserAutomationService.cleanupExpiredSessions();
-    logger.info({ operation: 'scheduler_tick', daily_enqueued: daily.enqueued, browser_enqueued: browser.enqueued, expired_browser_sessions: expiredBrowserSessions });
+    logger.info({
+      operation: 'scheduler_tick',
+      daily_enqueued: daily.enqueued,
+      browser_enqueued: browser.enqueued,
+      schedules_enqueued: scheduled.enqueued,
+      schedules_evaluated: scheduled.evaluated,
+      expired_browser_sessions: expiredBrowserSessions,
+    });
   });
 
   await jobQueue.unschedule(JOBS.tick, 'hourly');

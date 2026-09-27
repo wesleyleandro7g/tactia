@@ -38,6 +38,7 @@ import {
 import { createProposeActionTool, type ActionProposalPort } from './propose-action';
 import { createSendEmailTool, type DirectEmailPort } from './send-email';
 import { createGenerateInfographicTool, type InfographicStore } from './generate-infographic';
+import { createScheduleTools, type SchedulePort } from './schedule';
 import {
   createGetAcquisitionTool,
   createGetCashFlowTool,
@@ -112,6 +113,15 @@ export {
   type InfographicStore,
 } from './generate-infographic';
 export {
+  createScheduleTools,
+  createCreateScheduleTool,
+  createListSchedulesTool,
+  createUpdateScheduleTool,
+  createDisableScheduleTool,
+  createTriggerScheduleTool,
+  type SchedulePort,
+} from './schedule';
+export {
   currentMonthPeriod,
   periodInputSchema,
   periodLabel,
@@ -138,6 +148,12 @@ export type CreateToolsOptions = {
    * attach branded PNGs to chat/WhatsApp answers.
    */
   infographicStore?: InfographicStore;
+  /**
+   * When provided, the schedule tools (create/list/update/disable/trigger) are
+   * registered so the assistant can manage the company's schedules from chat.
+   * Chat-only — do not pass it for the MCP registry.
+   */
+  schedulePort?: SchedulePort;
 };
 
 /** Read tools + analytics tools + optional propose_action (Etapa 7). */
@@ -198,6 +214,9 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
   }
   if (options.infographicStore) {
     tools.push(createGenerateInfographicTool(options.infographicStore));
+  }
+  if (options.schedulePort) {
+    tools.push(...createScheduleTools(options.schedulePort));
   }
 
   return tools;

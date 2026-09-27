@@ -132,6 +132,12 @@ const TOOL_GUIDE: Record<string, string> = {
     'envia um e-mail imediatamente (sem aprovação) usando o SMTP da empresa. Use quando o usuário pedir explicitamente para enviar um e-mail. Confirme o envio só após o status voltar como enviado.',
   generate_infographic:
     'gera um infográfico PNG (KPI, comparação, ranking, insight, pizza, linha, períodos ou barras). Use só se o usuário pedir visual/imagem/infográfico OU se a resposta tiver 3+ números/comparações que se beneficiem de um quadro. Não use em respostas curtas.',
+  create_schedule:
+    'cria um agendamento da empresa (diário/semanal/mensal/custom/manual) que dispara o agente de IA ou uma ação. Confirme o resumo (o quê, quando, repetição) com o usuário antes de criar. target=ai_agent exige aiConfig.instruction; target=action exige actionType/actionInput.',
+  list_schedules: 'lista os agendamentos da empresa (nome, alvo, frequência, ativo).',
+  update_schedule: 'atualiza um agendamento existente (informe scheduleId e só os campos a mudar).',
+  disable_schedule: 'desativa ou reativa um agendamento sem apagar o histórico.',
+  trigger_schedule: 'dispara um agendamento agora (execução manual), independente da recorrência.',
 };
 
 /**

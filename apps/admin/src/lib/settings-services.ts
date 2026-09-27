@@ -5,6 +5,8 @@ import {
   prisma,
   CredentialRepository,
   RawRecordRepository,
+  ScheduleOccurrenceRepository,
+  ScheduleRepository,
   TenantApiKeyRepository,
   TenantRepository,
   WhatsappAuthorizedNumberRepository,
@@ -12,12 +14,14 @@ import {
 import {
   EmailConfigService,
   MediaIngestService,
+  ScheduleService,
   TenantApiKeyService,
   WhatsappAuthorizedNumberService,
 } from '@tactia/domain';
-import { createAudioTranscriberFromEnv, createVisionExtractorFromEnv } from '@tactia/ai';
+import { ScheduleRunner, type ScheduleAgentRunner } from '@tactia/execution';
+import { createAudioTranscriberFromEnv, createVisionExtractorFromEnv, type ToolContext } from '@tactia/ai';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
-import { chatServices } from './chat';
+import { chatServices, chatRuntime } from './chat';
 import { operatorTenantContext } from './operator-tenant';
 
 /**
@@ -55,6 +59,67 @@ export const emailConfigService = new EmailConfigService(
   new CredentialRepository(prisma),
   auditLogService,
 );
+
+// Scheduling -----------------------------------------------------------------
+const scheduleRepository = new ScheduleRepository(prisma);
+const scheduleOccurrenceRepository = new ScheduleOccurrenceRepository(prisma);
+const tenantsForSchedule = new TenantRepository(prisma);
+
+/**
+ * Resolves a real principal (the tenant owner) so the AI read path accepts the
+ * headless run: the context builder/tools require an authenticated member.
+ */
+async function resolveScheduleAgentContext(tenantId: string, requestId: string): Promise<ToolContext> {
+  const page = await membershipRepository.listByTenant({ tenantId, skip: 0, take: 100 });
+  const active = page.items.filter((m) => m.status === 'active');
+  const principal =
+    active.find((m) => m.role === 'owner') ??
+    active.find((m) => m.role === 'admin') ??
+    active[0];
+  if (!principal) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, 'Nenhum usuário ativo para executar o agente neste agendamento.');
+  }
+  return { requestId, tenantId, userId: principal.userId, role: principal.role, operatorId: null, ip: null };
+}
+
+/** ai_agent runner backed by the admin chat runtime (same stack as apps/web). */
+const scheduleAgentRunner: ScheduleAgentRunner = {
+  async run({ ctx, aiConfig }) {
+    const toolCtx = await resolveScheduleAgentContext(ctx.tenantId as string, ctx.requestId);
+    const question = aiConfig.systemPrompt
+      ? `${aiConfig.systemPrompt}\n\n${aiConfig.instruction}`
+      : aiConfig.instruction;
+    const answer = await chatRuntime.getOrchestrator().run({ ctx: toolCtx, question, history: [] });
+    return {
+      summary: answer.content,
+      proposals: answer.proposals?.length ?? 0,
+      toolCalls: answer.toolCalls?.map((call) => call.name) ?? [],
+    };
+  },
+};
+
+export const scheduleRunner = new ScheduleRunner({
+  schedules: scheduleRepository,
+  occurrences: scheduleOccurrenceRepository,
+  engine: chatServices.executionEngine,
+  auditLogs: auditLogService,
+  agentRunner: scheduleAgentRunner,
+});
+
+export const scheduleService = new ScheduleService({
+  schedules: scheduleRepository,
+  occurrences: scheduleOccurrenceRepository,
+  auditLogs: auditLogService,
+  tenantTimezone: async (tenantId) => {
+    const tenant = await tenantsForSchedule.findById({ tenantId });
+    return tenant?.timezone;
+  },
+  // The admin runs the occurrence inline (it does not register the pg-boss
+  // worker). The web tick still fires automatic occurrences on schedule.
+  enqueueRun: async ({ tenantId, occurrenceId }) => {
+    await scheduleRunner.run(tenantId, occurrenceId);
+  },
+});
 
 const visionEnv = {
   LLM_PROVIDER: process.env.LLM_PROVIDER,

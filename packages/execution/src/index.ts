@@ -41,6 +41,11 @@ export {
   type PublishOptions,
 } from './pg-boss-job-queue';
 export { ExecutionEngine, type ExecutionEngineDeps, type EpisodeSink } from './execution-engine';
+export {
+  ScheduleRunner,
+  type ScheduleRunnerDeps,
+  type ScheduleAgentRunner,
+} from './schedule-runner';
 export { ActionService } from './action-service';
 export { ApprovalService } from './approval-service';
 export {

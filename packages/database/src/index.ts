@@ -34,6 +34,11 @@ export type {
   MediaAssetPurpose,
   Metric,
   AgentSkillKind,
+  ScheduleTarget,
+  ScheduleEffectMode,
+  ScheduleFrequency,
+  ScheduleRepeatMode,
+  ScheduleOccurrenceStatus,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
 export { OperatorRepository } from './repositories/operator-repository';
@@ -94,6 +99,16 @@ export { MessageRepository } from './repositories/message-repository';
 export { ActionRepository } from './repositories/action-repository';
 export { ActionExecutionRepository } from './repositories/action-execution-repository';
 export { ApprovalRepository } from './repositories/approval-repository';
+export { ScheduleRepository } from './repositories/schedule-repository';
+export type {
+  CreateScheduleInput,
+  UpdateScheduleInput,
+} from './repositories/schedule-repository';
+export { ScheduleOccurrenceRepository } from './repositories/schedule-occurrence-repository';
+export type {
+  CreateScheduleOccurrenceInput,
+  UpdateScheduleOccurrenceInput,
+} from './repositories/schedule-occurrence-repository';
 export type { CreateTenantInput, BackofficeTenantListQuery } from './repositories/tenant-repository';
 export type { CreateOperatorInput, OperatorRecord } from './repositories/operator-repository';
 export type { CreateUserInput } from './repositories/user-repository';

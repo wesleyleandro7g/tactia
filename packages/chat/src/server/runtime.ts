@@ -4,6 +4,7 @@ import {
   ToolRegistry,
   createDefaultTools,
   createSendEmailTool,
+  createScheduleTools,
   defineTool,
   requireLLMAdapter,
   type ActionProposalPort,
@@ -11,6 +12,7 @@ import {
   type DirectEmailPort,
   type InfographicStore,
   type LLMAdapter,
+  type SchedulePort,
   type ToolContext,
 } from '@tactia/ai';
 import { AppError, ErrorCode, redactSensitiveDeep, type RequestContext } from '@tactia/shared';
@@ -54,6 +56,12 @@ export function answerMetadata(answer: ChatAnswer) {
 export type ChatRuntimeOptions = {
   /** Overrides the env-configured `chat` LLM (tests). */
   llm?: () => LLMAdapter;
+  /**
+   * When provided, the schedule tools are added to the chat registry so the
+   * assistant can manage the company's schedules. Injected by apps/web where
+   * the ScheduleService (job queue + tenant timezone) is wired.
+   */
+  schedulePort?: SchedulePort;
 };
 
 /**
@@ -178,6 +186,8 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
         };
       },
     }),
+    // Schedule management (chat-only). Added when apps/web wires a SchedulePort.
+    ...(options.schedulePort ? createScheduleTools(options.schedulePort) : []),
   ]);
 
   const contextBuilder = new ContextBuilder({
