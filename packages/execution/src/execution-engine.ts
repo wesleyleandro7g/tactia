@@ -93,7 +93,11 @@ export class ExecutionEngine {
     // Schema validation before anything is persisted (spec §45)
     const input = this.deps.registry.validate(action.type, raw.input);
 
-    const requiresApproval = action.requiresApproval || origin === 'ai' || origin === 'mcp';
+    // `ai_direct` is the explicit "send now" rail for send_email: it skips
+    // approval by design (relaxes spec §44 only for this origin + action type).
+    // Every other origin keeps the previous guardrail.
+    const requiresApproval =
+      origin === 'ai_direct' ? false : action.requiresApproval || origin === 'ai' || origin === 'mcp';
 
     let execution;
     try {
@@ -131,7 +135,7 @@ export class ExecutionEngine {
       action: AuditAction.ACTION_PROPOSED,
       entityType: 'action_execution',
       entityId: execution.id,
-      actorType: origin === 'ai' || origin === 'mcp' ? origin : 'user',
+      actorType: origin === 'ai' || origin === 'ai_direct' ? 'ai' : origin === 'mcp' ? 'mcp' : 'user',
       metadata: {
         actionType: action.type,
         origin,
@@ -177,6 +181,56 @@ export class ExecutionEngine {
     },
   ) {
     return this.proposeFromOrigin(ctx, input, 'mcp');
+  }
+
+  /**
+   * Direct e-mail send requested by the user through the chat assistant. Unlike
+   * `proposeFromAi`, this executes immediately (no human approval) — it is the
+   * only rail that lets the LLM cause a side effect on its own, and it is
+   * deliberately restricted to `send_email` (origin `ai_direct`).
+   */
+  async sendEmailFromAi(
+    ctx: RequestContext,
+    input: {
+      actionType?: string;
+      input: unknown;
+      reason?: string | null;
+      idempotencyKey?: string | null;
+    },
+  ) {
+    const type = (input.actionType ?? 'send_email') as ActionType;
+    if (type !== 'send_email') {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        `Envio direto pela IA só é permitido para 'send_email' (recebido: '${type}').`,
+      );
+    }
+    if (!this.deps.registry.has(type)) {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        `Ação '${type}' não é suportada. Disponíveis: ${this.deps.registry.types().join(', ')}.`,
+      );
+    }
+
+    const execution = await this.propose(
+      ctx,
+      {
+        actionType: type,
+        input: input.input,
+        reason: input.reason ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+      },
+      { origin: 'ai_direct' },
+    );
+
+    return {
+      id: execution.id,
+      actionType: type,
+      status: execution.status,
+      requiresApproval: false,
+      output: (execution.output ?? null) as Record<string, unknown> | null,
+      error: execution.error ?? null,
+    };
   }
 
   private async proposeFromOrigin(
@@ -404,11 +458,14 @@ export class ExecutionEngine {
       await this.deps.auditLogs.record(
         { tenantId, userId: execution.requestedBy },
         {
-          action: AuditAction.ACTION_EXECUTED,
+          action:
+            execution.origin === 'ai_direct'
+              ? AuditAction.ACTION_EXECUTED_DIRECT
+              : AuditAction.ACTION_EXECUTED,
           entityType: 'action_execution',
           entityId: executionId,
-          actorType: 'system',
-          metadata: { actionType: execution.action.type, output },
+          actorType: execution.origin === 'ai_direct' ? 'ai' : 'system',
+          metadata: { actionType: execution.action.type, origin: execution.origin, output },
         },
       );
 

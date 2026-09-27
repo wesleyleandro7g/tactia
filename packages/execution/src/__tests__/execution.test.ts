@@ -535,6 +535,66 @@ describe('ExecutionEngine', () => {
     ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
   });
 
+  it('sendEmailFromAi sends immediately (origin ai_direct, no approval)', async () => {
+    const result = await engine.sendEmailFromAi(memberCtx, {
+      input: {
+        to: 'cliente@exec.local',
+        subject: 'Retomada de contato',
+        body: 'Olá, sentimos sua falta.',
+      },
+      reason: 'Pedido direto do usuário no chat',
+    });
+
+    expect(result.actionType).toBe('send_email');
+    expect(result.requiresApproval).toBe(false);
+    expect(result.status).toBe('completed');
+
+    const execution = await actionService.getExecution(memberCtx, result.id);
+    expect(execution.origin).toBe('ai_direct');
+    expect(execution.status).toBe('completed');
+    expect(execution.approvals).toHaveLength(0);
+
+    // The e-mail actually went through the injected sender.
+    expect(emailSender.sent.some((m) => m.to === 'cliente@exec.local')).toBe(true);
+
+    const audit = await auditLogRepository.list({ tenantId, skip: 0, take: 50 });
+    const executedDirect = audit.items.find(
+      (entry) => entry.action === 'ACTION_EXECUTED_DIRECT',
+    );
+    expect(executedDirect).toBeDefined();
+    expect(executedDirect?.actorType).toBe('ai');
+    const proposedEntry = audit.items
+      .filter((entry) => entry.action === 'ACTION_PROPOSED')
+      .find((entry) => entry.entityId === execution.id);
+    expect(proposedEntry?.actorType).toBe('ai');
+  });
+
+  it('sendEmailFromAi rejects any action type other than send_email', async () => {
+    await expect(
+      engine.sendEmailFromAi(memberCtx, {
+        actionType: 'create_task',
+        input: { title: 'Não permitido por este caminho' },
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+  });
+
+  it('sendEmailFromAi records the failure without throwing when SMTP fails', async () => {
+    const failingEngine = buildEngine(failingEmailSender);
+    const result = await failingEngine.sendEmailFromAi(memberCtx, {
+      input: {
+        to: 'cliente@exec.local',
+        subject: 'Vai falhar',
+        body: 'Corpo',
+      },
+    });
+
+    expect(result.status).toBe('failed');
+    const execution = await actionService.getExecution(memberCtx, result.id);
+    expect(execution.origin).toBe('ai_direct');
+    expect(execution.status).toBe('failed');
+    expect(execution.error).toContain('smtp unreachable');
+  });
+
   it('enforces roles: viewer cannot propose, member cannot approve', async () => {
     const viewerCtx = context({ tenantId, userId: memberCtx.userId, role: 'viewer' });
     await expect(

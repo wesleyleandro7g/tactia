@@ -3,10 +3,12 @@ import {
   Orchestrator,
   ToolRegistry,
   createDefaultTools,
+  createSendEmailTool,
   defineTool,
   requireLLMAdapter,
   type ActionProposalPort,
   type ChatAnswer,
+  type DirectEmailPort,
   type InfographicStore,
   type LLMAdapter,
   type ToolContext,
@@ -73,6 +75,15 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
         : services.executionEngine.proposeFromAi(ctx, input),
   };
 
+  /**
+   * Direct e-mail rail (no approval). Chat-only: it is NOT added to the shared
+   * registry consumed by MCP, so the ChatGPT/MCP channel keeps proposing with
+   * human approval.
+   */
+  const directEmailSender: DirectEmailPort = {
+    sendEmailDirect: (ctx, input) => services.executionEngine.sendEmailFromAi(ctx, input),
+  };
+
   const infographicStore: InfographicStore = {
     save: (ctx, input) => services.infographicService.create(ctx, input),
   };
@@ -109,6 +120,7 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
   /** Browser delegation is chat-only; the MCP registry above stays unchanged. */
   const chatToolRegistry = new ToolRegistry([
     ...toolRegistry.list(),
+    createSendEmailTool(directEmailSender),
     defineTool({
       name: 'load_company_skill',
       minRole: 'member',

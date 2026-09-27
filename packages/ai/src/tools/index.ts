@@ -36,6 +36,7 @@ import {
   createSearchEpisodesTool,
 } from './memory';
 import { createProposeActionTool, type ActionProposalPort } from './propose-action';
+import { createSendEmailTool, type DirectEmailPort } from './send-email';
 import { createGenerateInfographicTool, type InfographicStore } from './generate-infographic';
 import {
   createGetAcquisitionTool,
@@ -105,6 +106,7 @@ export {
   PROPOSABLE_ACTION_TYPES,
   type ActionProposalPort,
 } from './propose-action';
+export { createSendEmailTool, type DirectEmailPort } from './send-email';
 export {
   createGenerateInfographicTool,
   type InfographicStore,
@@ -125,6 +127,12 @@ export type CreateToolsOptions = {
    * actions for human approval (Etapa 7). Omit it to keep the chat read-only.
    */
   actionProposer?: ActionProposalPort;
+  /**
+   * When provided, `send_email` is registered so the assistant can send an
+   * e-mail directly (no approval) at the user's request. Chat-only — do not
+   * pass it for the MCP registry, which must keep the approval guardrail.
+   */
+  directEmailSender?: DirectEmailPort;
   /**
    * When provided, `generate_infographic` is registered so the assistant can
    * attach branded PNGs to chat/WhatsApp answers.
@@ -184,6 +192,9 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
 
   if (options.actionProposer) {
     tools.push(createProposeActionTool(options.actionProposer));
+  }
+  if (options.directEmailSender) {
+    tools.push(createSendEmailTool(options.directEmailSender));
   }
   if (options.infographicStore) {
     tools.push(createGenerateInfographicTool(options.infographicStore));

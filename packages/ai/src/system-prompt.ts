@@ -128,6 +128,8 @@ const TOOL_GUIDE: Record<string, string> = {
   load_company_skill:
     'carrega pelo slug a orientação operacional completa de uma skill secundária desta empresa. Use quando o catálogo indicar uma skill relevante.',
   propose_action: 'propor tarefa ou e-mail para aprovação humana.',
+  send_email:
+    'envia um e-mail imediatamente (sem aprovação) usando o SMTP da empresa. Use quando o usuário pedir explicitamente para enviar um e-mail. Confirme o envio só após o status voltar como enviado.',
   generate_infographic:
     'gera um infográfico PNG (KPI, comparação, ranking, insight, pizza, linha, períodos ou barras). Use só se o usuário pedir visual/imagem/infográfico OU se a resposta tiver 3+ números/comparações que se beneficiem de um quadro. Não use em respostas curtas.',
 };
@@ -141,6 +143,7 @@ const TOOL_GUIDE: Record<string, string> = {
  */
 export function buildSystemPrompt(context: AiContext, toolNames: string[]): string {
   const canProposeActions = toolNames.includes('propose_action');
+  const canSendEmail = toolNames.includes('send_email');
   const canDelegateBrowser =
     toolNames.includes('list_browser_profiles') && toolNames.includes('browser_delegate');
   const currency = context.company.currency;
@@ -268,8 +271,10 @@ export function buildSystemPrompt(context: AiContext, toolNames: string[]): stri
     '2. Você não tem acesso ao banco de dados; apenas as ferramentas retornam dados reais.',
     '3. Percentuais vêm em fração decimal (0.15 = 15%); converta ao exibir. Valores monetários em ' + currency + '.',
     canProposeActions
-      ? '4. Para providências concretas (criar tarefa, enviar e-mail), use propose_action. Ela apenas registra uma proposta pendente de aprovação humana: ' +
-        'nunca diga que a ação foi executada — diga que ficou pendente de aprovação. Quando uma recomendação trouxer `suggestedAction`, ofereça propô-la.'
+      ? (canSendEmail
+          ? '4. Para enviar um e-mail quando o usuário pedir explicitamente, use send_email: ela ENVIA na hora, sem aprovação. Confirme o envio ao usuário apenas depois que a ferramenta retornar como enviado; se falhar, diga que não foi enviado. Para criar tarefa (create_task), use propose_action, que apenas registra uma proposta pendente de aprovação humana — nunca diga que foi executada. Quando uma recomendação trouxer `suggestedAction`, ofereça a providência adequada.'
+          : '4. Para providências concretas (criar tarefa, enviar e-mail), use propose_action. Ela apenas registra uma proposta pendente de aprovação humana: ' +
+            'nunca diga que a ação foi executada — diga que ficou pendente de aprovação. Quando uma recomendação trouxer `suggestedAction`, ofereça propô-la.')
       : '4. Não prometa executar ações (enviar e-mail, criar tarefa). Você apenas analisa e recomenda.',
     '5. Use Markdown: **negrito** para destaques, listas curtas, tabelas para comparar valores.',
     toolNames.includes('generate_infographic')
