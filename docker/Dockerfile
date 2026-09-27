@@ -21,6 +21,7 @@ COPY apps/web/package.json apps/web/
 COPY apps/admin/package.json apps/admin/
 COPY apps/landing/package.json apps/landing/
 COPY packages/ai/package.json packages/ai/
+COPY packages/chat/package.json packages/chat/
 COPY packages/connectors/package.json packages/connectors/
 COPY packages/database/package.json packages/database/
 COPY packages/domain/package.json packages/domain/

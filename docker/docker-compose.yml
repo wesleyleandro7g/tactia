@@ -54,7 +54,9 @@ services:
     restart: unless-stopped
     environment:
       PORT: 11345
-      SESSION_SECRET: ${FIGRANIUM_SESSION_SECRET:?defina FIGRANIUM_SESSION_SECRET}
+      # Compose interpolates variables from inactive profiles too. Keep this
+      # optional here so core services (for example postgres) can start alone.
+      SESSION_SECRET: ${FIGRANIUM_SESSION_SECRET:-}
       ALLOWED_IPS: ${FIGRANIUM_ALLOWED_IPS:-}
       SKIP_LOCAL_CAPTCHA_MODEL: "true"
     ports:
@@ -68,8 +70,63 @@ services:
       timeout: 5s
       retries: 10
 
+  browser-runtime:
+    profiles: ["browser-automation"]
+    build:
+      context: ..
+      dockerfile: services/browser-runtime/Dockerfile
+    environment:
+      BROWSER_RUNTIME_TOKEN: ${BROWSER_RUNTIME_TOKEN:-local-browser-runtime-token}
+      BROWSER_EGRESS_URL: http://browser-egress:8888
+      BROWSER_TEST_LOCAL: "true"
+    networks:
+      - browser_control
+    depends_on:
+      - browser-egress
+
+  browser-runtime-gateway:
+    profiles: ["browser-automation"]
+    build:
+      context: ..
+      dockerfile: services/browser-runtime/Dockerfile
+    command: ["python", "-m", "app.gateway"]
+    ports:
+      - "127.0.0.1:8765:8765"
+    networks:
+      - default
+      - browser_control
+    depends_on:
+      - browser-runtime
+
+  browser-egress:
+    profiles: ["browser-automation"]
+    build:
+      context: ..
+      dockerfile: services/browser-runtime/Dockerfile
+    command: ["python", "-m", "app.egress"]
+    environment:
+      BROWSER_RUNTIME_TOKEN: ${BROWSER_RUNTIME_TOKEN:-local-browser-runtime-token}
+      BROWSER_TEST_LOCAL: "true"
+    networks:
+      - browser_control
+      - browser_outbound
+
+  browser-test:
+    profiles: ["browser-automation"]
+    build:
+      context: ..
+      dockerfile: services/browser-runtime/Dockerfile
+    command: ["python", "-m", "app.test_site"]
+    networks:
+      - browser_outbound
+
 volumes:
   postgres_data:
   minio_data:
   figranium_torge_data:
   figranium_torge_captures:
+
+networks:
+  browser_control:
+    internal: true
+  browser_outbound:

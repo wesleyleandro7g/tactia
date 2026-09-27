@@ -146,6 +146,21 @@ preservados; só o resultado canônico é reescrito.
 
 O chat nunca executa nada: uma proposta de ação sempre cai em `/approvals`.
 
+### 6.1 Chat de teste no admin (`/tenants/{id}/chat`)
+
+O operador conversa com o assistente usando os dados do tenant — mesma stack do web (`packages/chat`: tools, contexto, orquestrador, UI).
+
+- **Efêmero:** nada é salvo em `conversations`/`messages`; o histórico vive na página (últimos 12 turnos reenviados a cada pergunta) e some ao recarregar.
+- **Principal = operador:** `userId: null`, `operatorId` preenchido, papel `owner`. Efeitos das tools são reais: aprovar uma proposta executa a ação no tenant; fatos, infográficos e tarefas do Browser Agent são gravados com `requested_by`/`approved_by`/`created_by` nulos e a autoria fica no audit log (`actorType=operator`).
+- **Requisitos no admin:** `LLM_*`/`EMBEDDING_MODEL` (ou `LLM_PROVIDER=mock`), storage igual ao web e `JOBS_ENABLED=true` para o Browser Agent. O admin só publica `browser.task`; quem executa é o worker do web — sem ele a tarefa fica em "Aguardando início".
+- **Logs:** `grep '"operation":"chat"' | grep operator_id` (linhas com `conversation_id: null`).
+
+| Sintoma | Causa | Ação |
+|---|---|---|
+| Banner "Chat indisponível" no admin | Admin sem `LLM_API_KEY` | Configurar em `apps/admin/.env.local` / compose do admin |
+| "Browser task queue is disabled" | Admin com `JOBS_ENABLED` ≠ `true` | Habilitar jobs no admin |
+| Cartão do Browser Agent parado em "Aguardando início" | Worker do web parado | Conferir o web com `JOBS_ENABLED=true` |
+
 ## 7. Segredos e chaves
 
 | Variável | Efeito se faltar/estiver errada |

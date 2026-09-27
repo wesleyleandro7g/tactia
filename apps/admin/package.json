@@ -13,7 +13,10 @@
     "publish:browser-workflow": "tsx scripts/publish-browser-workflow.ts"
   },
   "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@shadcn/react": "^0.3.1",
     "@tactia/ai": "workspace:*",
+    "@tactia/chat": "workspace:*",
     "@tactia/connectors": "workspace:*",
     "@tactia/database": "workspace:*",
     "@tactia/domain": "workspace:*",
@@ -27,6 +30,8 @@
     "next-themes": "^0.4.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "3.6.0",
     "zod": "^3.25.76"
   },

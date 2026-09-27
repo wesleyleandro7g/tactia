@@ -88,12 +88,17 @@ services:
       JOBS_ENABLED: ${JOBS_ENABLED:-true}
       CRON_SECRET: ${CRON_SECRET:-}
       FIGRANIUM_INSTANCES_JSON: ${FIGRANIUM_INSTANCES_JSON:-{}}
+      BROWSER_RUNTIME_URL: http://browser-runtime:8765
+      BROWSER_RUNTIME_TOKEN: ${BROWSER_RUNTIME_TOKEN:?defina BROWSER_RUNTIME_TOKEN}
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
       EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
       EVOLUTION_WEBHOOK_SECRET: ${EVOLUTION_WEBHOOK_SECRET:-}
     volumes:
       - uploads_data:/data/uploads
+    networks:
+      - default
+      - browser_control
     depends_on:
       postgres:
         condition: service_healthy
@@ -156,6 +161,13 @@ services:
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
       JOBS_ENABLED: ${JOBS_ENABLED:-true}
       FIGRANIUM_INSTANCES_JSON: ${FIGRANIUM_INSTANCES_JSON:-{}}
+      # Chat de teste do operador (/tenants/{id}/chat): mesmo LLM do web.
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_CLASSIFIER_MODEL: ${LLM_CLASSIFIER_MODEL:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
     volumes:
       - uploads_data:/data/uploads
     depends_on:
@@ -196,9 +208,50 @@ services:
       timeout: 5s
       retries: 10
 
+  browser-runtime:
+    build:
+      context: ..
+      dockerfile: services/browser-runtime/Dockerfile
+    restart: unless-stopped
+    environment:
+      BROWSER_RUNTIME_TOKEN: ${BROWSER_RUNTIME_TOKEN:?defina BROWSER_RUNTIME_TOKEN}
+      BROWSER_EGRESS_URL: http://browser-egress:8888
+      BROWSER_MAX_SESSIONS: ${BROWSER_MAX_SESSIONS:-2}
+    networks:
+      - browser_control
+    depends_on:
+      - browser-egress
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    mem_limit: 2g
+
+  browser-egress:
+    build:
+      context: ..
+      dockerfile: services/browser-runtime/Dockerfile
+    command: ['python', '-m', 'app.egress']
+    restart: unless-stopped
+    environment:
+      BROWSER_RUNTIME_TOKEN: ${BROWSER_RUNTIME_TOKEN:?defina BROWSER_RUNTIME_TOKEN}
+    networks:
+      - browser_control
+      - browser_outbound
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
 volumes:
   postgres_data:
   minio_data:
   uploads_data:
   figranium_torge_data:
   figranium_torge_captures:
+
+networks:
+  browser_control:
+    internal: true
+  browser_outbound:
