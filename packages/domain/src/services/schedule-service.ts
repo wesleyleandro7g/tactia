@@ -10,6 +10,7 @@ import { AuditAction, type AuditLogService } from './audit-log-service';
 import {
   computePeriodKey,
   isDue,
+  isValidCronExpression,
   recurrenceConfigSchema,
   type ScheduleRecurrence,
 } from './schedule-recurrence';
@@ -65,6 +66,12 @@ function assertCoherent(value: {
   }
   if (value.frequency === 'custom' && !value.cronExpression) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Frequência custom exige cronExpression.');
+  }
+  if (value.frequency === 'custom' && value.cronExpression && !isValidCronExpression(value.cronExpression)) {
+    throw new AppError(
+      ErrorCode.VALIDATION_ERROR,
+      'cronExpression inválida. Use 5 campos (min hora dia-do-mês mês dia-da-semana), ex.: "*/5 * * * *".',
+    );
   }
   if (value.frequency === 'weekly' && !(value.recurrenceConfig?.weekdays?.length)) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Frequência semanal exige recurrenceConfig.weekdays.');

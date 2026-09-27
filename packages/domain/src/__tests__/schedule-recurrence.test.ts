@@ -4,6 +4,9 @@ import {
   daysInMonth,
   isDue,
   isoWeek,
+  isValidCronExpression,
+  matchesCron,
+  matchesCronField,
   nthBusinessDayOfMonth,
   type ScheduleRecurrence,
 } from '../services/schedule-recurrence';
@@ -82,9 +85,40 @@ describe('schedule recurrence — isDue', () => {
     expect(isDue(r, spInstant(2026, 1, 6, 0, 0))).toBe(false);
   });
 
-  it('custom and manual never fire automatically', () => {
-    expect(isDue(rec({ frequency: 'custom', cronExpression: '* * * * *' }), spInstant(2026, 1, 15, 12))).toBe(false);
+  it('manual never fires automatically', () => {
     expect(isDue(rec({ frequency: 'manual' }), spInstant(2026, 1, 15, 12))).toBe(false);
+  });
+
+  it('custom without cronExpression never fires', () => {
+    expect(isDue(rec({ frequency: 'custom', cronExpression: null }), spInstant(2026, 1, 15, 12))).toBe(false);
+  });
+
+  it('custom fires on cron minute matches in the schedule timezone', () => {
+    // "*/5 * * * *" — every 5 minutes.
+    const r = rec({ frequency: 'custom', cronExpression: '*/5 * * * *' });
+    expect(isDue(r, spInstant(2026, 1, 15, 12, 0))).toBe(true);
+    expect(isDue(r, spInstant(2026, 1, 15, 12, 5))).toBe(true);
+    expect(isDue(r, spInstant(2026, 1, 15, 12, 3))).toBe(false);
+  });
+
+  it('custom honors specific minute/hour', () => {
+    // 30 8 * * * — 08:30 every day.
+    const r = rec({ frequency: 'custom', cronExpression: '30 8 * * *' });
+    expect(isDue(r, spInstant(2026, 1, 15, 8, 30))).toBe(true);
+    expect(isDue(r, spInstant(2026, 1, 15, 8, 0))).toBe(false);
+    expect(isDue(r, spInstant(2026, 1, 15, 9, 30))).toBe(false);
+  });
+
+  it('custom honors day-of-week', () => {
+    // 0 9 * * 1 — 09:00 on Mondays. 2026-01-19 is a Monday, 2026-01-20 Tuesday.
+    const r = rec({ frequency: 'custom', cronExpression: '0 9 * * 1' });
+    expect(isDue(r, spInstant(2026, 1, 19, 9, 0))).toBe(true);
+    expect(isDue(r, spInstant(2026, 1, 20, 9, 0))).toBe(false);
+  });
+
+  it('custom rejects malformed expressions (never fires)', () => {
+    expect(isDue(rec({ frequency: 'custom', cronExpression: 'not-a-cron' }), spInstant(2026, 1, 15, 12))).toBe(false);
+    expect(isDue(rec({ frequency: 'custom', cronExpression: '* * * *' }), spInstant(2026, 1, 15, 12))).toBe(false);
   });
 });
 
@@ -108,5 +142,79 @@ describe('schedule recurrence — computePeriodKey', () => {
     // 2026-01-16 01:00 UTC is still 2026-01-15 22:00 in São Paulo.
     const r = rec({ frequency: 'daily' });
     expect(computePeriodKey(r, new Date(Date.UTC(2026, 0, 16, 1, 0)))).toBe('2026-01-15');
+  });
+});
+
+describe('schedule recurrence — cron matching', () => {
+  it('matchesCronField handles wildcard, list, range and step', () => {
+    expect(matchesCronField('*', 42, 0, 59)).toBe(true);
+    expect(matchesCronField('5', 5, 0, 59)).toBe(true);
+    expect(matchesCronField('5', 6, 0, 59)).toBe(false);
+    expect(matchesCronField('1,2,3', 2, 0, 59)).toBe(true);
+    expect(matchesCronField('1,2,3', 4, 0, 59)).toBe(false);
+    expect(matchesCronField('10-20', 15, 0, 59)).toBe(true);
+    expect(matchesCronField('10-20', 25, 0, 59)).toBe(false);
+    expect(matchesCronField('*/15', 30, 0, 59)).toBe(true);
+    expect(matchesCronField('*/15', 20, 0, 59)).toBe(false);
+    expect(matchesCronField('0-30/10', 20, 0, 59)).toBe(true);
+    expect(matchesCronField('0-30/10', 25, 0, 59)).toBe(false);
+  });
+
+  it('matchesCronField rejects malformed tokens and out-of-range values', () => {
+    expect(matchesCronField('', 0, 0, 59)).toBe(false);
+    expect(matchesCronField('abc', 0, 0, 59)).toBe(false);
+    expect(matchesCronField('*/0', 0, 0, 59)).toBe(false);
+    expect(matchesCronField('70', 70, 0, 59)).toBe(false); // above max
+    expect(matchesCronField('20-10', 15, 0, 59)).toBe(false); // inverted range
+    expect(matchesCronField('1/2/3', 1, 0, 59)).toBe(false); // double step
+  });
+
+  it('matchesCron requires exactly 5 fields', () => {
+    const parts = { year: 2026, month: 1, day: 15, hour: 12, minute: 0, weekday: 4 };
+    expect(matchesCron('0 12 * * *', parts)).toBe(true);
+    expect(matchesCron('0 12 * *', parts)).toBe(false);
+    expect(matchesCron('0 12 * * * *', parts)).toBe(false);
+  });
+
+  it('matchesCron unions dom and dow when both are restricted (POSIX)', () => {
+    // "0 0 13 * 5" — midnight on the 13th OR any Friday.
+    // 2026-02-13 is a Friday (both match); pick a case where only dow matches.
+    // 2026-01-16 is a Friday and not the 13th.
+    const friday16 = { year: 2026, month: 1, day: 16, hour: 0, minute: 0, weekday: 5 };
+    const the13thWed = { year: 2026, month: 5, day: 13, hour: 0, minute: 0, weekday: 3 };
+    const neither = { year: 2026, month: 1, day: 14, hour: 0, minute: 0, weekday: 3 };
+    expect(matchesCron('0 0 13 * 5', friday16)).toBe(true); // dow only
+    expect(matchesCron('0 0 13 * 5', the13thWed)).toBe(true); // dom only
+    expect(matchesCron('0 0 13 * 5', neither)).toBe(false);
+  });
+
+  it('matchesCron accepts 7 as Sunday', () => {
+    const sunday = { year: 2026, month: 1, day: 18, hour: 0, minute: 0, weekday: 0 };
+    expect(matchesCron('0 0 * * 7', sunday)).toBe(true);
+    expect(matchesCron('0 0 * * 0', sunday)).toBe(true);
+  });
+
+  it('isValidCronExpression accepts well-formed expressions', () => {
+    expect(isValidCronExpression('*/5 * * * *')).toBe(true);
+    expect(isValidCronExpression('30 8 * * *')).toBe(true);
+    expect(isValidCronExpression('0 9 * * 1')).toBe(true);
+    expect(isValidCronExpression('0 0 13 * 5')).toBe(true);
+    expect(isValidCronExpression('0 0 * * 7')).toBe(true); // 7 = Sunday
+    expect(isValidCronExpression('0,15,30,45 0-23 1-31 1-12 *')).toBe(true);
+    expect(isValidCronExpression('  0   12   *   *   *  ')).toBe(true); // extra spaces
+  });
+
+  it('isValidCronExpression rejects malformed expressions', () => {
+    expect(isValidCronExpression('not-a-cron')).toBe(false);
+    expect(isValidCronExpression('* * * *')).toBe(false); // 4 fields
+    expect(isValidCronExpression('* * * * * *')).toBe(false); // 6 fields
+    expect(isValidCronExpression('60 * * * *')).toBe(false); // minute out of range
+    expect(isValidCronExpression('* 24 * * *')).toBe(false); // hour out of range
+    expect(isValidCronExpression('* * 32 * *')).toBe(false); // dom out of range
+    expect(isValidCronExpression('* * * 13 *')).toBe(false); // month out of range
+    expect(isValidCronExpression('* * * * 8')).toBe(false); // dow out of range
+    expect(isValidCronExpression('*/0 * * * *')).toBe(false); // zero step
+    expect(isValidCronExpression('20-10 * * * *')).toBe(false); // inverted range
+    expect(isValidCronExpression('')).toBe(false);
   });
 });

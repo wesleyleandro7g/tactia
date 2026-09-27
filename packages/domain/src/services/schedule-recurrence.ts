@@ -159,12 +159,152 @@ export function computePeriodKey(recurrence: ScheduleRecurrence, now: Date): str
 }
 
 /**
+ * Validates a single cron field for SYNTAX (independently of any value): every
+ * token must be `*`, a bare number, a range, or either with a `*​/step`, all
+ * within `[min, max]`. Mirrors the parsing rules of `matchesCronField`.
+ */
+function isValidCronField(field: string, min: number, max: number): boolean {
+  const inRange = (n: number) => Number.isInteger(n) && n >= min && n <= max;
+
+  for (const part of field.split(',')) {
+    const token = part.trim();
+    if (token === '') return false;
+
+    const [rangeRaw, stepRaw, ...rest] = token.split('/');
+    if (rest.length > 0 || rangeRaw === undefined) return false;
+
+    if (stepRaw !== undefined) {
+      const step = Number(stepRaw);
+      if (!Number.isInteger(step) || step <= 0) return false;
+    }
+
+    if (rangeRaw === '*') continue;
+    if (rangeRaw.includes('-')) {
+      const [a, b, ...more] = rangeRaw.split('-');
+      if (more.length > 0 || a === undefined || b === undefined) return false;
+      const start = Number(a);
+      const end = Number(b);
+      if (!inRange(start) || !inRange(end) || start > end) return false;
+    } else {
+      if (!inRange(Number(rangeRaw))) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Validates a standard 5-field cron expression's syntax. Day-of-week accepts
+ * 0..7 (both 0 and 7 mean Sunday). Returns false for anything the scheduler
+ * cannot evaluate, so callers can reject it at creation time.
+ */
+export function isValidCronExpression(expression: string): boolean {
+  const fields = expression.trim().split(/\s+/);
+  if (fields.length !== 5) return false;
+  const [minute, hour, dom, month, dow] = fields as [string, string, string, string, string];
+  return (
+    isValidCronField(minute, 0, 59) &&
+    isValidCronField(hour, 0, 23) &&
+    isValidCronField(dom, 1, 31) &&
+    isValidCronField(month, 1, 12) &&
+    isValidCronField(dow, 0, 7)
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cron matching (custom frequency)
+// ---------------------------------------------------------------------------
+
+/**
+ * Matches a single standard cron field against a numeric value. Supports the
+ * subset used by schedules: `*`, lists (`1,2`), ranges (`1-5`), steps (`*​/5`,
+ * `1-30/5`) and any combination separated by commas. `min`/`max` bound the
+ * field (e.g. 0..59 for minutes) so ranges/steps stay within domain.
+ *
+ * Returns `false` on any malformed token: an invalid cron never fires
+ * automatically, which is safer than firing on every tick.
+ */
+export function matchesCronField(field: string, value: number, min: number, max: number): boolean {
+  const clampError = (n: number) => Number.isNaN(n) || n < min || n > max;
+
+  for (const part of field.split(',')) {
+    const token = part.trim();
+    if (token === '') return false;
+
+    // Split off an optional step: "range/step" or "*​/step".
+    const [rangeRaw, stepRaw, ...rest] = token.split('/');
+    if (rest.length > 0) return false; // more than one '/' is malformed
+    if (rangeRaw === undefined) return false;
+
+    let step = 1;
+    if (stepRaw !== undefined) {
+      step = Number(stepRaw);
+      if (!Number.isInteger(step) || step <= 0) return false;
+    }
+
+    let start: number;
+    let end: number;
+    if (rangeRaw === '*') {
+      start = min;
+      end = max;
+    } else if (rangeRaw.includes('-')) {
+      const [a, b, ...more] = rangeRaw.split('-');
+      if (more.length > 0 || a === undefined || b === undefined) return false;
+      start = Number(a);
+      end = Number(b);
+      if (clampError(start) || clampError(end) || start > end) return false;
+    } else {
+      const single = Number(rangeRaw);
+      if (clampError(single)) return false;
+      // A bare number ignores step (step only meaningful with a range or '*').
+      if (value === single) return true;
+      continue;
+    }
+
+    if (value < start || value > end) continue;
+    if ((value - start) % step === 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Evaluates a standard 5-field cron expression (`min hour dom month dow`)
+ * against wall-clock parts. Day-of-month is 1..31, month 1..12, day-of-week
+ * 0..6 (0=Sunday; 7 is normalized to 0). Per POSIX cron, when BOTH day-of-month
+ * and day-of-week are restricted (neither is `*`), the match is a UNION (either
+ * one satisfies); otherwise it is an intersection.
+ */
+export function matchesCron(expression: string, parts: LocalParts): boolean {
+  const fields = expression.trim().split(/\s+/);
+  if (fields.length !== 5) return false;
+  const [minute, hour, dom, month, dow] = fields as [string, string, string, string, string];
+
+  const minuteOk = matchesCronField(minute, parts.minute, 0, 59);
+  const hourOk = matchesCronField(hour, parts.hour, 0, 23);
+  const monthOk = matchesCronField(month, parts.month, 1, 12);
+  if (!minuteOk || !hourOk || !monthOk) return false;
+
+  // Normalize dow: cron allows 7 for Sunday; LocalParts uses 0=Sun..6=Sat.
+  const dowValue = parts.weekday;
+  const domRestricted = dom.trim() !== '*';
+  const dowRestricted = dow.trim() !== '*';
+  const domOk = matchesCronField(dom, parts.day, 1, 31);
+  const dowOk = matchesCronField(dow, dowValue, 0, 6) || matchesCronField(dow, dowValue === 0 ? 7 : dowValue, 0, 7);
+
+  if (domRestricted && dowRestricted) return domOk || dowOk;
+  if (domRestricted) return domOk;
+  if (dowRestricted) return dowOk;
+  return true; // both '*'
+}
+
+/**
  * Whether the schedule should fire for the period containing `now`. Idempotency
  * (not firing twice in the same period) is handled by the occurrence store; this
  * only answers "is this the right day/time?".
  *
- * `custom` (cron) and `manual` return false here: cron cadence is delegated to
- * the job scheduler and manual only fires on demand.
+ * `custom` evaluates the cron expression in the schedule's timezone. The tick
+ * runs every 5 minutes, so cron cadence is effectively floored to that
+ * resolution; the minute-granular `periodKey` guarantees at most one run per
+ * matched minute. `manual` never fires automatically.
  */
 export function isDue(recurrence: ScheduleRecurrence, now: Date): boolean {
   const p = localParts(now, recurrence.timezone);
@@ -190,7 +330,10 @@ export function isDue(recurrence: ScheduleRecurrence, now: Date): boolean {
       }
       return false;
     }
-    case 'custom':
+    case 'custom': {
+      if (!recurrence.cronExpression) return false;
+      return matchesCron(recurrence.cronExpression, p);
+    }
     case 'manual':
     default:
       return false;
