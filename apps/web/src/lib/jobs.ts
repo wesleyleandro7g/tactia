@@ -19,6 +19,8 @@ export const JOBS = {
   ingestMedia: 'knowledge.ingest_media',
   /** One firing of a Schedule occurrence (agendamento de ações). */
   scheduleRun: 'schedule.run',
+  /** One async WhatsApp agent operation (direct execution + status reply). */
+  whatsappAgent: 'whatsapp.agent',
   /** Same name the chat package publishes (`BROWSER_TASK_JOB`). */
   browserTask: BROWSER_TASK_JOB,
 } as const;
@@ -35,6 +37,7 @@ export type ScheduleRunJob = {
   periodKey: string;
   requestId: string;
 };
+export type WhatsappAgentJobPayload = { tenantId: string; jobId: string };
 export type SyncJob = {
   tenantId: string;
   syncJobId: string;
@@ -239,6 +242,11 @@ export async function startJobWorkers(): Promise<void> {
     await browserAutomationService.run(data.tenantId, data.taskId);
   });
 
+  await jobQueue.register<WhatsappAgentJobPayload>(JOBS.whatsappAgent, async (data) => {
+    const { runWhatsappAgentJob } = await import('./whatsapp-worker');
+    await runWhatsappAgentJob(data.tenantId, data.jobId);
+  });
+
   await jobQueue.register<ScheduleRunJob>(JOBS.scheduleRun, async (data) => {
     const { scheduleRunner } = await import('./schedules');
     await scheduleRunner.run(data.tenantId, data.occurrenceId, data.requestId);
@@ -266,4 +274,36 @@ export async function startJobWorkers(): Promise<void> {
   await jobQueue.unschedule(JOBS.tick, 'hourly');
   await jobQueue.schedule(JOBS.tick, '*/5 * * * *', {}, { tz: 'UTC', key: 'integration-tick' });
   logger.info({ operation: 'job_workers_started' });
+}
+
+/**
+ * Enqueue a WhatsApp agent operation. When the pg-boss queue is not running
+ * (dev/serverless without JOBS_ENABLED) it runs inline via `after()`-style
+ * fire-and-forget so the webhook still responds fast.
+ */
+export async function enqueueWhatsappAgentJob(payload: WhatsappAgentJobPayload): Promise<void> {
+  const jobQueue = getJobQueue();
+  if (jobQueue && jobQueue.isStarted) {
+    await jobQueue.publish<WhatsappAgentJobPayload>(JOBS.whatsappAgent, payload, {
+      singletonKey: payload.jobId,
+    });
+    logger.info({
+      tenant_id: payload.tenantId,
+      operation: 'wa_job_enqueue',
+      queue: 'pg-boss',
+      job_id: payload.jobId,
+    });
+    return;
+  }
+  logger.info({
+    tenant_id: payload.tenantId,
+    operation: 'wa_job_enqueue',
+    queue: 'inline',
+    job_id: payload.jobId,
+  });
+  const { runWhatsappAgentJob } = await import('./whatsapp-worker');
+  // Do not await: keep the webhook ACK fast; errors are handled inside the runner.
+  void runWhatsappAgentJob(payload.tenantId, payload.jobId).catch((err) => {
+    logger.error({ err, job_id: payload.jobId, operation: 'wa_job_inline_failed' });
+  });
 }

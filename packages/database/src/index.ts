@@ -189,6 +189,14 @@ export type {
   CreateWhatsappAuthorizedNumberInput,
   WhatsappAuthorizedNumberRecord,
 } from './repositories/whatsapp-authorized-number-repository';
+export { WhatsappAgentConfigRepository } from './repositories/whatsapp-agent-config-repository';
+export type { WhatsappAgentConfigData } from './repositories/whatsapp-agent-config-repository';
+export { WhatsappAgentJobRepository } from './repositories/whatsapp-agent-job-repository';
+export type {
+  CreateWhatsappAgentJobInput,
+  WhatsappAgentJobRecord,
+} from './repositories/whatsapp-agent-job-repository';
+export type { WhatsappAgentJobStatus } from './client';
 export type {
   CreateKnowledgeDocumentInput,
   KnowledgeDocumentRecord,

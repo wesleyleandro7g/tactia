@@ -1,14 +1,33 @@
 import { prisma } from '@tactia/database';
 import type { RequestContext } from '@tactia/shared';
-import { scopedTenant, whatsappAuthorizedNumberService } from './settings-services';
+import {
+  scopedTenant,
+  whatsappAgentConfigService,
+  whatsappAuthorizedNumberService,
+} from './settings-services';
 
 export async function listTenantWhatsappNumbers(ctx: RequestContext, tenantId: string) {
   const scoped = await scopedTenant(ctx, tenantId);
-  const [numbers, users] = await Promise.all([
+  const [numbers, users, config] = await Promise.all([
     whatsappAuthorizedNumberService.list(scoped),
     listActiveTenantUsers(tenantId),
+    whatsappAgentConfigService.get(scoped),
   ]);
-  return { numbers, users };
+  return { numbers, users, config };
+}
+
+export async function getTenantWhatsappConfig(ctx: RequestContext, tenantId: string) {
+  const scoped = await scopedTenant(ctx, tenantId);
+  return whatsappAgentConfigService.get(scoped);
+}
+
+export async function updateTenantWhatsappConfig(
+  ctx: RequestContext,
+  tenantId: string,
+  raw: unknown,
+) {
+  const scoped = await scopedTenant(ctx, tenantId);
+  return whatsappAgentConfigService.upsert(scoped, raw);
 }
 
 export async function createTenantWhatsappNumber(ctx: RequestContext, tenantId: string, raw: unknown) {

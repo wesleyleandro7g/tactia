@@ -36,6 +36,10 @@ import {
 } from '@/app/api/v1/tenants/[id]/whatsapp/numbers/route';
 import { DELETE as whatsappDelete } from '@/app/api/v1/tenants/[id]/whatsapp/numbers/[numberId]/route';
 import {
+  GET as whatsappConfigGet,
+  PUT as whatsappConfigPut,
+} from '@/app/api/v1/tenants/[id]/whatsapp/config/route';
+import {
   GET as playbooksGet,
   POST as playbooksPost,
 } from '@/app/api/v1/tenants/[id]/playbooks/route';
@@ -76,6 +80,8 @@ async function cleanUp() {
   const ids = rows.map((row) => row.id);
   if (ids.length > 0) {
     await prisma.tenantApiKey.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.whatsappAgentJob.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.whatsappAgentConfig.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.whatsappAuthorizedNumber.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.playbook.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.credential.deleteMany({ where: { tenantId: { in: ids } } });
@@ -210,6 +216,53 @@ describe('admin WhatsApp numbers', () => {
         id: otherTenantId,
         numberId: created.id,
       }),
+    ).rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
+  });
+
+  it('persists contact name and role', async () => {
+    const created = (await call(whatsappPost)(
+      jsonRequest({
+        phone: '5511977770000',
+        userId: ownerUserId,
+        contactName: 'João Silva',
+        contactRole: 'Gerente',
+      }),
+      operatorSession(),
+      { id: tenantId },
+    )) as { id: string; contactName: string | null; contactRole: string | null };
+    expect(created.contactName).toBe('João Silva');
+    expect(created.contactRole).toBe('Gerente');
+  });
+});
+
+describe('admin WhatsApp agent config', () => {
+  it('upserts and reads back the per-company config with operator audit', async () => {
+    const saved = (await call(whatsappConfigPut)(
+      jsonRequestMethod('PUT', {
+        tone: 'Formal',
+        instructions: 'Confirme antes de enviar e-mails.',
+        companyContext: 'Loja de calçados.',
+      }),
+      operatorSession(),
+      { id: tenantId },
+    )) as { id: string; tone: string | null };
+    expect(saved.tone).toBe('Formal');
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { tenantId, action: 'WHATSAPP_AGENT_CONFIG_UPDATED' },
+    });
+    expect(audit).toMatchObject({ operatorId, actorType: 'operator' });
+
+    const read = (await call(whatsappConfigGet)(new Request('http://localhost/api'), operatorSession(), {
+      id: tenantId,
+    })) as { tone: string | null; companyContext: string | null };
+    expect(read.tone).toBe('Formal');
+    expect(read.companyContext).toBe('Loja de calçados.');
+  });
+
+  it('hides unknown tenants', async () => {
+    await expect(
+      call(whatsappConfigGet)(new Request('http://localhost/api'), operatorSession(), { id: createId() }),
     ).rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
   });
 });

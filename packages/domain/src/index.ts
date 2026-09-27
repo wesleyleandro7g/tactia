@@ -90,10 +90,13 @@ export {
 export { TenantApiKeyService } from './services/tenant-api-key-service';
 export type { VerifiedTenantApiKey } from './services/tenant-api-key-service';
 export { WhatsappAuthorizedNumberService } from './services/whatsapp-authorized-number-service';
+export { WhatsappAgentConfigService } from './services/whatsapp-agent-config-service';
+export { WhatsappAgentJobService } from './services/whatsapp-agent-job-service';
 export { normalizeWhatsappPhone, INVALID_WHATSAPP_PHONE } from './whatsapp/phone';
 export {
   createWhatsappNumberSchema,
   updateWhatsappNumberSchema,
+  whatsappAgentConfigSchema,
 } from './schemas/whatsapp';
 export {
   parseTenantApiKeyToken,

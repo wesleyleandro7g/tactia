@@ -10,6 +10,7 @@ import {
   TenantApiKeyRepository,
   TenantRepository,
   WhatsappAuthorizedNumberRepository,
+  WhatsappAgentConfigRepository,
 } from '@tactia/database';
 import {
   EmailConfigService,
@@ -17,6 +18,7 @@ import {
   ScheduleService,
   TenantApiKeyService,
   WhatsappAuthorizedNumberService,
+  WhatsappAgentConfigService,
 } from '@tactia/domain';
 import { ScheduleRunner, type ScheduleAgentRunner } from '@tactia/execution';
 import { createAudioTranscriberFromEnv, createVisionExtractorFromEnv, type ToolContext } from '@tactia/ai';
@@ -52,6 +54,11 @@ export const tenantApiKeyService = new TenantApiKeyService(tenantApiKeyRepositor
 export const whatsappAuthorizedNumberService = new WhatsappAuthorizedNumberService(
   whatsappAuthorizedNumberRepository,
   membershipRepository,
+  auditLogService,
+);
+
+export const whatsappAgentConfigService = new WhatsappAgentConfigService(
+  new WhatsappAgentConfigRepository(prisma),
   auditLogService,
 );
 

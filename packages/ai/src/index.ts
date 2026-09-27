@@ -13,7 +13,7 @@ export {
   type ContextInsight,
   type ContextMetric,
 } from './context-builder';
-export { buildSystemPrompt, FOLLOW_UPS_HEADING } from './system-prompt';
+export { buildSystemPrompt, FOLLOW_UPS_HEADING, type WhatsappChannelContext } from './system-prompt';
 export {
   Orchestrator,
   extractFollowUps,

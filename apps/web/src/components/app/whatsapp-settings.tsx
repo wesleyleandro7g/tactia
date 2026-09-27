@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/feedback';
-import { Field, FormInput, Select } from '@/components/ui/field';
+import { Field, FormInput, FormTextarea, Select } from '@/components/ui/field';
 import { errorMessage, formatDateTime } from '@/lib/format';
 import { PageHeader } from '@/components/app/page-header';
 import {
@@ -23,6 +23,8 @@ export type WhatsappNumberRow = {
   id: string;
   phone: string;
   label: string | null;
+  contactName: string | null;
+  contactRole: string | null;
   userId: string;
   userName: string;
   userEmail: string;
@@ -36,6 +38,12 @@ export type WhatsappUserOption = {
   email: string;
 };
 
+export type WhatsappAgentConfigValue = {
+  tone: string;
+  instructions: string;
+  companyContext: string;
+};
+
 function describeError(code?: string, message?: string) {
   if (code === 'CONFLICT') return 'Este número já está cadastrado.';
   if (code === 'VALIDATION_ERROR' && message) return message;
@@ -45,15 +53,21 @@ function describeError(code?: string, message?: string) {
 export function WhatsappSettings({
   numbers,
   users,
+  config,
 }: {
   numbers: WhatsappNumberRow[];
   users: WhatsappUserOption[];
+  config: WhatsappAgentConfigValue;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disableId, setDisableId] = useState<string | null>(null);
   const [localNumbers, setLocalNumbers] = useState<WhatsappNumberRow[] | null>(null);
+  const [configForm, setConfigForm] = useState<WhatsappAgentConfigValue>(config);
+  const [configPending, setConfigPending] = useState(false);
+  const [configSaved, setConfigSaved] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const displayed = localNumbers ?? numbers;
   const active = displayed.filter((row) => !row.disabledAt);
@@ -63,6 +77,8 @@ export function WhatsappSettings({
     const phone = String(formData.get('phone') ?? '').trim();
     const userId = String(formData.get('userId') ?? '').trim();
     const label = String(formData.get('label') ?? '').trim();
+    const contactName = String(formData.get('contactName') ?? '').trim();
+    const contactRole = String(formData.get('contactRole') ?? '').trim();
     if (!phone || !userId) {
       setError('Informe o número e o usuário.');
       return false;
@@ -72,7 +88,13 @@ export function WhatsappSettings({
     const response = await fetch('/api/v1/whatsapp/numbers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, userId, ...(label ? { label } : {}) }),
+      body: JSON.stringify({
+        phone,
+        userId,
+        ...(label ? { label } : {}),
+        ...(contactName ? { contactName } : {}),
+        ...(contactRole ? { contactRole } : {}),
+      }),
     });
     setPending(false);
     if (!response.ok) {
@@ -87,6 +109,8 @@ export function WhatsappSettings({
         id: string;
         phone: string;
         label: string | null;
+        contactName: string | null;
+        contactRole: string | null;
         userId: string;
         user?: { name: string; email: string };
         disabledAt: string | null;
@@ -99,6 +123,8 @@ export function WhatsappSettings({
         id: created.id,
         phone: created.phone,
         label: created.label,
+        contactName: created.contactName,
+        contactRole: created.contactRole,
         userId: created.userId,
         userName: created.user?.name ?? 'Usuário',
         userEmail: created.user?.email ?? '',
@@ -131,6 +157,31 @@ export function WhatsappSettings({
     router.refresh();
   }
 
+  async function saveConfig() {
+    setConfigPending(true);
+    setConfigError(null);
+    setConfigSaved(false);
+    const response = await fetch('/api/v1/whatsapp/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tone: configForm.tone.trim() || null,
+        instructions: configForm.instructions.trim() || null,
+        companyContext: configForm.companyContext.trim() || null,
+      }),
+    });
+    setConfigPending(false);
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
+      setConfigError(describeError(body?.error?.code, body?.error?.message));
+      return;
+    }
+    setConfigSaved(true);
+    router.refresh();
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
@@ -143,6 +194,69 @@ export function WhatsappSettings({
           {error}
         </p>
       ) : null}
+
+      <Card>
+        <h2 className="text-base font-medium">Comunicação do agente</h2>
+        <p className="text-sm text-muted-foreground">
+          Ajuste o tom e o contexto que o agente usa ao responder pelo WhatsApp. Vale para toda a empresa.
+        </p>
+        {configError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {configError}
+          </p>
+        ) : null}
+        {configSaved ? (
+          <p className="text-sm text-emerald-600">Configuração salva.</p>
+        ) : null}
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveConfig();
+          }}
+        >
+          <Field htmlFor="wa-tone" label="Tom de voz" hint="Ex.: Formal e objetivo; amigável e próximo">
+            <FormInput
+              id="wa-tone"
+              value={configForm.tone}
+              onChange={(event) => setConfigForm((c) => ({ ...c, tone: event.target.value }))}
+              placeholder="Amigável, direto ao ponto"
+              maxLength={80}
+            />
+          </Field>
+          <Field
+            htmlFor="wa-instructions"
+            label="Instruções de atendimento"
+            hint="Diretrizes que o agente deve seguir ao conversar"
+          >
+            <FormTextarea
+              id="wa-instructions"
+              value={configForm.instructions}
+              onChange={(event) => setConfigForm((c) => ({ ...c, instructions: event.target.value }))}
+              placeholder="Confirme antes de enviar e-mails. Não prometa prazos sem verificar."
+              rows={3}
+              maxLength={2000}
+            />
+          </Field>
+          <Field
+            htmlFor="wa-company-context"
+            label="Contexto da empresa"
+            hint="O que o agente precisa saber sobre a empresa"
+          >
+            <FormTextarea
+              id="wa-company-context"
+              value={configForm.companyContext}
+              onChange={(event) => setConfigForm((c) => ({ ...c, companyContext: event.target.value }))}
+              placeholder="Loja de calçados com 3 filiais em SP. Foco em atacado."
+              rows={3}
+              maxLength={2000}
+            />
+          </Field>
+          <Button type="submit" loading={configPending}>
+            Salvar configuração
+          </Button>
+        </form>
+      </Card>
 
       <Card>
         <h2 className="text-base font-medium">Autorizar número</h2>
@@ -185,6 +299,12 @@ export function WhatsappSettings({
           <Field htmlFor="wa-label" label="Apelido" hint="Opcional">
             <FormInput id="wa-label" name="label" placeholder="Celular do João" maxLength={80} />
           </Field>
+          <Field htmlFor="wa-contact-name" label="Nome de tratamento" hint="Opcional — como o agente chama a pessoa">
+            <FormInput id="wa-contact-name" name="contactName" placeholder="João Silva" maxLength={120} />
+          </Field>
+          <Field htmlFor="wa-contact-role" label="Cargo" hint="Opcional — cargo/função da pessoa">
+            <FormInput id="wa-contact-role" name="contactRole" placeholder="Gerente Comercial" maxLength={120} />
+          </Field>
           <Button type="submit" loading={pending}>
             Autorizar
           </Button>
@@ -204,6 +324,11 @@ export function WhatsappSettings({
                 <div>
                   <p className="font-medium">{row.label ?? row.phone}</p>
                   <p className="font-mono text-xs text-muted-foreground">{row.phone}</p>
+                  {row.contactName || row.contactRole ? (
+                    <p className="text-xs text-muted-foreground">
+                      {[row.contactName, row.contactRole].filter(Boolean).join(' · ')}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     {row.userName} · {row.userEmail}
                     {` · desde ${formatDateTime(row.createdAt)}`}

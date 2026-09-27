@@ -141,13 +141,52 @@ const TOOL_GUIDE: Record<string, string> = {
 };
 
 /**
+ * Optional channel context. When the assistant runs over WhatsApp we inject the
+ * per-company tone/instructions/company-context and the treatment for the
+ * specific contact (name + role). Absent for the web chat, keeping its prompt
+ * byte-for-byte identical.
+ */
+export type WhatsappChannelContext = {
+  tone?: string | null;
+  instructions?: string | null;
+  companyContext?: string | null;
+  contactName?: string | null;
+  contactRole?: string | null;
+};
+
+function whatsappChannelSection(channel: WhatsappChannelContext): string[] {
+  const lines: string[] = ['', '## Canal: WhatsApp'];
+  if (channel.contactName || channel.contactRole) {
+    const who = [channel.contactName, channel.contactRole].filter(Boolean).join(', ');
+    lines.push(`- Você está conversando pelo WhatsApp com ${who}. Trate a pessoa por esse nome.`);
+  } else {
+    lines.push('- Você está conversando pelo WhatsApp com um contato autorizado da empresa.');
+  }
+  lines.push(
+    '- Respostas curtas e diretas, adequadas a mensagens de celular. Evite tabelas longas; prefira frases e listas curtas.',
+  );
+  if (channel.tone) lines.push(`- Tom desejado: ${wrapUntrusted(channel.tone, 'channel')}`);
+  if (channel.instructions) {
+    lines.push(`- Instruções da empresa para o atendimento: ${wrapUntrusted(channel.instructions, 'channel')}`);
+  }
+  if (channel.companyContext) {
+    lines.push(`- Contexto adicional da empresa: ${wrapUntrusted(channel.companyContext, 'channel')}`);
+  }
+  return lines;
+}
+
+/**
  * System prompt of the Tactia assistant.
  *
  * The model is an analyst, not a calculator: it interprets and explains, and
  * every number must come from a tool result or from the injected context —
  * both carry citable evidence (spec §3.4, §43).
  */
-export function buildSystemPrompt(context: AiContext, toolNames: string[]): string {
+export function buildSystemPrompt(
+  context: AiContext,
+  toolNames: string[],
+  channel?: WhatsappChannelContext,
+): string {
   const canProposeActions = toolNames.includes('propose_action');
   const canSendEmail = toolNames.includes('send_email');
   const canDelegateBrowser =
@@ -186,6 +225,7 @@ export function buildSystemPrompt(context: AiContext, toolNames: string[]): stri
           'Quando uma solicitação depender de uma destas orientações, chame load_company_skill com o slug exato antes de responder ou escolher ferramentas operacionais.',
         ]
       : []),
+    ...(channel ? whatsappChannelSection(channel) : []),
     '',
     `## Métricas do mês até agora (${periodLabel(context.period)})`,
     context.metrics.length > 0

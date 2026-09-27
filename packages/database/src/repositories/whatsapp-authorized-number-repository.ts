@@ -6,6 +6,8 @@ export type CreateWhatsappAuthorizedNumberInput = {
   userId: string;
   phone: string;
   label?: string | null;
+  contactName?: string | null;
+  contactRole?: string | null;
 };
 
 const withUser = {
@@ -27,6 +29,8 @@ export class WhatsappAuthorizedNumberRepository {
         userId: input.userId,
         phone: input.phone,
         label: input.label ?? null,
+        contactName: input.contactName ?? null,
+        contactRole: input.contactRole ?? null,
       },
       include: withUser,
     });
@@ -72,6 +76,8 @@ export class WhatsappAuthorizedNumberRepository {
       userId?: string;
       phone?: string;
       label?: string | null;
+      contactName?: string | null;
+      contactRole?: string | null;
       conversationId?: string | null;
       lastInboundMessageId?: string | null;
       disabledAt?: Date | null;

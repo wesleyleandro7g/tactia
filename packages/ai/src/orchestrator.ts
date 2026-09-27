@@ -1,7 +1,7 @@
 import { buildClaimAllowlist, unsourcedNumbers } from '@tactia/domain';
 import { AppError, logger, redactSensitive, redactSensitiveDeep } from '@tactia/shared';
 import type { AiContext } from './context-builder';
-import { buildSystemPrompt, FOLLOW_UPS_HEADING } from './system-prompt';
+import { buildSystemPrompt, FOLLOW_UPS_HEADING, type WhatsappChannelContext } from './system-prompt';
 import type { ToolRegistry } from './tool-registry';
 import type {
   ActionProposal,
@@ -56,6 +56,8 @@ export type ChatRequest = {
   history?: ChatTurn[];
   /** Period used to build the context. Defaults to the current month. */
   period?: { from: Date; to: Date };
+  /** Optional channel context (e.g. WhatsApp tone/contact). Absent for web chat. */
+  channel?: WhatsappChannelContext;
 };
 
 const UNSOURCED_FALLBACK =
@@ -385,7 +387,7 @@ export class Orchestrator {
       query: request.question,
     });
 
-    const system = buildSystemPrompt(context, this.deps.tools.names(request.ctx.role));
+    const system = buildSystemPrompt(context, this.deps.tools.names(request.ctx.role), request.channel);
     const history = (request.history ?? []).slice(-this.historyLimit);
 
     const messages: LLMMessage[] = [

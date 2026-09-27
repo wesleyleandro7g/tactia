@@ -707,6 +707,8 @@ model Tenant {
   infographicAssets  InfographicAsset[]
   apiKeys            TenantApiKey[]
   whatsappNumbers    WhatsappAuthorizedNumber[]
+  whatsappAgentConfig WhatsappAgentConfig?
+  whatsappAgentJobs  WhatsappAgentJob[]
   customFieldDefinitions CustomFieldDefinition[]
   integrationModuleRuns IntegrationModuleRun[]
   integrationArtifacts IntegrationArtifact[]
@@ -837,6 +839,8 @@ model WhatsappAuthorizedNumber {
   userId               String    @map("user_id") @db.Uuid
   phone                String
   label                String?
+  contactName          String?   @map("contact_name")
+  contactRole          String?   @map("contact_role")
   conversationId       String?   @map("conversation_id") @db.Uuid
   lastInboundMessageId String?   @map("last_inbound_message_id")
   disabledAt           DateTime? @map("disabled_at")
@@ -845,11 +849,59 @@ model WhatsappAuthorizedNumber {
   tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation         Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  agentJobs            WhatsappAgentJob[]
 
   @@unique([phone])
   @@index([tenantId, disabledAt])
   @@index([userId])
   @@map("whatsapp_authorized_numbers")
+}
+
+// Per-company communication settings for the WhatsApp agent (tone/context).
+model WhatsappAgentConfig {
+  id             String   @id @db.Uuid
+  tenantId       String   @unique @map("tenant_id") @db.Uuid
+  tone           String?
+  instructions   String?
+  companyContext String?  @map("company_context")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_agent_configs")
+}
+
+enum WhatsappAgentJobStatus {
+  queued
+  running
+  done
+  cancelled
+  failed
+}
+
+// Dedicated async job queue for WhatsApp agent operations (spec: status replies + immediate cancel).
+model WhatsappAgentJob {
+  id                String                 @id @db.Uuid
+  tenantId          String                 @map("tenant_id") @db.Uuid
+  numberId          String                 @map("number_id") @db.Uuid
+  conversationId    String?                @map("conversation_id") @db.Uuid
+  userId            String                 @map("user_id") @db.Uuid
+  status            WhatsappAgentJobStatus  @default(queued)
+  requestText       String                 @map("request_text")
+  plan              String?
+  messageId         String?                @map("message_id")
+  cancelRequestedAt DateTime?              @map("cancel_requested_at")
+  error             String?
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  startedAt         DateTime?              @map("started_at")
+  finishedAt        DateTime?              @map("finished_at")
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number            WhatsappAuthorizedNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([numberId, status])
+  @@map("whatsapp_agent_jobs")
 }
 
 model AuditLog {

@@ -1,4 +1,5 @@
 import { answerMetadata, createChatRuntime, toToolContext } from '@tactia/chat/server';
+import { createLLMAdapterFromEnv, type LLMAdapter } from '@tactia/ai';
 import { chatServices } from './services';
 import { schedulePort } from './schedules';
 
@@ -13,4 +14,23 @@ const chatRuntime = createChatRuntime(chatServices, { schedulePort });
 export const toolRegistry = chatRuntime.toolRegistry;
 export const contextBuilder = chatRuntime.contextBuilder;
 export const getOrchestrator = chatRuntime.getOrchestrator;
+
+/** Cheap classifier adapter (WhatsApp read-vs-operation routing). Null when no LLM key. */
+let classifierAdapter: LLMAdapter | null | undefined;
+export function getClassifierAdapter(): LLMAdapter | null {
+  if (classifierAdapter === undefined) {
+    classifierAdapter = createLLMAdapterFromEnv(
+      {
+        LLM_PROVIDER: process.env.LLM_PROVIDER,
+        LLM_API_KEY: process.env.LLM_API_KEY,
+        LLM_MODEL: process.env.LLM_MODEL,
+        LLM_CLASSIFIER_MODEL: process.env.LLM_CLASSIFIER_MODEL,
+        LLM_BASE_URL: process.env.LLM_BASE_URL,
+      },
+      'classifier',
+    );
+  }
+  return classifierAdapter;
+}
+
 export { chatRuntime, answerMetadata, toToolContext };

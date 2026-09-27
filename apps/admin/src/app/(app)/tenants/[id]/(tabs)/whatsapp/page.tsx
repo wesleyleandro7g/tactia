@@ -13,8 +13,9 @@ export default async function TenantWhatsappPage({ params }: { params: Promise<{
 
   let numbers: Awaited<ReturnType<typeof listTenantWhatsappNumbers>>['numbers'];
   let users: Awaited<ReturnType<typeof listTenantWhatsappNumbers>>['users'];
+  let config: Awaited<ReturnType<typeof listTenantWhatsappNumbers>>['config'];
   try {
-    ({ numbers, users } = await listTenantWhatsappNumbers(ctx, id));
+    ({ numbers, users, config } = await listTenantWhatsappNumbers(ctx, id));
   } catch (error) {
     if (isAppError(error) && error.code === ErrorCode.NOT_FOUND) notFound();
     throw error;
@@ -29,10 +30,17 @@ export default async function TenantWhatsappPage({ params }: { params: Promise<{
       <WhatsappSettings
         apiBasePath={`/api/v1/tenants/${id}/whatsapp`}
         users={users}
+        config={{
+          tone: config?.tone ?? '',
+          instructions: config?.instructions ?? '',
+          companyContext: config?.companyContext ?? '',
+        }}
         numbers={numbers.map((row) => ({
           id: row.id,
           phone: row.phone,
           label: row.label,
+          contactName: row.contactName,
+          contactRole: row.contactRole,
           userId: row.userId,
           userName: row.user.name,
           userEmail: row.user.email,

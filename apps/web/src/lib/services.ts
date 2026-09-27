@@ -23,6 +23,8 @@ import {
   TenantSettingsRepository,
   UserRepository,
   WhatsappAuthorizedNumberRepository,
+  WhatsappAgentConfigRepository,
+  WhatsappAgentJobRepository,
 } from '@tactia/database';
 import {
   ActivityService,
@@ -47,6 +49,8 @@ import {
   TenantApiKeyService,
   UserService,
   WhatsappAuthorizedNumberService,
+  WhatsappAgentConfigService,
+  WhatsappAgentJobService,
 } from '@tactia/domain';
 import { DEFAULT_JOB_RETRY_LIMIT } from '@tactia/execution';
 import { createAudioTranscriberFromEnv, createVisionExtractorFromEnv } from '@tactia/ai';
@@ -247,6 +251,15 @@ export const whatsappAuthorizedNumberService = new WhatsappAuthorizedNumberServi
   whatsappAuthorizedNumberRepository,
   membershipRepository,
   auditLogService,
+);
+
+export const whatsappAgentConfigService = new WhatsappAgentConfigService(
+  new WhatsappAgentConfigRepository(prisma),
+  auditLogService,
+);
+
+export const whatsappAgentJobService = new WhatsappAgentJobService(
+  new WhatsappAgentJobRepository(prisma),
 );
 
 export const dataSourceService = new DataSourceService(
