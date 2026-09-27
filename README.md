@@ -87,6 +87,7 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 |---|---|
 | [docs/deploy-producao.md](docs/deploy-producao.md) | Deploy em produção com Docker Compose e TLS |
 | [docs/onboarding-cliente.md](docs/onboarding-cliente.md) | Passo a passo para colocar um cliente real |
+| [docs/email-smtp-empresa.md](docs/email-smtp-empresa.md) | Envio de e-mails por empresa via SMTP (Gmail, Outlook, M365, custom) |
 | [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
 | [docs/browser-agent-p0-operacao.md](docs/browser-agent-p0-operacao.md) | Skills Markdown, snapshots, recuperação, erros e gates do Browser Agent interativo |
 | [docs/skills-hierarquicas-empresa.md](docs/skills-hierarquicas-empresa.md) | Skill global, catálogo secundário, vínculos, segurança e migração por empresa |

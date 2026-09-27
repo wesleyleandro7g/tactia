@@ -7,6 +7,29 @@ export {
 export { createTaskAction, createTaskInputSchema, type CreateTaskDeps } from './actions/create-task';
 export { sendEmailAction, sendEmailInputSchema, type SendEmailDeps } from './actions/send-email';
 export { ConsoleEmailSender, MemoryEmailSender } from './email-sender';
+export {
+  SmtpEmailSender,
+  defaultSmtpTransportFactory,
+  formatFromHeader,
+  type ResolvedSmtpConfig,
+  type SmtpTransport,
+  type SmtpTransportFactory,
+} from './smtp-email-sender';
+export {
+  SMTP_PROVIDER_PRESETS,
+  SMTP_PROVIDER_IDS,
+  getSmtpProviderPreset,
+  resolveSmtpConnection,
+  type SmtpProviderId,
+  type SmtpProviderPreset,
+  type ResolvedSmtpConnection,
+} from './email-providers';
+export {
+  TenantAwareEmailSender,
+  type EmailConfigResolver,
+  type StoredEmailConfigLike,
+  type TenantAwareEmailSenderOptions,
+} from './tenant-aware-email-sender';
 export { InlineJobQueue } from './job-queue';
 export {
   PgBossJobQueue,
@@ -37,6 +60,7 @@ export type {
   EmailMessage,
   EmailSendResult,
   EmailSender,
+  EmailSendContext,
   ExecutionOrigin,
   JobQueue,
   ProposeActionInput,

@@ -73,6 +73,20 @@ export type {
   RunPipelineOptions,
 } from './services/intelligence-pipeline-service';
 export { CredentialService, encrypt, decrypt } from './services/credential-service';
+export {
+  EmailConfigService,
+  EMAIL_CREDENTIAL_PROVIDER,
+  type StoredEmailConfig,
+  type EmailConfigView,
+} from './services/email-config-service';
+export {
+  emailConfigSchema,
+  sendTestEmailSchema,
+  SMTP_PROVIDER_ENUM,
+  type EmailConfigInput,
+  type SendTestEmailInput,
+  type SmtpProviderId,
+} from './schemas/email';
 export { TenantApiKeyService } from './services/tenant-api-key-service';
 export type { VerifiedTenantApiKey } from './services/tenant-api-key-service';
 export { WhatsappAuthorizedNumberService } from './services/whatsapp-authorized-number-service';

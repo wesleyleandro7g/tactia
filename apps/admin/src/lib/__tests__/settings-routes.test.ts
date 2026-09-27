@@ -40,6 +40,13 @@ import {
   POST as playbooksPost,
 } from '@/app/api/v1/tenants/[id]/playbooks/route';
 import { DELETE as playbookDelete } from '@/app/api/v1/tenants/[id]/playbooks/[playbookId]/route';
+import {
+  GET as emailGet,
+  PUT as emailPut,
+  DELETE as emailDelete,
+} from '@/app/api/v1/tenants/[id]/email/route';
+import { sendTenantTestEmail } from '@/lib/tenant-email';
+import type { SmtpTransport } from '@tactia/execution';
 
 type Handler = (request: Request, ctx: RequestContext, params: Record<string, string>) => Promise<unknown>;
 const call = (handler: unknown) => handler as Handler;
@@ -71,6 +78,7 @@ async function cleanUp() {
     await prisma.tenantApiKey.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.whatsappAuthorizedNumber.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.playbook.deleteMany({ where: { tenantId: { in: ids } } });
+    await prisma.credential.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.membership.deleteMany({ where: { tenantId: { in: ids } } });
     await prisma.tenant.deleteMany({ where: { id: { in: ids } } });
@@ -267,5 +275,120 @@ describe('admin playbooks', () => {
         id: tenantId,
       }),
     ).rejects.toBeInstanceOf(AppError);
+  });
+});
+
+function jsonRequestMethod(method: string, body: unknown) {
+  return new Request('http://localhost/api', {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+describe('admin email config', () => {
+  const gmailConfig = {
+    provider: 'gmail',
+    fromName: 'Acme',
+    fromEmail: 'noreply@acme.dev',
+    username: 'noreply@acme.dev',
+    password: 'app-password',
+  };
+
+  it('starts unconfigured', async () => {
+    const view = (await call(emailGet)(new Request('http://localhost/api'), operatorSession(), {
+      id: tenantId,
+    })) as { configured: boolean; hasPassword: boolean };
+    expect(view).toEqual({ configured: false, hasPassword: false });
+  });
+
+  it('saves a provider config and masks the password', async () => {
+    const saved = (await call(emailPut)(
+      jsonRequestMethod('PUT', gmailConfig),
+      operatorSession(),
+      { id: tenantId },
+    )) as { configured: boolean; provider: string; hasPassword: boolean };
+    expect(saved).toMatchObject({ configured: true, provider: 'gmail', hasPassword: true });
+    expect(JSON.stringify(saved)).not.toContain('app-password');
+
+    // The operator action is audited.
+    const audit = await prisma.auditLog.findFirst({
+      where: { tenantId, entityType: 'email_config' },
+    });
+    expect(audit).toMatchObject({ operatorId, actorType: 'operator' });
+
+    const listed = (await call(emailGet)(new Request('http://localhost/api'), operatorSession(), {
+      id: tenantId,
+    })) as { provider: string; fromEmail: string };
+    expect(listed).toMatchObject({ provider: 'gmail', fromEmail: 'noreply@acme.dev' });
+  });
+
+  it('rejects a custom provider without host/port/secure', async () => {
+    await expect(
+      call(emailPut)(
+        jsonRequestMethod('PUT', { ...gmailConfig, provider: 'custom' }),
+        operatorSession(),
+        { id: tenantId },
+      ),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+  });
+
+  it('sends a test email using the stored config (mocked transport)', async () => {
+    await call(emailPut)(jsonRequestMethod('PUT', gmailConfig), operatorSession(), {
+      id: tenantId,
+    });
+
+    const sent: Array<{ to: string; subject: string }> = [];
+    const transport: SmtpTransport = {
+      async sendMail(options) {
+        sent.push({ to: options.to, subject: options.subject });
+        return { messageId: '<test@smtp>' };
+      },
+      async verify() {
+        return true as const;
+      },
+    };
+
+    const result = await sendTenantTestEmail(
+      operatorSession(),
+      tenantId,
+      { to: 'client@example.com' },
+      () => transport,
+    );
+    expect(result).toMatchObject({ sent: true, to: 'client@example.com', messageId: '<test@smtp>' });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.to).toBe('client@example.com');
+  });
+
+  it('refuses a test email when unconfigured', async () => {
+    await call(emailDelete)(new Request('http://localhost/api'), operatorSession(), {
+      id: tenantId,
+    });
+    await expect(
+      sendTenantTestEmail(operatorSession(), tenantId, { to: 'client@example.com' }),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+  });
+
+  it('deletes the config', async () => {
+    await call(emailPut)(jsonRequestMethod('PUT', gmailConfig), operatorSession(), {
+      id: tenantId,
+    });
+    const removed = (await call(emailDelete)(
+      new Request('http://localhost/api'),
+      operatorSession(),
+      { id: tenantId },
+    )) as { removed: boolean };
+    expect(removed.removed).toBe(true);
+
+    const view = (await call(emailGet)(new Request('http://localhost/api'), operatorSession(), {
+      id: tenantId,
+    })) as { configured: boolean };
+    expect(view.configured).toBe(false);
+  });
+
+  it('hides unknown tenants', async () => {
+    await expect(
+      call(emailGet)(new Request('http://localhost/api'), operatorSession(), { id: createId() }),
+    ).rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
   });
 });

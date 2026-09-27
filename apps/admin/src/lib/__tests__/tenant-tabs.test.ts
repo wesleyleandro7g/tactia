@@ -17,6 +17,7 @@ describe('tenant tabs', () => {
       'Atividade',
       'Chat',
       'WhatsApp',
+      'Email',
       'API keys',
       'Conexões',
       'Documentos',
@@ -30,6 +31,7 @@ describe('tenant tabs', () => {
     expect(tenantTabHref('t1', 'users')).toBe('/tenants/t1/users');
     expect(tenantTabHref('t1', 'chat')).toBe('/tenants/t1/chat');
     expect(tenantTabHref('t1', 'whatsapp')).toBe('/tenants/t1/whatsapp');
+    expect(tenantTabHref('t1', 'email')).toBe('/tenants/t1/email');
     expect(tenantTabHref('t1', 'api-keys')).toBe('/tenants/t1/api-keys');
     expect(tenantTabHref('t1', 'documents')).toBe('/tenants/t1/documents');
   });

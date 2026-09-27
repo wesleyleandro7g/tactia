@@ -32,12 +32,15 @@ export function sendEmailAction(deps: SendEmailDeps): ActionDefinition {
         : [];
       const cc = [...new Set([...(input.cc ?? []), ...configuredCc])];
 
-      const result = await deps.emailSender.send({
-        to: input.to,
-        subject: input.subject,
-        body: input.body,
-        ...(cc.length > 0 ? { cc } : {}),
-      });
+      const result = await deps.emailSender.send(
+        {
+          to: input.to,
+          subject: input.subject,
+          body: input.body,
+          ...(cc.length > 0 ? { cc } : {}),
+        },
+        { tenantId: ctx.tenantId },
+      );
 
       return {
         messageId: result.id,

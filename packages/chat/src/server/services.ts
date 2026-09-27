@@ -8,6 +8,7 @@ import {
   BriefingRepository,
   BusinessFactRepository,
   ConversationRepository,
+  CredentialRepository,
   CustomFieldDefinitionRepository,
   CustomerRepository,
   EpisodeRepository,
@@ -38,6 +39,7 @@ import {
   CustomDataValidationService,
   CustomerService,
   DataCatalogService,
+  EmailConfigService,
   EpisodeService,
   InfographicService,
   InsightService,
@@ -60,6 +62,7 @@ import {
   ApprovalService,
   ConsoleEmailSender,
   ExecutionEngine,
+  TenantAwareEmailSender,
   createDefaultActionRegistry,
   defineAction,
   type EmailSender,
@@ -297,7 +300,18 @@ export function createChatServices(input: CreateChatServicesInput) {
   // Execution ------------------------------------------------------------------
   // Executors receive repositories, not services: an execution may run after
   // the request that proposed it. Authorization happens on propose/approve.
-  const emailSender = input.emailSender ?? new ConsoleEmailSender();
+  //
+  // Email: each tenant may configure its own SMTP mailbox (managed in Tactia
+  // Ops). The tenant-aware sender resolves that config at send time and falls
+  // back to console logging for tenants without email. Tests can inject a
+  // deterministic sender via `input.emailSender`.
+  const emailConfigService = new EmailConfigService(new CredentialRepository(prisma));
+  const emailSender =
+    input.emailSender ??
+    new TenantAwareEmailSender({
+      resolve: (tenantId) => emailConfigService.getResolvedForTenant(tenantId),
+      fallback: new ConsoleEmailSender(),
+    });
   const actionRegistry = createDefaultActionRegistry({
     activities: repositories.activities,
     customers: repositories.customers,

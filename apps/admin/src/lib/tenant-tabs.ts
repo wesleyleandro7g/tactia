@@ -8,6 +8,7 @@ export type TenantTabKey =
   | 'activity'
   | 'chat'
   | 'whatsapp'
+  | 'email'
   | 'api-keys'
   | 'connections'
   | 'documents'
@@ -21,6 +22,7 @@ export type TenantTabSegment =
   | 'activity'
   | 'chat'
   | 'whatsapp'
+  | 'email'
   | 'api-keys'
   | 'connections'
   | 'documents'
@@ -41,6 +43,7 @@ export const TENANT_TABS: readonly TenantTab[] = [
   { key: 'activity', label: 'Atividade', segment: 'activity' },
   { key: 'chat', label: 'Chat', segment: 'chat' },
   { key: 'whatsapp', label: 'WhatsApp', segment: 'whatsapp' },
+  { key: 'email', label: 'Email', segment: 'email' },
   { key: 'api-keys', label: 'API keys', segment: 'api-keys' },
   { key: 'connections', label: 'Conexões', segment: 'connections' },
   { key: 'documents', label: 'Documentos', segment: 'documents' },

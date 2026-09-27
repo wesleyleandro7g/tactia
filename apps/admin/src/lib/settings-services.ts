@@ -3,12 +3,14 @@ import {
   MediaAssetRepository,
   MembershipRepository,
   prisma,
+  CredentialRepository,
   RawRecordRepository,
   TenantApiKeyRepository,
   TenantRepository,
   WhatsappAuthorizedNumberRepository,
 } from '@tactia/database';
 import {
+  EmailConfigService,
   MediaIngestService,
   TenantApiKeyService,
   WhatsappAuthorizedNumberService,
@@ -46,6 +48,11 @@ export const tenantApiKeyService = new TenantApiKeyService(tenantApiKeyRepositor
 export const whatsappAuthorizedNumberService = new WhatsappAuthorizedNumberService(
   whatsappAuthorizedNumberRepository,
   membershipRepository,
+  auditLogService,
+);
+
+export const emailConfigService = new EmailConfigService(
+  new CredentialRepository(prisma),
   auditLogService,
 );
 
