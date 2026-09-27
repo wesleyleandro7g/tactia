@@ -36,6 +36,17 @@ type MappingRow = {
   configuration: { fields?: Array<{ source: string; target: string }> };
 };
 
+type TrelloMetrics = {
+  wip: number;
+  throughput: number;
+  overdue: number;
+  blocked: number;
+  averageAgeDays: number;
+  averageLeadTimeHours: number | null;
+  averageCycleTimeHours: number | null;
+  backflow: number;
+};
+
 export function DataSourceManagePanel({
   tenantId,
   dataSource,
@@ -56,6 +67,7 @@ export function DataSourceManagePanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [trelloMetrics, setTrelloMetrics] = useState<TrelloMetrics | null>(null);
   const [resources, setResources] = useState<DiscoveryResource[]>([]);
   const [sourceEntity, setSourceEntity] = useState('');
   const [targetEntity, setTargetEntity] = useState<TargetEntity>('customer');
@@ -129,6 +141,18 @@ export function DataSourceManagePanel({
       setMessage(`${next.length} recurso(s) descobertos.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao descobrir');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function loadTrelloMetrics() {
+    setPending(true);
+    setError(null);
+    try {
+      setTrelloMetrics(await opsJson<TrelloMetrics>(`${base}/metrics`));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao calcular métricas Kanban');
     } finally {
       setPending(false);
     }
@@ -217,12 +241,36 @@ export function DataSourceManagePanel({
               Descobrir
             </Button>
             <SyncButton tenantId={tenantId} dataSourceId={dataSource.id} />
+            {dataSource.type === 'trello' ? (
+              <Button type="button" variant="secondary" loading={pending} onClick={() => void loadTrelloMetrics()}>
+                Métricas Kanban
+              </Button>
+            ) : null}
           </div>
         </section>
       ) : null}
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      {trelloMetrics ? (
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Métricas Kanban">
+          {[
+            ['WIP', trelloMetrics.wip],
+            ['Throughput (30d)', trelloMetrics.throughput],
+            ['Vencidos', trelloMetrics.overdue],
+            ['Bloqueados', trelloMetrics.blocked],
+            ['Idade média (dias)', trelloMetrics.averageAgeDays],
+            ['Lead time médio (h)', trelloMetrics.averageLeadTimeHours ?? '—'],
+            ['Cycle time médio (h)', trelloMetrics.averageCycleTimeHours ?? '—'],
+            ['Retrocessos', trelloMetrics.backflow],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="rounded-md border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="mt-1 font-mono text-lg">{value}</p>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       {connectorAvailable ? (
         <form onSubmit={(event) => void saveMapping(event)} className="flex flex-col gap-3">

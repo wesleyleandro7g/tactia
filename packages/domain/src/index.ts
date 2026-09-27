@@ -74,6 +74,7 @@ export type {
 } from './services/intelligence-pipeline-service';
 export { CredentialService, encrypt, decrypt } from './services/credential-service';
 export { TenantApiKeyService } from './services/tenant-api-key-service';
+export { trelloAuthFromCredential, trelloOAuthConfigFromEnv } from './services/trello-oauth-credential';
 export type { VerifiedTenantApiKey } from './services/tenant-api-key-service';
 export { WhatsappAuthorizedNumberService } from './services/whatsapp-authorized-number-service';
 export { normalizeWhatsappPhone, INVALID_WHATSAPP_PHONE } from './whatsapp/phone';
@@ -202,3 +203,14 @@ export {
   sendMessageSchema,
   appendMessageSchema,
 } from './schemas/ai';
+
+export {
+  buildTrelloAuthorizationUrl,
+  computeChecksum,
+  exchangeTrelloAuthorizationCode,
+  generateTrelloOAuthState,
+  generateTrelloPkce,
+  sanitizeTrelloPayload,
+  trelloCallbackUrl,
+  verifyTrelloWebhookSignature,
+} from '@tactia/connectors';

@@ -25,6 +25,11 @@ import {
   canonicalEntityRank,
   CsvConnector,
   McpConnector,
+  TrelloApiError,
+  TrelloOAuthError,
+  TrelloClient,
+  TrelloConnector,
+  trelloCallbackUrl,
   extractCustomData,
   incrementalLookbackSince,
   normalizeRow,
@@ -38,6 +43,7 @@ import {
 } from '@tactia/connectors';
 import { assertTenantContext } from '../authz';
 import { AuditAction, type AuditLogService } from './audit-log-service';
+import { trelloAuthFromCredential } from './trello-oauth-credential';
 import { decrypt } from './credential-service';
 import type { CustomDataValidationService } from './custom-data-validation-service';
 
@@ -175,6 +181,44 @@ export class SyncService {
     return this.deps.syncJobs.findById({ tenantId, id: job.id });
   }
 
+  /** Trusted system entry point used only after a verified provider webhook or scheduler. */
+  async startSystemSync(
+    tenantId: string,
+    dataSourceId: string,
+    meta: { requestId?: string; now?: Date; timezone?: string } = {},
+  ) {
+    const source = await this.deps.dataSources.findById({ tenantId, id: dataSourceId });
+    if (!source || source.type !== 'trello') {
+      throw new AppError(ErrorCode.NOT_FOUND, 'Active Trello data source not found');
+    }
+    await this.ensureTrelloWebhooks(tenantId, source).catch(() => undefined);
+    const job = await this.deps.syncJobs.create({
+      tenantId,
+      dataSourceId,
+      status: 'pending',
+      mode: 'incremental',
+      trigger: 'scheduled',
+    });
+    if (this.deps.enqueueSync) {
+      await this.deps.enqueueSync({
+        tenantId,
+        syncJobId: job.id,
+        requestId: meta.requestId ?? '',
+        userId: null,
+        timezone: meta.timezone,
+        now: meta.now?.toISOString(),
+      });
+    } else {
+      await this.executeSync(tenantId, job.id, {
+        requestId: meta.requestId,
+        userId: null,
+        timezone: meta.timezone,
+        now: meta.now,
+      });
+    }
+    return this.deps.syncJobs.findById({ tenantId, id: job.id });
+  }
+
   async getSyncJob(ctx: RequestContext, id: string) {
     assertTenantContext(ctx);
     const job = await this.deps.syncJobs.findById({ tenantId: ctx.tenantId!, id });
@@ -220,10 +264,12 @@ export class SyncService {
         dataSourceId: source.id,
         activeOnly: true,
       });
-      if (mappings.length === 0) continue;
+      if (mappings.length === 0 && source.type !== 'trello') continue;
       ranked.push({
         id: source.id,
-        rank: Math.min(...mappings.map((mapping) => canonicalEntityRank(mapping.targetEntity))),
+        rank: mappings.length > 0
+          ? Math.min(...mappings.map((mapping) => canonicalEntityRank(mapping.targetEntity)))
+          : Number.MAX_SAFE_INTEGER,
       });
     }
 
@@ -289,7 +335,7 @@ export class SyncService {
         dataSourceId: ds.id,
         activeOnly: true,
       });
-      if (activeMappings.length === 0) {
+      if (activeMappings.length === 0 && ds.type !== 'trello') {
         throw new AppError(
           ErrorCode.VALIDATION_ERROR,
           'A fonte de dados não tem nenhum mapeamento ativo',
@@ -518,6 +564,18 @@ export class SyncService {
       // Stored classified and without stack trace (spec §48).
       const message = `${code}: ${detail}`;
 
+      if (
+        ((err instanceof TrelloApiError && err.status === 401) ||
+          (err instanceof TrelloOAuthError && [400, 401].includes(err.status))) &&
+        dataSourceId
+      ) {
+        await this.deps.dataSources.update({
+          tenantId,
+          id: dataSourceId,
+          data: { status: 'error' },
+        });
+      }
+
       await this.deps.syncJobs.updateStatus({
         id: syncJobId,
         status: 'failed',
@@ -659,6 +717,38 @@ export class SyncService {
     return outcome;
   }
 
+  private async ensureTrelloWebhooks(
+    tenantId: string,
+    source: { id: string; name: string; configuration: unknown; credentialId: string | null },
+  ) {
+    if (!source.credentialId) return;
+    const config = (source.configuration ?? {}) as Record<string, unknown>;
+    const boardIds = Array.isArray(config['boardIds'])
+      ? config['boardIds'].filter((value): value is string => typeof value === 'string')
+      : [];
+    const webhooks = config['webhooks'] && typeof config['webhooks'] === 'object'
+      ? { ...(config['webhooks'] as Record<string, unknown>) }
+      : {};
+    const missing = boardIds.filter((boardId) => typeof webhooks[boardId] !== 'string');
+    if (missing.length === 0) return;
+    const auth = await trelloAuthFromCredential({
+      tenantId,
+      credentialId: source.credentialId,
+      credentials: this.deps.credentials,
+    });
+    const client = new TrelloClient({ auth });
+    const callbackURL = trelloCallbackUrl(source.id, tenantId);
+    for (const boardId of missing) {
+      const created = await client.createWebhook({ callbackURL, idModel: boardId, description: `Tactia · ${source.name}` });
+      if (typeof created['id'] === 'string') webhooks[boardId] = created['id'];
+    }
+    await this.deps.dataSources.update({
+      tenantId,
+      id: source.id,
+      data: { configuration: { ...config, webhooks, webhookStatus: 'active' } },
+    });
+  }
+
   private async buildConnector(
     tenantId: string,
     ds: { type: string; configuration: unknown; credentialId: string | null },
@@ -679,6 +769,31 @@ export class SyncService {
       rawRecords: this.deps.rawRecords,
     });
     if (sql) return sql;
+
+    if (ds.type === 'trello') {
+      const auth = ds.credentialId
+        ? await trelloAuthFromCredential({
+            tenantId,
+            credentialId: ds.credentialId,
+            credentials: this.deps.credentials,
+          })
+        : { kind: 'token' as const, apiKey: '', token: '' };
+      const boardIds = Array.isArray(config['boardIds'])
+        ? config['boardIds'].filter((value): value is string => typeof value === 'string' && value.length > 0)
+        : [];
+      const historyValue = config['historyDays'];
+      const historyDays = historyValue === null || historyValue === 30 || historyValue === 90 || historyValue === 180
+        ? historyValue
+        : 90;
+      return new TrelloConnector(
+        {
+          boardIds,
+          historyDays,
+          auth,
+        },
+        this.deps.rawRecords,
+      );
+    }
 
     if (ds.type === 'mcp') {
       const credData = await this.decryptCredentials(tenantId, ds.credentialId);

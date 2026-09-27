@@ -69,3 +69,19 @@ export const probeDataSourceSchema = z.object({
     password: z.string().min(1),
   }),
 });
+
+export const probeTrelloDataSourceSchema = z.object({
+  type: z.literal('trello'),
+  credentialId: z.string().uuid().optional(),
+  credentials: z.object({
+    apiKey: z.string().min(1),
+    token: z.string().min(1),
+  }).optional(),
+}).refine((value) => Boolean(value.credentialId || value.credentials), {
+  message: 'credentialId or credentials is required',
+});
+
+export const trelloConfigurationSchema = z.object({
+  boardIds: z.array(z.string().min(1)).min(1),
+  historyDays: z.union([z.literal(30), z.literal(90), z.literal(180), z.null()]).default(90),
+});

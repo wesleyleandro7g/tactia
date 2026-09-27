@@ -25,6 +25,22 @@ export class CredentialRepository {
     return this.db.credential.findFirst({ where: { id, tenantId } });
   }
 
+  async updateEncryptedDataIfCurrent(input: {
+    tenantId: string;
+    id: string;
+    currentEncryptedData: string;
+    encryptedData: string;
+  }) {
+    return this.db.credential.updateMany({
+      where: {
+        id: input.id,
+        tenantId: input.tenantId,
+        encryptedData: input.currentEncryptedData,
+      },
+      data: { encryptedData: input.encryptedData },
+    });
+  }
+
   async delete({ tenantId, id }: { tenantId: string; id: string }) {
     const existing = await this.findById({ tenantId, id });
     if (!existing) return null;

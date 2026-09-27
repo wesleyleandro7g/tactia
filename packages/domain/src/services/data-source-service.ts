@@ -3,11 +3,16 @@ import type {
   DataSourceStatus,
   MappingRepository,
   CredentialRepository,
+  RawRecordRepository,
 } from '@tactia/database';
+import { computeTrelloKanbanMetrics } from '@tactia/intelligence';
 import { AppError, ErrorCode, paginationArgs, type RequestContext } from '@tactia/shared';
 import {
   CsvConnector,
   McpConnector,
+  TrelloClient,
+  TrelloConnector,
+  trelloCallbackUrl,
   sqlConnectorFromSource,
   type ConnectionTestResult,
   type DiscoveryResult,
@@ -19,12 +24,15 @@ import {
   createDataSourceSchema,
   createMappingSchema,
   probeDataSourceSchema,
+  probeTrelloDataSourceSchema,
+  trelloConfigurationSchema,
   updateDataSourceSchema,
   updateMappingSchema,
 } from '../schemas/data-platform';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import { CredentialService } from './credential-service';
 import { listQuerySchema } from '../schemas/business';
+import { trelloAuthFromCredential } from './trello-oauth-credential';
 
 export class DataSourceService {
   constructor(
@@ -32,6 +40,7 @@ export class DataSourceService {
     private readonly mappings: MappingRepository,
     private readonly credentials: CredentialRepository,
     private readonly auditLogs: AuditLogService,
+    private readonly rawRecords?: RawRecordRepository,
   ) {}
 
   async list(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -58,7 +67,8 @@ export class DataSourceService {
   async create(ctx: RequestContext, raw: unknown) {
     assertCanManageConnections(ctx);
     const input = createDataSourceSchema.parse(raw);
-    const ds = await this.dataSources.create({
+    if (input.type === 'trello') trelloConfigurationSchema.parse(input.configuration);
+    let ds = await this.dataSources.create({
       tenantId: ctx.tenantId!,
       ...input,
       configuration: input.configuration ?? null,
@@ -70,12 +80,51 @@ export class DataSourceService {
       entityId: ds.id,
       metadata: { name: ds.name, type: ds.type },
     });
+
+    if (input.type === 'trello' && input.credentialId) {
+      const configuration = trelloConfigurationSchema.parse(input.configuration);
+      const webhooks: Record<string, string> = {};
+      try {
+        const auth = await trelloAuthFromCredential({
+          tenantId: ctx.tenantId!,
+          credentialId: input.credentialId,
+          credentials: this.credentials,
+        });
+        const client = new TrelloClient({ auth });
+        const callbackURL = trelloCallbackUrl(ds.id, ctx.tenantId!);
+        for (const boardId of configuration.boardIds) {
+          const webhook = await client.createWebhook({
+            callbackURL,
+            idModel: boardId,
+            description: `Tactia · ${ds.name}`,
+          });
+          if (typeof webhook['id'] === 'string') webhooks[boardId] = webhook['id'];
+        }
+        const updated = await this.dataSources.update({
+          tenantId: ctx.tenantId!,
+          id: ds.id,
+          data: { configuration: { ...configuration, webhooks, webhookStatus: 'active' } },
+        });
+        if (updated) ds = updated;
+      } catch {
+        const updated = await this.dataSources.update({
+          tenantId: ctx.tenantId!,
+          id: ds.id,
+          data: { configuration: { ...configuration, webhooks, webhookStatus: 'pending' } },
+        });
+        if (updated) ds = updated;
+      }
+    }
     return ds;
   }
 
   async update(ctx: RequestContext, id: string, raw: unknown) {
     assertCanManageConnections(ctx);
     const input = updateDataSourceSchema.parse(raw);
+    const current = await this.get(ctx, id);
+    if (current.type === 'trello' && input.configuration != null) {
+      trelloConfigurationSchema.parse(input.configuration);
+    }
     const ds = await this.dataSources.update({
       tenantId: ctx.tenantId!,
       id,
@@ -98,8 +147,29 @@ export class DataSourceService {
 
   async remove(ctx: RequestContext, id: string) {
     assertCanManageConnections(ctx);
+    const current = await this.get(ctx, id);
+    if (current.type === 'trello' && current.credentialId) {
+      try {
+        const config = (current.configuration ?? {}) as Record<string, unknown>;
+        const webhooks = config['webhooks'] && typeof config['webhooks'] === 'object'
+          ? Object.values(config['webhooks'] as Record<string, unknown>).filter((value): value is string => typeof value === 'string')
+          : [];
+        const auth = await trelloAuthFromCredential({
+          tenantId: ctx.tenantId!,
+          credentialId: current.credentialId,
+          credentials: this.credentials,
+        });
+        const client = new TrelloClient({ auth });
+        await Promise.allSettled(webhooks.map((webhookId) => client.deleteWebhook(webhookId)));
+      } catch {
+        // A 410 callback will ask Trello to remove any webhook left behind.
+      }
+    }
     const ds = await this.dataSources.softDelete({ tenantId: ctx.tenantId!, id });
     if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');
+    if (current.type === 'trello' && current.credentialId) {
+      await this.credentials.delete({ tenantId: ctx.tenantId!, id: current.credentialId }).catch(() => null);
+    }
     await this.auditLogs.record(ctx, {
       action: AuditAction.DATA_SOURCE_DELETED,
       entityType: 'data_source',
@@ -129,8 +199,30 @@ export class DataSourceService {
   async probeConnection(
     ctx: RequestContext,
     raw: unknown,
-  ): Promise<ConnectionTestResult & { resources?: DiscoveryResource[] }> {
+  ): Promise<ConnectionTestResult & { resources?: DiscoveryResource[]; boards?: Array<Record<string, unknown>> }> {
     assertCanManageConnections(ctx);
+    if (raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as Record<string, unknown>)['type'] === 'trello') {
+      const input = probeTrelloDataSourceSchema.parse(raw);
+      const auth = input.credentialId
+        ? await trelloAuthFromCredential({
+            tenantId: ctx.tenantId!,
+            credentialId: input.credentialId,
+            credentials: this.credentials,
+          })
+        : {
+            kind: 'token' as const,
+            apiKey: input.credentials!.apiKey,
+            token: input.credentials!.token,
+          };
+      const connector = new TrelloConnector({
+        boardIds: [],
+        auth,
+      });
+      const test = await connector.testConnection();
+      if (!test.success) return test;
+      const boards = await connector.listBoards();
+      return { ...test, boards };
+    }
     const input = probeDataSourceSchema.parse(raw);
     const connector = sqlConnectorFromSource({
       type: 'database',
@@ -150,6 +242,37 @@ export class DataSourceService {
       message: 'Conexão bem-sucedida',
       resources: discovery.resources,
     };
+  }
+
+  async trelloMetrics(ctx: RequestContext, id: string) {
+    const source = await this.get(ctx, id);
+    if (source.type !== 'trello') throw new AppError(ErrorCode.VALIDATION_ERROR, 'Trello source required');
+    if (!this.rawRecords) throw new AppError(ErrorCode.INTERNAL_ERROR, 'Raw record repository unavailable');
+    const load = async (entityType: string) => {
+      const rows: RawRow[] = [];
+      let skip = 0;
+      for (;;) {
+        const page = await this.rawRecords!.list({ tenantId: ctx.tenantId!, dataSourceId: id, entityType, skip, take: 2000 });
+        rows.push(...page.items.map((item) => item.payload as RawRow));
+        skip += page.items.length;
+        if (skip >= page.total || page.items.length === 0) break;
+      }
+      return rows;
+    };
+    const [cards, actions] = await Promise.all([load('trello:cards'), load('trello:actions')]);
+    const config = (source.configuration ?? {}) as Record<string, unknown>;
+    const kanban = config['kanban'] && typeof config['kanban'] === 'object'
+      ? config['kanban'] as Record<string, unknown>
+      : {};
+    const strings = (key: string) => Array.isArray(kanban[key])
+      ? (kanban[key] as unknown[]).filter((value): value is string => typeof value === 'string')
+      : [];
+    return computeTrelloKanbanMetrics(cards, actions, {
+      inProgressListIds: strings('inProgressListIds'),
+      doneListIds: strings('doneListIds'),
+      blockedListIds: strings('blockedListIds'),
+      windowDays: typeof kanban['windowDays'] === 'number' ? kanban['windowDays'] : 30,
+    });
   }
 
   // Mapping CRUD
@@ -225,6 +348,22 @@ export class DataSourceService {
           : {},
     });
     if (sql) return sql;
+
+    if (ds.type === 'trello') {
+      const parsed = trelloConfigurationSchema.parse(config);
+      const auth = ds.credentialId
+        ? await trelloAuthFromCredential({
+            tenantId: ctx.tenantId!,
+            credentialId: ds.credentialId,
+            credentials: this.credentials,
+          })
+        : { kind: 'token' as const, apiKey: '', token: '' };
+      return new TrelloConnector({
+        boardIds: parsed.boardIds,
+        historyDays: parsed.historyDays,
+        auth,
+      });
+    }
 
     if (ds.type === 'mcp') {
       let credData: Record<string, unknown> = {};

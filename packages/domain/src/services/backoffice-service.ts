@@ -440,6 +440,11 @@ export class BackofficeService {
     return this.dataSourceService.preview(scoped, dataSourceId, input.resource, input.limit);
   }
 
+  async getTrelloMetrics(ctx: RequestContext, tenantId: string, dataSourceId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.dataSourceService.trelloMetrics(scoped, dataSourceId);
+  }
+
   async listMappings(ctx: RequestContext, tenantId: string, dataSourceId: string) {
     const scoped = await this.operatorScope(ctx, tenantId);
     return this.dataSourceService.listMappings(scoped, dataSourceId, { page: '1', pageSize: '50' });

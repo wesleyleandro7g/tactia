@@ -69,7 +69,7 @@ export function connectorScreenCopy(kind: SourceKind): { title: string; descript
     case 'trello':
       return {
         title: 'Trello',
-        description: 'Quadro e tokens da API. O sync ficará bloqueado até o conector existir.',
+        description: 'Autorize via OAuth 2.0, selecione vários quadros e configure o histórico.',
       };
     case 'erp':
       return {

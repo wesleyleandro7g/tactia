@@ -141,9 +141,9 @@ const campaignRepository = new CampaignRepository(prisma);
 const customFieldDefinitionRepository = new CustomFieldDefinitionRepository(prisma);
 const interactionRepository = new InteractionRepository(prisma);
 const credentialRepository = new CredentialRepository(prisma);
-const dataSourceRepository = new DataSourceRepository(prisma);
+export const dataSourceRepository = new DataSourceRepository(prisma);
 const syncJobRepository = new SyncJobRepository(prisma);
-const rawRecordRepository = new RawRecordRepository(prisma);
+export const rawRecordRepository = new RawRecordRepository(prisma);
 const mappingRepository = new MappingRepository(prisma);
 const importRepository = new ImportRepository(prisma);
 const dataQualityReportRepository = new DataQualityReportRepository(prisma);
@@ -370,6 +370,7 @@ export const dataSourceService = new DataSourceService(
   mappingRepository,
   credentialRepository,
   auditLogService,
+  rawRecordRepository,
 );
 
 export const importService = new ImportService(importRepository);

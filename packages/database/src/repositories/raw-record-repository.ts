@@ -109,4 +109,34 @@ export class RawRecordRepository {
       take,
     });
   }
+
+  async purgeTrelloHistory({
+    tenantId,
+    dataSourceId,
+    before,
+  }: {
+    tenantId: string;
+    dataSourceId: string;
+    before: Date;
+  }) {
+    return this.db.rawRecord.deleteMany({
+      where: {
+        tenantId,
+        dataSourceId,
+        entityType: { in: ['trello:actions', 'trello:webhook'] },
+        createdAt: { lt: before },
+      },
+    });
+  }
+
+  async scrubTrelloMember(memberExternalId: string) {
+    return this.db.rawRecord.updateMany({
+      where: { entityType: 'trello:members', externalId: memberExternalId },
+      data: {
+        payload: asJson({ id: memberExternalId, anonymized: true }) as Prisma.InputJsonValue,
+        checksum: `privacy:${memberExternalId}`,
+        processedAt: new Date(),
+      },
+    });
+  }
 }

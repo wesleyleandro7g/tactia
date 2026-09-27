@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getSourceKind } from '@tactia/domain/data-sources/catalog';
 import { ConnectSourceWizard } from '@/components/app/connect-source-wizard';
 import { DatabaseConnectWizard } from '@/components/app/database-connect-wizard';
+import { TrelloConnectWizard } from '@/components/app/trello-connect-wizard';
 import { connectorScreenCopy } from '@/components/app/connector-steps';
 import { PageHeader } from '@/components/app/page-header';
 import { requireOperator } from '@/lib/server-context';
@@ -10,6 +11,7 @@ import { backofficeService } from '@/lib/services';
 
 type PageProps = {
   params: Promise<{ id: string; kind: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export async function generateMetadata({ params }: PageProps) {
@@ -23,8 +25,8 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function NewDataSourceKindPage({ params }: PageProps) {
-  const { id, kind: kindId } = await params;
+export default async function NewDataSourceKindPage({ params, searchParams }: PageProps) {
+  const [{ id, kind: kindId }, query] = await Promise.all([params, searchParams]);
   if (kindId === 'postgres') {
     redirect(`/tenants/${id}/data-sources/new/database`);
   }
@@ -50,6 +52,14 @@ export default async function NewDataSourceKindPage({ params }: PageProps) {
       </div>
       {kind.id === 'database' ? (
         <DatabaseConnectWizard tenantId={id} kind={kind} />
+      ) : kind.id === 'trello' ? (
+        <TrelloConnectWizard
+          tenantId={id}
+          kind={kind}
+          oauthCredentialId={typeof query['credentialId'] === 'string' ? query['credentialId'] : undefined}
+          oauthStatus={typeof query['oauth'] === 'string' ? query['oauth'] : undefined}
+          oauthReason={typeof query['reason'] === 'string' ? query['reason'] : undefined}
+        />
       ) : (
         <ConnectSourceWizard tenantId={id} kind={kind} />
       )}

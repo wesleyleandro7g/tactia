@@ -46,3 +46,26 @@ export {
   CUSTOM_MAPPING_PREFIX,
 } from './normalizer';
 export type { NormalizeOutcome, NormalizerRepositories } from './normalizer';
+
+export { TrelloClient, TrelloApiError } from './trello-client';
+export type { TrelloAuth, TrelloClientOptions } from './trello-client';
+export { TrelloConnector, TRELLO_RESOURCES } from './trello-connector';
+export type { TrelloConnectorConfig, TrelloResource } from './trello-connector';
+
+export {
+  computeTrelloWebhookSignature,
+  sanitizeTrelloPayload,
+  trelloCallbackUrl,
+  verifyTrelloWebhookSignature,
+} from './trello-webhook';
+
+export {
+  TRELLO_OAUTH_SCOPES,
+  TrelloOAuthError,
+  buildTrelloAuthorizationUrl,
+  exchangeTrelloAuthorizationCode,
+  generateTrelloOAuthState,
+  generateTrelloPkce,
+  refreshTrelloOAuthTokens,
+} from './trello-oauth';
+export type { TrelloOAuthConfig, TrelloOAuthTokens } from './trello-oauth';

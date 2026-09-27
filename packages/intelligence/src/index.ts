@@ -106,3 +106,6 @@ export type {
   TenantThresholds,
 } from './types';
 export { METRIC_KEYS, METRIC_DEFINITIONS, DEFAULT_THRESHOLDS, THRESHOLD_KEYS } from './types';
+
+export { computeTrelloKanbanMetrics } from './trello-metrics';
+export type { TrelloKanbanConfig, TrelloKanbanMetrics } from './trello-metrics';

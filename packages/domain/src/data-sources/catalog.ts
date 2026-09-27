@@ -9,7 +9,7 @@ export type CatalogField = {
   placeholder?: string;
 };
 
-export type SourceConnectorKind = 'csv' | 'sql' | 'mcp' | 'none';
+export type SourceConnectorKind = 'csv' | 'sql' | 'mcp' | 'trello' | 'none';
 
 export const SQL_DIALECTS = [
   { value: 'postgres', label: 'PostgreSQL', defaultPort: 5432 },
@@ -172,16 +172,13 @@ export const SOURCE_KINDS: readonly SourceKind[] = [
   {
     id: 'trello',
     label: 'Trello',
-    description: 'Quadros do Trello. O conector ainda não está disponível.',
+    description: 'Quadros, cards e histórico operacional do Trello.',
     group: 'work_management',
     groupLabel: WORK,
-    connector: 'none',
+    connector: 'trello',
     selectable: true,
-    configFields: [{ key: 'boardId', label: 'ID do quadro', type: 'string', required: true }],
-    credentialFields: [
-      { key: 'apiKey', label: 'API key', type: 'secret', required: true },
-      { key: 'token', label: 'Token', type: 'secret', required: true },
-    ],
+    configFields: [],
+    credentialFields: [],
   },
   {
     id: 'erp',

@@ -88,6 +88,7 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 | [docs/deploy-producao.md](docs/deploy-producao.md) | Deploy em produção com Docker Compose e TLS |
 | [docs/onboarding-cliente.md](docs/onboarding-cliente.md) | Passo a passo para colocar um cliente real |
 | [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
+| [docs/conector-trello.md](docs/conector-trello.md) | Configuração, webhooks, sync, LGPD e métricas do conector Trello |
 | [docs/integracao-chatgpt-mcp.md](docs/integracao-chatgpt-mcp.md) | OAuth 2.1, deploy e publicação do app MCP no ChatGPT |
 
 Logs são JSON estruturado com `request_id`, `tenant_id`, `user_id`, `operation`,
@@ -101,7 +102,7 @@ apps/web              Next.js (UI + route handlers)
 packages/database     Prisma, client, repositories
 packages/domain       Services, autorização, portas
 packages/shared       Erros, logger, UUID v7, helpers de API
-packages/connectors     CSV/Postgres connectors, normalização, data quality
+packages/connectors     CSV/Postgres/Trello connectors, normalização, data quality
 packages/intelligence   Metric engine, rules, insights, recommendations
 packages/execution      Action registry, execution engine, approvals
 packages/ai             Tool registry, context builder, LLM adapter, orchestrator

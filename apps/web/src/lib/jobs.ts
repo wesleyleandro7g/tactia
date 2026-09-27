@@ -13,6 +13,8 @@ export const JOBS = {
   daily: 'intelligence.daily',
   weeklyBriefing: 'briefing.weekly',
   sync: 'sync.execute',
+  trelloReconcile: 'trello.reconcile',
+  trelloPrivacy: 'trello.privacy',
   embedFacts: 'memory.embed_facts',
   ingestDocument: 'knowledge.ingest',
   ingestMedia: 'knowledge.ingest_media',
@@ -23,6 +25,8 @@ export type WeeklyBriefingJob = { tenantId: string; now?: string };
 export type EmbedFactsJob = { tenantId: string };
 export type IngestDocumentJob = { tenantId: string; documentId: string };
 export type IngestMediaJob = { tenantId: string; mediaId: string };
+export type TrelloReconcileJob = { tenantId: string; dataSourceId: string; now?: string };
+export type TrelloPrivacyJob = { now?: string };
 export type SyncJob = {
   tenantId: string;
   syncJobId: string;
@@ -170,6 +174,98 @@ export async function enqueueDailyForDueTenants(now = new Date()) {
   return { enqueued };
 }
 
+export async function enqueueTrelloReconciliations(now = new Date()) {
+  const jobQueue = getJobQueue();
+  if (!jobQueue) return { enqueued: 0 };
+  const { tenantRepository, dataSourceRepository } = await import('./services');
+  const tenants = await tenantRepository.listActive();
+  const hourKey = now.toISOString().slice(0, 13);
+  let enqueued = 0;
+  for (const tenant of tenants) {
+    const sources = await dataSourceRepository.listActiveTrello(tenant.id);
+    for (const source of sources) {
+      await jobQueue.publish<TrelloReconcileJob>(
+        JOBS.trelloReconcile,
+        { tenantId: tenant.id, dataSourceId: source.id, now: now.toISOString() },
+        { singletonKey: `${source.id}:${hourKey}` },
+      );
+      enqueued += 1;
+    }
+  }
+  return { enqueued };
+}
+
+export async function enqueueTrelloPrivacy(now = new Date()) {
+  const jobQueue = getJobQueue();
+  if (!jobQueue || now.getUTCHours() !== 4) return { enqueued: 0 };
+  const id = await jobQueue.publish<TrelloPrivacyJob>(
+    JOBS.trelloPrivacy,
+    { now: now.toISOString() },
+    { singletonKey: now.toISOString().slice(0, 10) },
+  );
+  return { enqueued: id ? 1 : 0 };
+}
+
+export async function runTrelloPrivacy(now = new Date()) {
+  const { tenantRepository, dataSourceRepository, rawRecordRepository } = await import('./services');
+  const tenants = await tenantRepository.listActive();
+  let purged = 0;
+  for (const tenant of tenants) {
+    const sources = await dataSourceRepository.listActiveTrello(tenant.id);
+    for (const source of sources) {
+      const config = (source.configuration ?? {}) as Record<string, unknown>;
+      const days = config['historyDays'];
+      if (days === 30 || days === 90 || days === 180) {
+        const result = await rawRecordRepository.purgeTrelloHistory({
+          tenantId: tenant.id,
+          dataSourceId: source.id,
+          before: new Date(now.getTime() - days * 86_400_000),
+        });
+        purged += result.count;
+      }
+    }
+  }
+
+  const pluginId = process.env['TRELLO_PLUGIN_ID']?.trim();
+  const clientId = process.env['TRELLO_OAUTH_CLIENT_ID']?.trim();
+  const clientSecret = process.env['TRELLO_OAUTH_CLIENT_SECRET']?.trim();
+  let scrubbed = 0;
+  if (pluginId && clientId && clientSecret) {
+    const tokenResponse = await fetch('https://auth.atlassian.com/oauth/token', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials',
+        scope: 'read:client.privacy',
+      }),
+    });
+    if (!tokenResponse.ok) throw new Error(`Trello privacy token endpoint returned ${tokenResponse.status}`);
+    const tokenBody = await tokenResponse.json() as Record<string, unknown>;
+    if (typeof tokenBody['access_token'] !== 'string') throw new Error('Trello privacy access token missing');
+
+    const url = new URL(`https://api.trello.com/1/plugins/${encodeURIComponent(pluginId)}/compliance/memberPrivacy`);
+    url.searchParams.set('limit', '1000');
+    url.searchParams.set('since', new Date(now.getTime() - 13 * 86_400_000).toISOString());
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${tokenBody['access_token']}` },
+    });
+    if (!response.ok) throw new Error(`Trello privacy API returned ${response.status}`);
+    const events = await response.json() as Array<Record<string, unknown>>;
+    const memberIds = new Set(events
+      .filter((event) => ['accountDeleted', 'accountUpdated', 'tokenRevoked', 'tokenExpired'].includes(String(event['event'] ?? '')))
+      .map((event) => event['id'])
+      .filter((id): id is string => typeof id === 'string'));
+    for (const memberId of memberIds) {
+      const result = await rawRecordRepository.scrubTrelloMember(memberId);
+      scrubbed += result.count;
+    }
+  }
+  logger.info({ operation: 'trello_privacy', purged, scrubbed, status: 'completed' });
+  return { purged, scrubbed };
+}
+
 export async function startJobWorkers(): Promise<void> {
   const jobQueue = getJobQueue();
   if (!jobQueue) return;
@@ -208,6 +304,16 @@ export async function startJobWorkers(): Promise<void> {
     });
   });
 
+  await jobQueue.register<TrelloReconcileJob>(JOBS.trelloReconcile, async (data) => {
+    await syncService.startSystemSync(data.tenantId, data.dataSourceId, {
+      now: data.now ? new Date(data.now) : new Date(),
+    });
+  });
+
+  await jobQueue.register<TrelloPrivacyJob>(JOBS.trelloPrivacy, async (data) => {
+    await runTrelloPrivacy(data.now ? new Date(data.now) : new Date());
+  });
+
   await jobQueue.register<EmbedFactsJob>(JOBS.embedFacts, async (data) => {
     await runMemoryEmbed(data.tenantId);
   });
@@ -223,7 +329,12 @@ export async function startJobWorkers(): Promise<void> {
   });
 
   await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {
-    await enqueueDailyForDueTenants(data.now ? new Date(data.now) : new Date());
+    const now = data.now ? new Date(data.now) : new Date();
+    await Promise.all([
+      enqueueDailyForDueTenants(now),
+      enqueueTrelloReconciliations(now),
+      enqueueTrelloPrivacy(now),
+    ]);
   });
 
   await jobQueue.schedule(JOBS.tick, '5 * * * *', {}, { tz: 'UTC', key: 'hourly' });

@@ -76,6 +76,7 @@ export const dataSourceService = new DataSourceService(
   mappingRepository,
   credentialRepository,
   auditLogService,
+  rawRecordRepository,
 );
 
 export const customDataValidationService = new CustomDataValidationService(

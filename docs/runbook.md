@@ -323,3 +323,28 @@ Limite: 60 req/min por key. `GET`/`DELETE` na mesma path existem só para o tran
 | Rate limit **in-memory** | Vale por processo; com mais de uma instância o limite efetivo é multiplicado |
 | Sem retry de execução falha | Reproponha manualmente |
 | E-mail só no driver `console` | Nenhum e-mail sai de verdade |
+
+## Conector Trello
+
+### Fonte não conecta ou entrou em `error`
+
+1. No Ops, use **Testar conexão**. Falhas de refresh ou `401` indicam grant expirado/revogado; abra o wizard e autorize novamente.
+2. Confirme no app Trello os scopes `read:board:trello` e `read:member:trello`, e que o usuário autorizado acessa todos os `boardIds`.
+3. Procure logs com `operation=sync`, `data_source_id` e `sync_job_id`. Authorization code, verifier, client secret e tokens nunca aparecem nos logs.
+4. `429` é repetido automaticamente; ocorrências contínuas indicam concorrência excessiva para o mesmo token/cliente OAuth.
+
+### Webhook não entrega
+
+1. Confirme `TRELLO_CALLBACK_BASE_URL` HTTPS público, certificado válido e porta 443.
+2. Execute `HEAD /api/v1/webhooks/trello/{sourceId}?tenantId={tenantId}` e espere `200`.
+3. Confira `webhookStatus`, `webhookLastReceivedAt` e `webhooks` na configuração exibida pelo Ops.
+4. Se o status estiver `pending`, habilite `JOBS_ENABLED=true`; a próxima reconciliação horária tenta registrar os quadros ausentes.
+5. Mudanças na URL exigem recriar webhooks, pois a URL exata participa da assinatura HMAC.
+
+### Dados desatualizados ou evento perdido
+
+O worker `trello.reconcile` é publicado pelo `intelligence.tick` a cada hora. Verifique se o processo Node iniciou pg-boss e procure `job_start`, `job_complete` ou `job_failed` para esse nome. Um sync manual também reconcilia a fonte. O estado atual é recuperável; ações exclusivas de webhook que nunca chegaram não podem ser reconstruídas pela API do Trello.
+
+### Privacidade e retenção
+
+O worker `trello.privacy` roda diariamente às 04:00 UTC. Para o polling oficial de privacidade, configure `TRELLO_PLUGIN_ID`, `TRELLO_OAUTH_CLIENT_ID` e `TRELLO_OAUTH_CLIENT_SECRET`. Sem essas variáveis, a retenção por `historyDays` continua ativa, mas eventos de conta do Trello não são consultados. Consulte [conector-trello.md](conector-trello.md) para o modelo de dados e procedimento completo.

@@ -66,6 +66,13 @@ export class DataSourceRepository {
     return { items, total };
   }
 
+
+  async listActiveTrello(tenantId: string) {
+    return this.db.dataSource.findMany({
+      where: { tenantId, status: 'active', type: 'trello' },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
   async listActiveForSync(tenantId: string) {
     return this.db.dataSource.findMany({
       where: {
