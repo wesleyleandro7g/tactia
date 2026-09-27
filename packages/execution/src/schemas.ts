@@ -5,6 +5,7 @@ export const ACTION_TYPES = [
   'send_email',
   'send_whatsapp',
   'generate_report',
+  'browser_action',
 ] as const;
 
 export const createActionSchema = z.object({

@@ -13,7 +13,7 @@ export {
   type ContextInsight,
   type ContextMetric,
 } from './context-builder';
-export { buildSystemPrompt, FOLLOW_UPS_HEADING } from './system-prompt';
+export { buildSystemPrompt, FOLLOW_UPS_HEADING, type WhatsappChannelContext } from './system-prompt';
 export {
   Orchestrator,
   extractFollowUps,
@@ -107,7 +107,14 @@ export {
   createQueryBusinessDataTool,
   createAggregateBusinessDataTool,
   createProposeActionTool,
+  createSendEmailTool,
   createGenerateInfographicTool,
+  createScheduleTools,
+  createCreateScheduleTool,
+  createListSchedulesTool,
+  createUpdateScheduleTool,
+  createDisableScheduleTool,
+  createTriggerScheduleTool,
   currentMonthPeriod,
   periodInputSchema,
   periodLabel,
@@ -116,8 +123,10 @@ export {
   sourceFromMetric,
   PROPOSABLE_ACTION_TYPES,
   type ActionProposalPort,
+  type DirectEmailPort,
   type CreateToolsOptions,
   type InfographicStore,
+  type SchedulePort,
   type ToolDeps,
 } from './tools/index';
 export {

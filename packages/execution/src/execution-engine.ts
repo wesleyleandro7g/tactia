@@ -11,7 +11,7 @@ import {
   formatEpisodeText,
   type AuditLogService,
 } from '@tactia/domain';
-import { assertOwnerOrAdmin, assertRole, assertTenantContext } from '@tactia/domain';
+import { assertOwnerOrAdmin, assertRole } from '@tactia/domain';
 import { AppError, ErrorCode, createId, isAppError, logger, type RequestContext } from '@tactia/shared';
 import type { ActionRegistry } from './action-registry';
 import { InlineJobQueue } from './job-queue';
@@ -64,20 +64,36 @@ export class ExecutionEngine {
   async propose(
     ctx: RequestContext,
     raw: ProposeActionInput,
-    options: { origin?: ExecutionOrigin } = {},
+    options: { origin?: ExecutionOrigin; forceExecute?: boolean } = {},
   ) {
-    assertRole(ctx, 'member');
     const origin = options.origin ?? 'user';
+    // `schedule` is a server-only origin: the scheduler tick enqueues it and
+    // authorization already happened when the owner/admin created the schedule.
+    // There is no user/operator principal at run time, so the user-facing role
+    // gate does not apply; we only require a tenant scope.
+    if (origin === 'schedule') {
+      if (!ctx.tenantId) {
+        throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+      }
+    } else {
+      assertRole(ctx, 'member');
+    }
+    // Both branches guarantee a tenant scope; narrow for the rest of the method.
+    const tenantId = ctx.tenantId;
+    if (!tenantId) {
+      throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+    }
+    const scoped: RequestContext & { tenantId: string } = { ...ctx, tenantId };
 
     if (raw.idempotencyKey) {
       const existing = await this.deps.executions.findByIdempotencyKey({
-        tenantId: ctx.tenantId,
+        tenantId,
         key: raw.idempotencyKey,
       });
       if (existing) {
         logger.info({
           request_id: ctx.requestId,
-          tenant_id: ctx.tenantId,
+          tenant_id: tenantId,
           operation: 'action_propose_idempotent_hit',
           execution_id: existing.id,
         });
@@ -85,7 +101,7 @@ export class ExecutionEngine {
       }
     }
 
-    const action = await this.resolveAction(ctx, raw);
+    const action = await this.resolveAction(scoped, raw);
     if (!action.enabled) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, `Ação '${action.type}' está desativada`);
     }
@@ -93,12 +109,20 @@ export class ExecutionEngine {
     // Schema validation before anything is persisted (spec §45)
     const input = this.deps.registry.validate(action.type, raw.input);
 
-    const requiresApproval = action.requiresApproval || origin === 'ai' || origin === 'mcp';
+    // `ai_direct` is the explicit "send now" rail for send_email: it skips
+    // approval by design (relaxes spec §44 only for this origin + action type).
+    // `forceExecute` is the scheduler's `auto_execute` rail: the owner configured
+    // the schedule to run without a human in the loop, so approval is skipped.
+    // Every other origin keeps the previous guardrail.
+    const requiresApproval =
+      origin === 'ai_direct' || options.forceExecute
+        ? false
+        : action.requiresApproval || origin === 'ai' || origin === 'mcp';
 
     let execution;
     try {
       execution = await this.deps.executions.create({
-        tenantId: ctx.tenantId,
+        tenantId,
         actionId: action.id,
         requestedBy: ctx.userId,
         origin,
@@ -110,7 +134,7 @@ export class ExecutionEngine {
       // Concurrent request with the same Idempotency-Key won the race.
       if (raw.idempotencyKey && isUniqueViolation(error)) {
         const existing = await this.deps.executions.findByIdempotencyKey({
-          tenantId: ctx.tenantId,
+          tenantId,
           key: raw.idempotencyKey,
         });
         if (existing) return existing;
@@ -120,7 +144,7 @@ export class ExecutionEngine {
 
     if (requiresApproval) {
       await this.deps.approvals.create({
-        tenantId: ctx.tenantId,
+        tenantId,
         actionExecutionId: execution.id,
         requestedBy: ctx.userId,
         reason: raw.reason ?? null,
@@ -131,7 +155,7 @@ export class ExecutionEngine {
       action: AuditAction.ACTION_PROPOSED,
       entityType: 'action_execution',
       entityId: execution.id,
-      actorType: origin === 'ai' || origin === 'mcp' ? origin : 'user',
+      actorType: origin === 'ai' || origin === 'ai_direct' ? 'ai' : origin === 'mcp' ? 'mcp' : 'user',
       metadata: {
         actionType: action.type,
         origin,
@@ -141,10 +165,10 @@ export class ExecutionEngine {
     });
 
     if (!requiresApproval) {
-      await this.enqueue(ctx, execution.id);
+      await this.enqueue(scoped, execution.id);
     }
 
-    return this.requireExecution(ctx, execution.id);
+    return this.requireExecution(scoped, execution.id);
   }
 
   /**
@@ -177,6 +201,56 @@ export class ExecutionEngine {
     },
   ) {
     return this.proposeFromOrigin(ctx, input, 'mcp');
+  }
+
+  /**
+   * Direct e-mail send requested by the user through the chat assistant. Unlike
+   * `proposeFromAi`, this executes immediately (no human approval) — it is the
+   * only rail that lets the LLM cause a side effect on its own, and it is
+   * deliberately restricted to `send_email` (origin `ai_direct`).
+   */
+  async sendEmailFromAi(
+    ctx: RequestContext,
+    input: {
+      actionType?: string;
+      input: unknown;
+      reason?: string | null;
+      idempotencyKey?: string | null;
+    },
+  ) {
+    const type = (input.actionType ?? 'send_email') as ActionType;
+    if (type !== 'send_email') {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        `Envio direto pela IA só é permitido para 'send_email' (recebido: '${type}').`,
+      );
+    }
+    if (!this.deps.registry.has(type)) {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        `Ação '${type}' não é suportada. Disponíveis: ${this.deps.registry.types().join(', ')}.`,
+      );
+    }
+
+    const execution = await this.propose(
+      ctx,
+      {
+        actionType: type,
+        input: input.input,
+        reason: input.reason ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+      },
+      { origin: 'ai_direct' },
+    );
+
+    return {
+      id: execution.id,
+      actionType: type,
+      status: execution.status,
+      requiresApproval: false,
+      output: (execution.output ?? null) as Record<string, unknown> | null,
+      error: execution.error ?? null,
+    };
   }
 
   private async proposeFromOrigin(
@@ -404,11 +478,14 @@ export class ExecutionEngine {
       await this.deps.auditLogs.record(
         { tenantId, userId: execution.requestedBy },
         {
-          action: AuditAction.ACTION_EXECUTED,
+          action:
+            execution.origin === 'ai_direct'
+              ? AuditAction.ACTION_EXECUTED_DIRECT
+              : AuditAction.ACTION_EXECUTED,
           entityType: 'action_execution',
           entityId: executionId,
-          actorType: 'system',
-          metadata: { actionType: execution.action.type, output },
+          actorType: execution.origin === 'ai_direct' ? 'ai' : 'system',
+          metadata: { actionType: execution.action.type, origin: execution.origin, output },
         },
       );
 
@@ -469,7 +546,12 @@ export class ExecutionEngine {
    * defaults on first use so the AI/API never fails for a missing catalog row.
    */
   async ensureAction(ctx: RequestContext, type: ActionType) {
-    assertTenantContext(ctx);
+    // Tenant scope is enough here: this only provisions a catalog default and
+    // runs after authorization (user/operator at propose time, or the trusted
+    // scheduler for `origin: schedule`). A missing tenant is still rejected.
+    if (!ctx.tenantId) {
+      throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+    }
     const existing = await this.deps.actions.findByType({ tenantId: ctx.tenantId, type });
     if (existing) return existing;
 

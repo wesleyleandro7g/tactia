@@ -71,6 +71,11 @@ export function connectorScreenCopy(kind: SourceKind): { title: string; descript
         title: 'Trello',
         description: 'Autorize via OAuth 2.0, selecione vários quadros e configure o histórico.',
       };
+    case 'torge':
+      return {
+        title: 'Torge',
+        description: 'Configure a conta, a filial e a instância de navegador dedicada. A fonte começa como rascunho e não dispara carga automaticamente.',
+      };
     case 'erp':
       return {
         title: 'ERP',

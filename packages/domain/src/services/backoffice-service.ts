@@ -2,6 +2,8 @@ import type {
   AuditLogRepository,
   DataSourceRepository,
   ImportRepository,
+  IntegrationModuleRunRepository,
+  IntegrationArtifactRepository,
   InsightRepository,
   MembershipRepository,
   SyncJobRepository,
@@ -13,6 +15,7 @@ import {
   ErrorCode,
   paginationArgs,
   type RequestContext,
+  type ObjectStorage,
 } from '@tactia/shared';
 import { assertOperator } from '../authz';
 import type { AuthProvider } from '../ports/auth-provider';
@@ -31,6 +34,8 @@ import type { CredentialService } from './credential-service';
 import type { CustomFieldDefinitionService } from './custom-field-definition-service';
 import type { DataSourceService } from './data-source-service';
 import type { SyncService } from './sync-service';
+
+export type TenantSyncIndicator = 'running' | 'failed' | null;
 
 function slugify(name: string): string {
   return name
@@ -69,6 +74,9 @@ export class BackofficeService {
     private readonly dataSourceService: DataSourceService,
     private readonly credentialService: CredentialService,
     private readonly customFields?: CustomFieldDefinitionService,
+    private readonly moduleRuns?: IntegrationModuleRunRepository,
+    private readonly integrationArtifacts?: IntegrationArtifactRepository,
+    private readonly objectStorage?: ObjectStorage,
   ) {}
 
   async listTenants(ctx: RequestContext, query: Record<string, string | undefined>) {
@@ -84,26 +92,62 @@ export class BackofficeService {
     return { ...result, pagination: { page: input.page, pageSize: input.pageSize } };
   }
 
-  async getTenant(ctx: RequestContext, tenantId: string) {
+  private async requireTenant(ctx: RequestContext, tenantId: string) {
     assertOperator(ctx);
     const tenant = await this.tenants.findByIdForOperator(tenantId);
     if (!tenant) throw new AppError(ErrorCode.NOT_FOUND, 'Tenant not found');
+    return tenant;
+  }
 
-    const [memberships, dataSources, syncJobs, imports, insights, audit] = await Promise.all([
-      this.memberships.listByTenant({ tenantId, skip: 0, take: 100 }),
-      this.dataSources.list({ tenantId, skip: 0, take: 50 }),
+  /**
+   * Lightweight header for the tenant detail layout: the tenant plus tab indicators.
+   * `sync` is `running` when any job is pending/running, otherwise `failed` when the
+   * latest job failed, otherwise `null`.
+   */
+  async getTenantHeader(ctx: RequestContext, tenantId: string) {
+    const tenant = await this.requireTenant(ctx, tenantId);
+    const [memberships, dataSources, active, latest] = await Promise.all([
+      this.memberships.listByTenant({ tenantId, skip: 0, take: 1 }),
+      this.dataSources.list({ tenantId, skip: 0, take: 1 }),
+      this.syncJobs.list({ tenantId, statuses: ['pending', 'running'], skip: 0, take: 1 }),
+      this.syncJobs.list({ tenantId, skip: 0, take: 1 }),
+    ]);
+    const sync: TenantSyncIndicator =
+      active.total > 0 ? 'running' : latest.items[0]?.status === 'failed' ? 'failed' : null;
+    return {
+      tenant,
+      indicators: { users: memberships.total, dataSources: dataSources.total, sync },
+    };
+  }
+
+  async listTenantUsers(ctx: RequestContext, tenantId: string) {
+    await this.requireTenant(ctx, tenantId);
+    const result = await this.memberships.listByTenant({ tenantId, skip: 0, take: 100 });
+    return result.items;
+  }
+
+  async listTenantDataSources(ctx: RequestContext, tenantId: string) {
+    await this.requireTenant(ctx, tenantId);
+    const result = await this.dataSources.list({ tenantId, skip: 0, take: 50 });
+    return result.items;
+  }
+
+  async getTenantSyncHistory(ctx: RequestContext, tenantId: string) {
+    await this.requireTenant(ctx, tenantId);
+    const [syncJobs, imports] = await Promise.all([
       this.syncJobs.list({ tenantId, skip: 0, take: 15 }),
       this.imports.list({ tenantId, skip: 0, take: 15 }),
+    ]);
+    return { syncJobs: syncJobs.items, imports: imports.items };
+  }
+
+  async getTenantActivity(ctx: RequestContext, tenantId: string) {
+    await this.requireTenant(ctx, tenantId);
+    const [insights, audit] = await Promise.all([
       this.insights.list({ tenantId, page: 1, pageSize: 10, orderBy: 'createdAt' }),
       this.auditLogRepo.list({ tenantId, skip: 0, take: 30 }),
     ]);
-
     return {
-      tenant,
-      users: memberships.items,
-      dataSources: dataSources.items,
-      syncJobs: syncJobs.items,
-      imports: imports.items,
       insights: insights.items.map((row) => ({
         id: row.id,
         title: row.title,
@@ -114,6 +158,17 @@ export class BackofficeService {
       })),
       auditLogs: audit.items,
     };
+  }
+
+  async getTenant(ctx: RequestContext, tenantId: string) {
+    const tenant = await this.requireTenant(ctx, tenantId);
+    const [users, dataSources, history, activity] = await Promise.all([
+      this.listTenantUsers(ctx, tenantId),
+      this.listTenantDataSources(ctx, tenantId),
+      this.getTenantSyncHistory(ctx, tenantId),
+      this.getTenantActivity(ctx, tenantId),
+    ]);
+    return { tenant, users, dataSources, ...history, ...activity };
   }
 
   async provisionTenant(ctx: RequestContext, raw: unknown) {
@@ -367,6 +422,11 @@ export class BackofficeService {
     return this.syncService.startSync(operatorCtx, dataSourceId);
   }
 
+  async cancelSync(ctx: RequestContext, tenantId: string, syncJobId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    return this.syncService.cancelSyncJob(scoped, syncJobId);
+  }
+
   async reprocessImport(ctx: RequestContext, tenantId: string, importId: string) {
     assertOperator(ctx);
     const tenant = await this.tenants.findByIdForOperator(tenantId);
@@ -387,10 +447,12 @@ export class BackofficeService {
   async getDataSource(ctx: RequestContext, tenantId: string, dataSourceId: string) {
     const scoped = await this.operatorScope(ctx, tenantId);
     const dataSource = await this.dataSourceService.get(scoped, dataSourceId);
-    const mappings = await this.dataSourceService.listMappings(scoped, dataSourceId, {
-      page: '1',
-      pageSize: '50',
-    });
+    const [mappings, moduleRuns] = await Promise.all([
+      this.dataSourceService.listMappings(scoped, dataSourceId, { page: '1', pageSize: '50' }),
+      this.moduleRuns
+        ? this.moduleRuns.listByDataSource({ tenantId, dataSourceId, take: 100 })
+        : Promise.resolve([]),
+    ]);
     const { credential, ...rest } = dataSource;
     return {
       dataSource: {
@@ -400,6 +462,7 @@ export class BackofficeService {
           : null,
       },
       mappings: mappings.items,
+      moduleRuns,
       connectorAvailable: sourceKindHasConnector(dataSource.type),
     };
   }
@@ -475,6 +538,23 @@ export class BackofficeService {
     const scoped = await this.operatorScope(ctx, tenantId);
     const credential = await this.credentialService.create(scoped, raw);
     return { id: credential.id, provider: credential.provider, createdAt: credential.createdAt };
+  }
+
+  async getIntegrationArtifact(ctx: RequestContext, tenantId: string, artifactId: string) {
+    const scoped = await this.operatorScope(ctx, tenantId);
+    if (!this.integrationArtifacts || !this.objectStorage) {
+      throw new AppError(ErrorCode.INTERNAL_ERROR, 'Integration artifact storage is not configured');
+    }
+    const artifact = await this.integrationArtifacts.findById({ tenantId, id: artifactId });
+    if (!artifact) throw new AppError(ErrorCode.NOT_FOUND, 'Artifact not found');
+    const object = await this.objectStorage.get(artifact.storageKey);
+    await this.auditLogs.record(scoped, {
+      action: AuditAction.INTEGRATION_ARTIFACT_ACCESSED,
+      entityType: 'integration_artifact',
+      entityId: artifact.id,
+      metadata: { dataSourceId: artifact.dataSourceId, moduleKey: artifact.moduleKey },
+    });
+    return { body: object.body, contentType: artifact.mimeType || object.contentType };
   }
 
   async listCustomFields(ctx: RequestContext, tenantId: string, entityType?: string) {

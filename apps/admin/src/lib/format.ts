@@ -40,6 +40,8 @@ export const SYNC_STATUS_LABELS: Record<string, string> = {
   pending: 'Na fila',
   running: 'Executando',
   completed: 'Concluído',
+  partial: 'Parcial',
+  needs_attention: 'Requer atenção',
   failed: 'Falhou',
   cancelled: 'Cancelado',
 };

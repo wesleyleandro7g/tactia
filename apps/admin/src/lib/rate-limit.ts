@@ -32,6 +32,8 @@ export const RATE_LIMITS = {
   sync: { name: 'sync', limit: 6, windowMs: 60_000 },
   mutate: { name: 'mutate', limit: 60, windowMs: 60_000 },
   upload: { name: 'upload', limit: 10, windowMs: 60_000 },
+  /** Same budget as the web chat: each turn may call several LLM rounds. */
+  chat: { name: 'chat', limit: 20, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export function enforceRateLimit(

@@ -28,6 +28,7 @@ function buildConfiguration(
     if (!raw) continue;
     if (field.type === 'number') configuration[field.key] = Number(raw);
     else if (field.type === 'boolean') configuration[field.key] = raw === 'true';
+    else if (field.type === 'multiselect') configuration[field.key] = raw.split(',').filter(Boolean);
     else configuration[field.key] = raw;
   }
   if (extraJson.trim()) {
@@ -88,7 +89,18 @@ export function ConnectSourceWizard({
   const current = steps[stepIndex]!;
 
   const [name, setName] = useState(kind.label);
-  const [config, setConfig] = useState<Record<string, string>>({});
+  const [config, setConfig] = useState<Record<string, string>>(
+    kind.id === 'torge'
+      ? {
+          isolationMode: 'dedicated_instance',
+          enabledModules: 'products',
+          timezone: 'America/Sao_Paulo',
+          dailyTime: '03:00',
+          recentWindowDays: '30',
+          reconciliationWindowDays: '30',
+        }
+      : {},
+  );
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [extraJson, setExtraJson] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);

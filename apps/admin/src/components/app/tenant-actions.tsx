@@ -303,6 +303,34 @@ export function SyncButton({
   );
 }
 
+export function CancelSyncButton({ tenantId, syncJobId }: { tenantId: string; syncJobId: string }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function run() {
+    setPending(true);
+    setError(null);
+    try {
+      await postJson(`/api/v1/tenants/${tenantId}/sync/${syncJobId}/cancel`, {});
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao cancelar sync');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Button size="sm" variant="danger" loading={pending} onClick={() => void run()}>
+        Cancelar
+      </Button>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+    </div>
+  );
+}
+
 export function ReprocessButton({ tenantId, importId }: { tenantId: string; importId: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);

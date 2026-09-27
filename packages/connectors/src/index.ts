@@ -1,4 +1,11 @@
-export type { Connector, FieldMapping, FieldTransform, MappingConfig, ConnectionTestResult, DiscoveryResult, DiscoveryResource, DiscoveryColumn, FetchOptions, RawRow, SyncContext, SyncResult, SyncMode, SkippedMapping } from './types';
+export type { Connector, FieldMapping, FieldTransform, MappingConfig, ConnectionTestResult, DiscoveryResult, DiscoveryResource, DiscoveryColumn, FetchOptions, RawRow, SyncContext, SyncResult, SyncMode, SkippedMapping, ModuleSyncStatus, ModuleSyncStart, ModuleSyncResult, ModuleArtifact } from './types';
+export * from './browser/contracts';
+export * from './browser/engines/figranium/figranium-browser-executor';
+export * from './browser/engines/figranium/config';
+export * from './browser/engines/figranium/workflow-publisher';
+export * from './providers/torge/definition';
+export * from './providers/torge/parsers/products';
+export * from './providers/torge/torge-connector';
 export { applyTransform } from './transforms';
 export { computeChecksum } from './checksum';
 export { CsvConnector } from './csv-connector';

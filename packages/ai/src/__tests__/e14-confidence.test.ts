@@ -173,7 +173,6 @@ describe('E14 claim_mismatch', () => {
         {
           toolCalls: [
             {
-              id: 'call-1',
               name: 'generate_infographic',
               input: {
                 template: 'insight_card',

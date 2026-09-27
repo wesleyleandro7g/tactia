@@ -54,10 +54,15 @@ export type EmailSendResult = {
   driver: string;
 };
 
+/** Optional context handed to the sender at send time (e.g. tenant scoping). */
+export type EmailSendContext = {
+  tenantId?: string;
+};
+
 /** Pluggable e-mail transport. V0.1 ships a console/log driver only. */
 export interface EmailSender {
   readonly driver: string;
-  send(message: EmailMessage): Promise<EmailSendResult>;
+  send(message: EmailMessage, context?: EmailSendContext): Promise<EmailSendResult>;
 }
 
 /**
@@ -85,4 +90,4 @@ export type ProposeActionInput = {
   reason?: string | null;
 };
 
-export type ExecutionOrigin = 'user' | 'ai' | 'system' | 'mcp';
+export type ExecutionOrigin = 'user' | 'ai' | 'system' | 'mcp' | 'ai_direct' | 'schedule';

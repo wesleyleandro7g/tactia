@@ -79,6 +79,9 @@ enum ActivityType {
 
 enum DataSourceStatus {
   active
+  draft
+  paused
+  needs_attention
   inactive
   error
 }
@@ -87,8 +90,19 @@ enum SyncJobStatus {
   pending
   running
   completed
+  partial
+  needs_attention
   failed
   cancelled
+}
+
+enum IntegrationModuleRunStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+  needs_attention
 }
 
 enum SyncJobTrigger {
@@ -147,6 +161,7 @@ enum ActionType {
   send_email
   send_whatsapp
   generate_report
+  browser_action
 }
 
 enum ActionExecutionStatus {
@@ -163,6 +178,38 @@ enum ApprovalStatus {
   pending
   approved
   rejected
+}
+
+enum ScheduleTarget {
+  ai_agent
+  action
+  automation
+}
+
+enum ScheduleEffectMode {
+  propose
+  auto_execute
+}
+
+enum ScheduleFrequency {
+  daily
+  weekly
+  monthly
+  custom
+  manual
+}
+
+enum ScheduleRepeatMode {
+  infinite
+  count
+}
+
+enum ScheduleOccurrenceStatus {
+  pending
+  running
+  completed
+  failed
+  cancelled
 }
 
 enum EpisodeKind {
@@ -242,6 +289,11 @@ enum MediaAssetPurpose {
   knowledge
   interaction
   auto
+}
+
+enum AgentSkillKind {
+  global
+  secondary
 }
 
 // ---------------------------------------------------------------------------
@@ -610,6 +662,7 @@ model Tenant {
   status       TenantStatus @default(active)
   timezone     String       @default("America/Sao_Paulo")
   currency     String       @default("BRL")
+  browserAgentSkillMarkdown String @default("") @map("browser_agent_skills") @db.Text
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
   memberships  Membership[]
@@ -654,7 +707,22 @@ model Tenant {
   infographicAssets  InfographicAsset[]
   apiKeys            TenantApiKey[]
   whatsappNumbers    WhatsappAuthorizedNumber[]
+  whatsappAgentConfig WhatsappAgentConfig?
+  whatsappAgentJobs  WhatsappAgentJob[]
   customFieldDefinitions CustomFieldDefinition[]
+  integrationModuleRuns IntegrationModuleRun[]
+  integrationArtifacts IntegrationArtifact[]
+  browserExecutorInstances BrowserExecutorInstance[]
+  browserWorkflows      BrowserWorkflow[]
+  browserWorkflowBindings BrowserWorkflowBinding[]
+  browserAutomationProfiles BrowserAutomationProfile[]
+  browserAutomationTasks BrowserAutomationTask[]
+  browserAutomationSessions BrowserAutomationSession[]
+  browserAutomationArtifacts BrowserAutomationArtifact[]
+  browserAutomationActionLogs BrowserAutomationActionLog[]
+  agentSkills AgentSkill[]
+  schedules            Schedule[]
+  scheduleOccurrences  ScheduleOccurrence[]
 
   @@unique([slug])
   @@index([status])
@@ -771,6 +839,8 @@ model WhatsappAuthorizedNumber {
   userId               String    @map("user_id") @db.Uuid
   phone                String
   label                String?
+  contactName          String?   @map("contact_name")
+  contactRole          String?   @map("contact_role")
   conversationId       String?   @map("conversation_id") @db.Uuid
   lastInboundMessageId String?   @map("last_inbound_message_id")
   disabledAt           DateTime? @map("disabled_at")
@@ -779,11 +849,59 @@ model WhatsappAuthorizedNumber {
   tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation         Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  agentJobs            WhatsappAgentJob[]
 
   @@unique([phone])
   @@index([tenantId, disabledAt])
   @@index([userId])
   @@map("whatsapp_authorized_numbers")
+}
+
+// Per-company communication settings for the WhatsApp agent (tone/context).
+model WhatsappAgentConfig {
+  id             String   @id @db.Uuid
+  tenantId       String   @unique @map("tenant_id") @db.Uuid
+  tone           String?
+  instructions   String?
+  companyContext String?  @map("company_context")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_agent_configs")
+}
+
+enum WhatsappAgentJobStatus {
+  queued
+  running
+  done
+  cancelled
+  failed
+}
+
+// Dedicated async job queue for WhatsApp agent operations (spec: status replies + immediate cancel).
+model WhatsappAgentJob {
+  id                String                 @id @db.Uuid
+  tenantId          String                 @map("tenant_id") @db.Uuid
+  numberId          String                 @map("number_id") @db.Uuid
+  conversationId    String?                @map("conversation_id") @db.Uuid
+  userId            String                 @map("user_id") @db.Uuid
+  status            WhatsappAgentJobStatus  @default(queued)
+  requestText       String                 @map("request_text")
+  plan              String?
+  messageId         String?                @map("message_id")
+  cancelRequestedAt DateTime?              @map("cancel_requested_at")
+  error             String?
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  startedAt         DateTime?              @map("started_at")
+  finishedAt        DateTime?              @map("finished_at")
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number            WhatsappAuthorizedNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([numberId, status])
+  @@map("whatsapp_agent_jobs")
 }
 
 model AuditLog {
@@ -1097,6 +1215,8 @@ model Credential {
   updatedAt     DateTime     @updatedAt @map("updated_at")
   tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   dataSources   DataSource[]
+  browserExecutorInstances BrowserExecutorInstance[]
+  browserAutomationProfiles BrowserAutomationProfile[]
 
   @@index([tenantId])
   @@map("credentials")
@@ -1120,6 +1240,9 @@ model DataSource {
   mappings     Mapping[]
   imports      Import[]
   qualityReports DataQualityReport[]
+  moduleRuns IntegrationModuleRun[]
+  integrationArtifacts IntegrationArtifact[]
+  dedicatedBrowserExecutorInstance BrowserExecutorInstance? @relation("DedicatedBrowserConnection")
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1141,6 +1264,8 @@ model SyncJob {
   recordsUpdated  Int            @default(0) @map("records_updated")
   recordsFailed   Int            @default(0) @map("records_failed")
   error           String?
+  idempotencyKey  String?         @unique @map("idempotency_key")
+  configSnapshot  Json?           @map("config_snapshot")
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
   tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1148,6 +1273,7 @@ model SyncJob {
   rawRecords      RawRecord[]
   imports         Import[]
   qualityReports  DataQualityReport[]
+  moduleRuns      IntegrationModuleRun[]
 
   @@index([tenantId, status])
   @@index([tenantId, dataSourceId])
@@ -1238,6 +1364,326 @@ model DataQualityReport {
   @@index([tenantId, dataSourceId])
   @@index([tenantId, createdAt])
   @@map("data_quality_reports")
+}
+
+model IntegrationModuleRun {
+  id                  String                     @id @db.Uuid
+  tenantId            String                     @map("tenant_id") @db.Uuid
+  dataSourceId        String                     @map("data_source_id") @db.Uuid
+  syncJobId           String                     @map("sync_job_id") @db.Uuid
+  moduleKey           String                     @map("module_key")
+  status              IntegrationModuleRunStatus @default(queued)
+  attempt             Int                        @default(1)
+  nextAttemptAt       DateTime?                   @map("next_attempt_at")
+  startedAt           DateTime?                   @map("started_at")
+  finishedAt          DateTime?                   @map("finished_at")
+  externalExecutionId String?                     @map("external_execution_id")
+  workflowKey         String                      @map("workflow_key")
+  workflowVersion     String                      @map("workflow_version")
+  parserVersion       String                      @map("parser_version")
+  recordsRead         Int                        @default(0) @map("records_read")
+  recordsFailed       Int                        @default(0) @map("records_failed")
+  checkpoint          Json?
+  evidence            Json?
+  errorCode           String?                     @map("error_code")
+  safeMessage         String?                     @map("safe_message")
+  retryable           Boolean                    @default(false)
+  leaseOwner          String?                     @map("lease_owner")
+  leaseExpiresAt      DateTime?                   @map("lease_expires_at")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+  tenant              Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource          DataSource                 @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  syncJob             SyncJob                    @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
+  artifacts           IntegrationArtifact[]
+
+  @@unique([syncJobId, moduleKey])
+  @@index([tenantId, dataSourceId, status])
+  @@index([leaseExpiresAt])
+  @@map("integration_module_runs")
+}
+
+model IntegrationArtifact {
+  id             String               @id @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  dataSourceId   String               @map("data_source_id") @db.Uuid
+  moduleRunId    String               @map("module_run_id") @db.Uuid
+  origin         String
+  moduleKey      String               @map("module_key")
+  periodFrom     DateTime?            @map("period_from")
+  periodTo       DateTime?            @map("period_to")
+  checksum       String
+  mimeType       String               @map("mime_type")
+  storageKey     String               @map("storage_key")
+  byteSize       Int                  @map("byte_size")
+  retentionUntil DateTime?            @map("retention_until")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dataSource     DataSource           @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  moduleRun      IntegrationModuleRun @relation(fields: [moduleRunId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, checksum, moduleKey])
+  @@index([tenantId, dataSourceId, createdAt])
+  @@index([retentionUntil])
+  @@map("integration_artifacts")
+}
+
+model BrowserWorkflowBinding {
+  id                 String   @id @db.Uuid
+  tenantId           String?  @map("tenant_id") @db.Uuid
+  provider           String
+  engine             String
+  workflowKey        String   @map("workflow_key")
+  workflowVersion    String   @map("workflow_version")
+  environment        String
+  instanceKey        String   @map("instance_key")
+  externalTaskId     String   @map("external_task_id")
+  definitionChecksum String?  @map("definition_checksum")
+  reconciliationMarker String? @map("reconciliation_marker")
+  browserExecutorInstanceId String? @map("browser_executor_instance_id") @db.Uuid
+  workflowRevisionId String?  @map("workflow_revision_id") @db.Uuid
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  tenant             Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  instance           BrowserExecutorInstance? @relation(fields: [browserExecutorInstanceId], references: [id], onDelete: SetNull)
+  workflowRevision   BrowserWorkflowRevision? @relation(fields: [workflowRevisionId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, engine, workflowKey, workflowVersion, environment, instanceKey])
+  @@index([provider, environment, active])
+  @@index([tenantId])
+  @@index([browserExecutorInstanceId])
+  @@index([workflowRevisionId])
+  @@map("browser_workflow_bindings")
+}
+
+// A backend-resolved, tenant-scoped browser executor instance. Replaces the
+// FIGRANIUM_INSTANCES_JSON env document (which remains a read-only fallback).
+// The API key lives in a Credential; only its reference is stored here.
+model BrowserExecutorInstance {
+  id                   String   @id @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  provider             String
+  engine               String
+  instanceKey          String   @map("instance_key")
+  baseUrl              String   @map("base_url")
+  dedicatedConnectionId String? @unique @map("dedicated_connection_id") @db.Uuid
+  apiKeyCredentialId   String   @map("api_key_credential_id") @db.Uuid
+  environment          String
+  allowInsecureHttp    Boolean  @default(false) @map("allow_insecure_http")
+  active               Boolean  @default(true)
+  lastHealthAt         DateTime? @map("last_health_at")
+  lastHealthStatus     String?   @map("last_health_status")
+  lastHealthMessage    String?   @map("last_health_message")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  apiKeyCredential     Credential @relation(fields: [apiKeyCredentialId], references: [id], onDelete: Restrict)
+  dedicatedConnection  DataSource? @relation("DedicatedBrowserConnection", fields: [dedicatedConnectionId], references: [id], onDelete: SetNull)
+  bindings             BrowserWorkflowBinding[]
+
+  @@unique([tenantId, provider, engine, instanceKey, environment])
+  @@index([tenantId, provider, environment, active])
+  @@map("browser_executor_instances")
+}
+
+// Logical workflow (stable identity per tenant/provider/environment). The task
+// definition itself lives in immutable revisions; the workflow points at the
+// currently active revision.
+model BrowserWorkflow {
+  id               String   @id @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  provider         String
+  engine           String
+  workflowKey      String   @map("workflow_key")
+  environment      String
+  activeRevisionId String?  @unique @map("active_revision_id") @db.Uuid
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  activeRevision   BrowserWorkflowRevision? @relation("BrowserWorkflowActiveRevision", fields: [activeRevisionId], references: [id], onDelete: SetNull)
+  revisions        BrowserWorkflowRevision[] @relation("BrowserWorkflowRevisions")
+
+  @@unique([tenantId, provider, engine, workflowKey, environment])
+  @@index([tenantId, provider, environment, active])
+  @@map("browser_workflows")
+}
+
+// Immutable internal revision of a workflow definition. Rows are append-only:
+// importing JSON substitutes the active revision by creating a new one, never
+// mutating an existing definition.
+model BrowserWorkflowRevision {
+  id                 String   @id @db.Uuid
+  workflowId         String   @map("workflow_id") @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  revision           Int
+  workflowVersion    String   @map("workflow_version")
+  definition         Json
+  definitionChecksum String   @map("definition_checksum")
+  publishable        Boolean  @default(false)
+  createdBy          String?  @map("created_by")
+  createdAt          DateTime @default(now()) @map("created_at")
+  workflow           BrowserWorkflow @relation("BrowserWorkflowRevisions", fields: [workflowId], references: [id], onDelete: Cascade)
+  activeFor          BrowserWorkflow? @relation("BrowserWorkflowActiveRevision")
+  bindings           BrowserWorkflowBinding[]
+
+  @@unique([workflowId, revision])
+  @@index([workflowId])
+  @@index([tenantId])
+  @@map("browser_workflow_revisions")
+}
+
+model AgentSkill {
+  id          String         @id @db.Uuid
+  tenantId    String         @map("tenant_id") @db.Uuid
+  kind        AgentSkillKind
+  slug        String
+  title       String
+  description String
+  markdown    String         @db.Text
+  enabled     Boolean        @default(true)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bindings    AgentSkillBinding[]
+
+  @@unique([tenantId, slug])
+  @@unique([id, tenantId])
+  @@index([tenantId, kind, enabled])
+  @@map("agent_skills")
+}
+
+model AgentSkillBinding {
+  id           String   @id @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  skillId      String   @map("skill_id") @db.Uuid
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  skill        AgentSkill @relation(fields: [skillId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([skillId, resourceType, resourceId])
+  @@index([tenantId, resourceType, resourceId])
+  @@map("agent_skill_bindings")
+}
+
+// Interactive browser capability. Kept separate from the published Figranium
+// workflows above so a task cannot accidentally reuse their shared state.
+model BrowserAutomationProfile {
+  id              String   @id @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  name            String
+  startUrl        String   @map("start_url")
+  allowedDomains  Json     @map("allowed_domains")
+  skillMarkdown   String   @default("") @map("skills") @db.Text
+  credentialId    String?  @map("credential_id") @db.Uuid
+  encryptedState  String?  @map("encrypted_state")
+  lastValidatedAt DateTime? @map("last_validated_at")
+  lastUsedAt      DateTime? @map("last_used_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  credential      Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  tasks           BrowserAutomationTask[]
+  sessions        BrowserAutomationSession[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, credentialId])
+  @@map("browser_automation_profiles")
+}
+
+model BrowserAutomationTask {
+  id            String   @id @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  profileId     String   @map("profile_id") @db.Uuid
+  conversationId String? @map("conversation_id") @db.Uuid
+  requestedBy   String?  @map("requested_by") @db.Uuid
+  objective     String
+  status        String   @default("QUEUED")
+  stepCount     Int      @default(0) @map("step_count")
+  result        Json?
+  safeError     String?  @map("safe_error")
+  pendingAction Json?    @map("pending_action")
+  approvalExecutionId String? @map("approval_execution_id") @db.Uuid
+  startedAt     DateTime? @map("started_at")
+  finishedAt    DateTime? @map("finished_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile       BrowserAutomationProfile @relation(fields: [profileId], references: [id])
+  sessions      BrowserAutomationSession[]
+  artifacts     BrowserAutomationArtifact[]
+  actionLogs    BrowserAutomationActionLog[]
+  resultMessage Message? @relation("BrowserTaskResultMessage")
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, conversationId])
+  @@map("browser_automation_tasks")
+}
+
+model BrowserAutomationSession {
+  id             String   @id @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  taskId         String   @map("task_id") @db.Uuid
+  profileId      String   @map("profile_id") @db.Uuid
+  runtimeId      String   @map("runtime_id")
+  status         String   @default("STARTING")
+  currentUrl     String?  @map("current_url")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+  expiresAt      DateTime @map("expires_at")
+  closedAt       DateTime? @map("closed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task           BrowserAutomationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  profile        BrowserAutomationProfile @relation(fields: [profileId], references: [id])
+  artifacts      BrowserAutomationArtifact[]
+  actionLogs     BrowserAutomationActionLog[]
+
+  @@index([tenantId, taskId])
+  @@index([status, expiresAt])
+  @@map("browser_automation_sessions")
+}
+
+model BrowserAutomationArtifact {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  type       String
+  filename   String
+  mimeType   String   @map("mime_type")
+  storageKey String   @map("storage_key")
+  byteSize   Int      @map("byte_size")
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task       BrowserAutomationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  session    BrowserAutomationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, taskId])
+  @@map("browser_automation_artifacts")
+}
+
+model BrowserAutomationActionLog {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  actionType String   @map("action_type")
+  actionInput Json?   @map("action_input")
+  result     Json?
+  urlBefore  String?  @map("url_before")
+  urlAfter   String?  @map("url_after")
+  durationMs Int      @map("duration_ms")
+  status     String
+  errorCode  String?  @map("error_code")
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  task       BrowserAutomationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  session    BrowserAutomationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, taskId, createdAt])
+  @@map("browser_automation_action_logs")
 }
 
 // ---------------------------------------------------------------------------
@@ -1570,8 +2016,10 @@ model Message {
   role           MessageRole
   content        String
   metadata       Json?
+  browserTaskId  String?      @unique @map("browser_task_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at")
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  browserTask    BrowserAutomationTask? @relation("BrowserTaskResultMessage", fields: [browserTaskId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt])
   @@index([tenantId, createdAt])
@@ -1646,6 +2094,82 @@ model Approval {
   @@index([tenantId, createdAt])
   @@index([actionExecutionId])
   @@map("approvals")
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling — agendamento de ações por empresa
+// ---------------------------------------------------------------------------
+
+/// A recurring (or manual) schedule that triggers the AI agent or a catalog
+/// action for a tenant. Recurrence is hybrid: a structured `frequency` +
+/// `recurrenceConfig` covers the common cases and an optional `cronExpression`
+/// covers the custom trigger. `manual` never fires automatically.
+model Schedule {
+  id               String             @id @db.Uuid
+  tenantId         String             @map("tenant_id") @db.Uuid
+  name             String
+  description      String?
+  enabled          Boolean            @default(true)
+  target           ScheduleTarget
+  effectMode       ScheduleEffectMode @default(propose) @map("effect_mode")
+  frequency        ScheduleFrequency
+  /// Structured recurrence: { weekdays?: number[], dayOfMonth?: number,
+  /// nthBusinessDay?: number, localTime?: "HH:mm" }.
+  recurrenceConfig Json               @default("{}") @map("recurrence_config")
+  /// Optional cron string used when frequency = custom.
+  cronExpression   String?            @map("cron_expression")
+  /// Overrides tenant timezone when set.
+  timezone         String?
+  repeatMode       ScheduleRepeatMode @default(infinite) @map("repeat_mode")
+  /// Total successful occurrences allowed when repeatMode = count.
+  maxOccurrences   Int?               @map("max_occurrences")
+  /// Successful occurrences so far (failures do not count — spec resiliência).
+  successCount     Int                @default(0) @map("success_count")
+  /// Payload for target = ai_agent: { systemPrompt?, instruction, tools?: string[], skillIds?: string[] }.
+  aiConfig         Json?              @map("ai_config")
+  /// Payload for target = action.
+  actionType       ActionType?        @map("action_type")
+  actionInput      Json?              @map("action_input")
+  lastRunAt        DateTime?          @map("last_run_at")
+  createdBy        String?            @map("created_by") @db.Uuid
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  occurrences      ScheduleOccurrence[]
+
+  @@index([tenantId, enabled])
+  @@index([tenantId, createdAt])
+  @@map("schedules")
+}
+
+/// One firing of a schedule for a given period. `periodKey` makes each period
+/// idempotent: the tick may retry, but only one occurrence exists per period,
+/// so work already done is never repeated (spec resiliência §5.1). A reset
+/// (§5.2) is the only way to re-run a completed period.
+model ScheduleOccurrence {
+  id                String                   @id @db.Uuid
+  tenantId          String                   @map("tenant_id") @db.Uuid
+  scheduleId        String                   @map("schedule_id") @db.Uuid
+  /// Stable key per period: e.g. "2026-01-15", "2026-W03", "manual:<ts>".
+  periodKey         String                   @map("period_key")
+  status            ScheduleOccurrenceStatus @default(pending)
+  /// user | ai | system — who originated the occurrence.
+  origin            String                   @default("system")
+  actionExecutionId String?                  @map("action_execution_id") @db.Uuid
+  output            Json?
+  error             String?
+  startedAt         DateTime?                @map("started_at")
+  finishedAt        DateTime?                @map("finished_at")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schedule          Schedule                 @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, scheduleId, periodKey])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([scheduleId])
+  @@map("schedule_occurrences")
 }
 
 // ---------------------------------------------------------------------------

@@ -274,4 +274,18 @@ describe('propose_action tool', () => {
     expect(withActions).toContain('pendente de aprovação');
     expect(withActions).not.toContain('Não prometa executar ações');
   });
+
+  it('requires autonomous browser discovery for requests to access registered systems', async () => {
+    const context = await contextSource().build(toolContext());
+    const prompt = buildSystemPrompt(context, [
+      'get_revenue',
+      'list_browser_profiles',
+      'browser_delegate',
+    ]);
+
+    expect(prompt).toContain('SEMPRE chame list_browser_profiles primeiro');
+    expect(prompt).toContain('mesmo que o usuário não cite o nome das ferramentas');
+    expect(prompt).toContain('chame browser_delegate');
+    expect(prompt).toContain('Nunca diga que não pode navegar');
+  });
 });

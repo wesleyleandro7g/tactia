@@ -84,6 +84,13 @@ export class DataSourceRepository {
     });
   }
 
+  async listActiveBrowserForSchedule() {
+    return this.db.dataSource.findMany({
+      where: { type: 'torge', status: 'active' },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   async update({
     tenantId,
     id,

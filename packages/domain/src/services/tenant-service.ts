@@ -83,6 +83,13 @@ export class TenantService {
   }
 
   async get(ctx: RequestContext, id: string) {
+    // Backoffice operator acting on this tenant (admin test chat): no membership,
+    // but only the tenant already bound to the operator context is readable.
+    if (!ctx.userId && ctx.operatorId && ctx.role) {
+      const tenant = ctx.tenantId === id ? await this.tenants.findById({ tenantId: id }) : null;
+      if (!tenant) throw new AppError(ErrorCode.NOT_FOUND, 'Tenant not found');
+      return { ...tenant, role: ctx.role };
+    }
     assertAuthenticated(ctx);
     const membership = await this.memberships.findByUserAndTenant({
       tenantId: id,

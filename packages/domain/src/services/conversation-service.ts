@@ -1,6 +1,6 @@
 import type { ConversationRepository, MessageRepository, MessageRole } from '@tactia/database';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
-import { assertTenantContext, hasMinRole } from '../authz';
+import { assertTenantUser, hasMinRole } from '../authz';
 import {
   appendMessageSchema,
   createConversationSchema,
@@ -33,7 +33,7 @@ export class ConversationService {
   ) {}
 
   async create(ctx: RequestContext, raw: unknown, firstMessage?: string) {
-    assertTenantContext(ctx);
+    assertTenantUser(ctx);
     const input = createConversationSchema.parse(raw ?? {});
 
     const conversation = await this.conversations.create({
@@ -53,7 +53,7 @@ export class ConversationService {
   }
 
   async list(ctx: RequestContext, query: Record<string, string | undefined>) {
-    assertTenantContext(ctx);
+    assertTenantUser(ctx);
     const parsed = listConversationsQuerySchema.parse(query);
     // Conversations are personal: each user only sees their own history.
     return this.conversations.list({
@@ -64,7 +64,7 @@ export class ConversationService {
   }
 
   async get(ctx: RequestContext, id: string) {
-    assertTenantContext(ctx);
+    assertTenantUser(ctx);
     const conversation = await this.conversations.findByIdWithMessages({
       tenantId: ctx.tenantId,
       id,
@@ -75,20 +75,20 @@ export class ConversationService {
   }
 
   async listMessages(ctx: RequestContext, conversationId: string) {
-    assertTenantContext(ctx);
+    assertTenantUser(ctx);
     await this.requireConversation(ctx, conversationId);
     return this.messages.listByConversation({ tenantId: ctx.tenantId, conversationId });
   }
 
   /** Last `limit` messages, chronological — used to build the LLM prompt. */
   async recentMessages(ctx: RequestContext, conversationId: string, limit = 20) {
-    assertTenantContext(ctx);
+    assertTenantUser(ctx);
     await this.requireConversation(ctx, conversationId);
     return this.messages.listRecent({ tenantId: ctx.tenantId, conversationId, limit });
   }
 
   async appendMessage(ctx: RequestContext, conversationId: string, raw: unknown) {
-    assertTenantContext(ctx);
+    assertTenantUser(ctx);
     await this.requireConversation(ctx, conversationId);
     const input = appendMessageSchema.parse(raw);
 
@@ -109,7 +109,7 @@ export class ConversationService {
    * No-op when the user already chose a title.
    */
   async renameFromFirstMessage(ctx: RequestContext, conversationId: string, content: string) {
-    assertTenantContext(ctx);
+    assertTenantUser(ctx);
     const conversation = await this.requireConversation(ctx, conversationId);
     if (conversation.title !== DEFAULT_TITLE) return conversation;
     return this.conversations.updateTitle({
@@ -120,7 +120,7 @@ export class ConversationService {
   }
 
   /** Returns the conversation, enforcing tenant + read permission. */
-  async requireConversation(ctx: RequestContext, conversationId: string) {    assertTenantContext(ctx);
+  async requireConversation(ctx: RequestContext, conversationId: string) {    assertTenantUser(ctx);
     const conversation = await this.conversations.findById({
       tenantId: ctx.tenantId,
       id: conversationId,

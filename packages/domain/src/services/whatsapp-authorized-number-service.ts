@@ -38,6 +38,8 @@ export class WhatsappAuthorizedNumberService {
         data: {
           userId: input.userId,
           label: input.label ?? existing.label,
+          contactName: input.contactName ?? existing.contactName,
+          contactRole: input.contactRole ?? existing.contactRole,
           disabledAt: null,
           conversationId: null,
           lastInboundMessageId: null,
@@ -59,6 +61,8 @@ export class WhatsappAuthorizedNumberService {
         userId: input.userId,
         phone,
         label: input.label,
+        contactName: input.contactName,
+        contactRole: input.contactRole,
       });
       await this.auditLogs.record(ctx, {
         action: AuditAction.WHATSAPP_NUMBER_CREATED,
@@ -100,6 +104,8 @@ export class WhatsappAuthorizedNumberService {
           ...(input.userId ? { userId: input.userId } : {}),
           ...(phone ? { phone } : {}),
           ...(input.label !== undefined ? { label: input.label } : {}),
+          ...(input.contactName !== undefined ? { contactName: input.contactName } : {}),
+          ...(input.contactRole !== undefined ? { contactRole: input.contactRole } : {}),
         },
       });
       if (!row) throw new AppError(ErrorCode.NOT_FOUND, 'WhatsApp number not found');

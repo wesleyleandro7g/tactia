@@ -151,6 +151,29 @@ describe('Orchestrator', () => {
     expect(second.tools?.map((tool) => tool.name)).toContain('get_revenue');
   });
 
+  it('forces a configured tool only on the first model round', async () => {
+    const llm = new MockLLMAdapter({
+      script: [
+        { toolCalls: [{ name: 'get_revenue' }] },
+        { text: 'Consulta concluída.' },
+      ],
+    });
+    const orchestrator = new Orchestrator(
+      { llm, tools: registry(), contextBuilder: contextSource() },
+      {
+        initialToolChoice: () => ({ type: 'tool', toolName: 'get_revenue' }),
+      },
+    );
+
+    await orchestrator.run({ ctx: toolContext(), question: 'Consulte os dados.' });
+
+    expect(llm.requests[0]?.toolChoice).toEqual({
+      type: 'tool',
+      toolName: 'get_revenue',
+    });
+    expect(llm.requests[1]?.toolChoice).toBeUndefined();
+  });
+
   it('E14: unsourced_numbers when digit and no sources', async () => {
     const llm = new MockLLMAdapter({
       script: [{ text: 'A receita foi de R$ 999.999,00.' }],

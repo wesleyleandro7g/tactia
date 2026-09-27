@@ -1,6 +1,6 @@
 import { WhatsappSettings } from '@/components/app/whatsapp-settings';
 import { requireTenant } from '@/lib/server-context';
-import { userService, whatsappAuthorizedNumberService } from '@/lib/services';
+import { userService, whatsappAgentConfigService, whatsappAuthorizedNumberService } from '@/lib/services';
 import { hasMinRole } from '@tactia/domain';
 import { redirect } from 'next/navigation';
 
@@ -10,9 +10,10 @@ export default async function WhatsappSettingsPage() {
   const ctx = await requireTenant('/settings/whatsapp');
   if (!hasMinRole(ctx.role, 'admin')) redirect('/dashboard');
 
-  const [numbers, users] = await Promise.all([
+  const [numbers, users, config] = await Promise.all([
     whatsappAuthorizedNumberService.list(ctx),
     userService.list(ctx, { page: '1', pageSize: '100' }),
+    whatsappAgentConfigService.get(ctx),
   ]);
 
   return (
@@ -21,6 +22,8 @@ export default async function WhatsappSettingsPage() {
         id: row.id,
         phone: row.phone,
         label: row.label,
+        contactName: row.contactName,
+        contactRole: row.contactRole,
         userId: row.userId,
         userName: row.user.name,
         userEmail: row.user.email,
@@ -32,6 +35,11 @@ export default async function WhatsappSettingsPage() {
         name: user.name,
         email: user.email,
       }))}
+      config={{
+        tone: config?.tone ?? '',
+        instructions: config?.instructions ?? '',
+        companyContext: config?.companyContext ?? '',
+      }}
     />
   );
 }

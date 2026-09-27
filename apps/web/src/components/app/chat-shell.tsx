@@ -1,11 +1,13 @@
 'use client';
 
+import { useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Menu } from 'lucide-react';
+import type { ChatMessageView } from '@tactia/chat/protocol';
+import { ChatPanel, persistentChatEndpoints } from '@tactia/chat/ui';
 import { Button } from '@/components/ui/button';
-import { ChatPanel, type ChatMessageView } from '@/components/app/chat-panel';
 import { ConversationList, type ConversationSummary } from '@/components/app/conversation-list';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { useState } from 'react';
 
 /**
  * Shell do chat: sidebar de conversas + área principal em altura fixa.
@@ -16,14 +18,26 @@ export function ChatShell({
   initialMessages,
   llmConfigured,
   canApprove,
+  canControl,
 }: {
   conversationId: string | null;
   conversations: ConversationSummary[];
   initialMessages: ChatMessageView[];
   llmConfigured: boolean;
   canApprove: boolean;
+  canControl: boolean;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const endpoints = useMemo(() => persistentChatEndpoints(), []);
+  // `?q=` (ex.: "Perguntar no chat" de um insight): new conversations send it
+  // automatically; existing ones keep it as an editable draft.
+  const question = searchParams.get('q')?.trim();
+  const prefill = useMemo(
+    () => (question ? { question, autoSend: conversationId === null } : null),
+    [question, conversationId],
+  );
 
   const activeConversation = conversations.find((c) => c.id === conversationId);
   const headerTitle = activeConversation?.title ?? 'Nova conversa';
@@ -71,10 +85,19 @@ export function ChatShell({
         </header>
 
         <ChatPanel
+          mode="persistent"
+          endpoints={endpoints}
           conversationId={conversationId}
           initialMessages={initialMessages}
           llmConfigured={llmConfigured}
           canApprove={canApprove}
+          canControl={canControl}
+          prefill={prefill}
+          onTurnComplete={({ conversationId: id, createdConversation }) => {
+            if (createdConversation && id) router.replace(`/chat/${id}`);
+            router.refresh();
+          }}
+          onApprovalResolved={() => router.refresh()}
         />
       </div>
     </div>

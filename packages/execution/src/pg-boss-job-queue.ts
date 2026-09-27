@@ -17,6 +17,7 @@ import type { JobQueue } from './types';
  */
 
 export const ACTION_EXECUTE_JOB = 'action.execute';
+export const DEFAULT_JOB_RETRY_LIMIT = 3;
 
 export type ActionExecuteJob = { tenantId: string; executionId: string };
 
@@ -94,7 +95,7 @@ export class PgBossJobQueue implements JobQueue {
     const existing = await this.boss.getQueue(name);
     if (!existing) {
       await this.boss.createQueue(name, {
-        retryLimit: this.options.retryLimit ?? 3,
+        retryLimit: this.options.retryLimit ?? DEFAULT_JOB_RETRY_LIMIT,
         retryDelay: this.options.retryDelaySeconds ?? 60,
         retryBackoff: true,
         expireInSeconds: this.options.expireInSeconds ?? 15 * 60,

@@ -144,7 +144,38 @@ preservados; só o resultado canônico é reescrito.
 | `RATE_LIMITED` (429) | Mais de 20 mensagens/min no tenant | Esperado; ajustar em `apps/web/src/lib/rate-limit.ts` se necessário |
 | Chat responde, mas sem números | Tenant sem dados no período | Importar dados / conferir o período |
 
+## 7. Agendamentos (agendamento de ações)
+
+Ver também [docs/agendamento-acoes.md](agendamento-acoes.md).
+
+| Sintoma | Causa | Ação |
+|---|---|---|
+| Agendamento não dispara | `JOBS_ENABLED != true` ou tick parado | Conferir `grep '"operation":"scheduler_tick"'` (deve aparecer a cada 5 min com `schedules_enqueued`) |
+| Não dispara no horário esperado | `localTime`/timezone; `manual`/`custom` não disparam automático | Conferir `recurrenceConfig` e o timezone do agendamento/empresa |
+| Disparou uma vez e parou | `repeatMode=count` atingiu `maxOccurrences` (desativa) | Esperado; reativar ou aumentar `maxOccurrences` |
+| Ocorrência `failed` | Erro no alvo (ex.: SMTP, input inválido, `automation`) | `grep '"operation":"schedule_run"' \| grep 500` mostra o erro; corrigir e disparar de novo |
+| Preciso reexecutar um período já concluído | Idempotência por ocorrência (§5.1) | Fazer **reset** da ocorrência (UI ou `POST /schedules/{id}/reset`) — única via sancionada (§5.2) |
+| `ai_agent` falha com "Runner do agente não configurado" | Ambiente sem LLM/orchestrator | Configurar `LLM_API_KEY` (ou `LLM_PROVIDER=mock` em teste) |
+
+Consultas úteis (logs JSON): `schedule_run` (execução da ocorrência),
+`schedule_agent_run` (turno do agente), `scheduler_tick` (enfileiramento).
+
 O chat nunca executa nada: uma proposta de ação sempre cai em `/approvals`.
+
+### 6.1 Chat de teste no admin (`/tenants/{id}/chat`)
+
+O operador conversa com o assistente usando os dados do tenant — mesma stack do web (`packages/chat`: tools, contexto, orquestrador, UI).
+
+- **Efêmero:** nada é salvo em `conversations`/`messages`; o histórico vive na página (últimos 12 turnos reenviados a cada pergunta) e some ao recarregar.
+- **Principal = operador:** `userId: null`, `operatorId` preenchido, papel `owner`. Efeitos das tools são reais: aprovar uma proposta executa a ação no tenant; fatos, infográficos e tarefas do Browser Agent são gravados com `requested_by`/`approved_by`/`created_by` nulos e a autoria fica no audit log (`actorType=operator`).
+- **Requisitos no admin:** `LLM_*`/`EMBEDDING_MODEL` (ou `LLM_PROVIDER=mock`), storage igual ao web e `JOBS_ENABLED=true` para o Browser Agent. O admin só publica `browser.task`; quem executa é o worker do web — sem ele a tarefa fica em "Aguardando início".
+- **Logs:** `grep '"operation":"chat"' | grep operator_id` (linhas com `conversation_id: null`).
+
+| Sintoma | Causa | Ação |
+|---|---|---|
+| Banner "Chat indisponível" no admin | Admin sem `LLM_API_KEY` | Configurar em `apps/admin/.env.local` / compose do admin |
+| "Browser task queue is disabled" | Admin com `JOBS_ENABLED` ≠ `true` | Habilitar jobs no admin |
+| Cartão do Browser Agent parado em "Aguardando início" | Worker do web parado | Conferir o web com `JOBS_ENABLED=true` |
 
 ## 7. Segredos e chaves
 

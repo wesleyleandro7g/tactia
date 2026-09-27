@@ -74,10 +74,12 @@ import {
 import {
   ContextBuilder,
   createDefaultTools,
+  createSendEmailTool,
   MockLLMAdapter,
   Orchestrator,
   ToolRegistry,
   type ActionProposalPort,
+  type DirectEmailPort,
   type ToolContext,
 } from '@tactia/ai';
 import { createId, type RequestContext } from '@tactia/shared';
@@ -250,8 +252,11 @@ const approvalService = new ApprovalService(approvalRepository, executionEngine)
 const actionProposer: ActionProposalPort = {
   propose: (ctx, input) => executionEngine.proposeFromAi(ctx, input),
 };
-const toolRegistry = new ToolRegistry(
-  createDefaultTools(
+const directEmailSender: DirectEmailPort = {
+  sendEmailDirect: (ctx, input) => executionEngine.sendEmailFromAi(ctx, input),
+};
+const toolRegistry = new ToolRegistry([
+  ...createDefaultTools(
     {
       metrics: metricService,
       analytics: analyticsService,
@@ -265,7 +270,8 @@ const toolRegistry = new ToolRegistry(
     },
     { actionProposer },
   ),
-);
+  createSendEmailTool(directEmailSender),
+]);
 const contextBuilder = new ContextBuilder({
   tenants: tenantService,
   metrics: metricService,
@@ -683,6 +689,57 @@ describe('Fluxo do piloto (spec §2)', () => {
     expect(actions).toContain('ACTION_PROPOSED');
     expect(actions).toContain('ACTION_APPROVED');
     expect(actions).toContain('ACTION_EXECUTED');
+  });
+
+  it('12b. o agente envia e-mail diretamente quando o usuário pede', async () => {
+    const llm = new MockLLMAdapter({
+      script: [
+        {
+          text: '',
+          toolCalls: [
+            {
+              name: 'send_email',
+              input: {
+                to: 'contato@padaria-aurora.local',
+                subject: 'Retomada de contato',
+                body: 'Olá! Sentimos sua falta e gostaríamos de retomar o contato.',
+              },
+            },
+          ],
+        },
+        { text: 'Pronto: enviei o e-mail para contato@padaria-aurora.local.' },
+      ],
+    });
+    const orchestrator = new Orchestrator({ llm, tools: toolRegistry, contextBuilder });
+    const answer = await orchestrator.run({
+      ctx: { requestId: createId(), tenantId, userId: ownerUserId, role: 'owner' },
+      question: 'Envie um e-mail para contato@padaria-aurora.local retomando o contato',
+    });
+
+    // The tool ran and reported the send back to the model.
+    const sendCall = answer.toolCalls.find((call) => call.name === 'send_email');
+    expect(sendCall).toBeDefined();
+    expect(sendCall?.error).toBeUndefined();
+
+    // The e-mail was actually delivered to the injected sender.
+    expect(
+      emailSender.sent.some((message) => message.to === 'contato@padaria-aurora.local'),
+    ).toBe(true);
+
+    // A direct execution was recorded with origin ai_direct and no approval.
+    const executions = await actionService.listExecutions(ownerCtx, { pageSize: '50' });
+    const direct = executions.items.find((item) => item.origin === 'ai_direct');
+    expect(direct).toBeDefined();
+    expect(direct?.status).toBe('completed');
+    expect(direct?.approvals ?? []).toHaveLength(0);
+
+    // No new pending approval was created by the direct send.
+    const queue = await approvalService.list(ownerCtx, { status: 'pending' });
+    expect(queue.total).toBe(0);
+
+    // Audit trail differentiates the direct send.
+    const audit = await auditLogService.list({ tenantId, skip: 0, take: 300 });
+    expect(audit.items.map((log) => log.action)).toContain('ACTION_EXECUTED_DIRECT');
   });
 
   it('13. o tenant vizinho não vê nada do piloto', async () => {

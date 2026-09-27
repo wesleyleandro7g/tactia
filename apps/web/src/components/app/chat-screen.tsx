@@ -1,12 +1,13 @@
+import { isLlmConfigured } from '@tactia/chat/server';
 import { hasMinRole } from '@tactia/domain';
 import { ChatShell } from '@/components/app/chat-shell';
-import type { ChatMessageView } from '@/components/app/chat-panel';
+import type { ChatMessageView } from '@tactia/chat/protocol';
 import { requireTenant } from '@/lib/server-context';
 import { conversationService } from '@/lib/services';
 
 /** Um chat só é utilizável se houver provider de LLM configurado (ou mock). */
 export function llmConfigured(): boolean {
-  return Boolean(process.env['LLM_API_KEY']) || process.env['LLM_PROVIDER'] === 'mock';
+  return isLlmConfigured();
 }
 
 type MessageRow = {
@@ -22,6 +23,8 @@ export function toMessageView(message: MessageRow): ChatMessageView {
     sources?: ChatMessageView['sources'];
     proposals?: ChatMessageView['proposals'];
     attachments?: ChatMessageView['attachments'];
+    browserTaskIds?: string[];
+    browserResultTaskId?: string;
     followUps?: string[];
     toolCalls?: Array<{ name: string }>;
   };
@@ -33,6 +36,8 @@ export function toMessageView(message: MessageRow): ChatMessageView {
     sources: metadata.sources ?? [],
     proposals: metadata.proposals ?? [],
     attachments: metadata.attachments ?? [],
+    browserTaskIds: metadata.browserTaskIds ?? [],
+    browserResultTaskId: metadata.browserResultTaskId,
     followUps: metadata.followUps ?? [],
     toolsUsed: (metadata.toolCalls ?? []).map((call) => call.name),
   };
@@ -59,6 +64,7 @@ export async function ChatScreen({ conversationId }: { conversationId: string | 
       initialMessages={(messages as MessageRow[]).map(toMessageView)}
       llmConfigured={llmConfigured()}
       canApprove={hasMinRole(ctx.role, 'admin')}
+      canControl={hasMinRole(ctx.role, 'member')}
     />
   );
 }

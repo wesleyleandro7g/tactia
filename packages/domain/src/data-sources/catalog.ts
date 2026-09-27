@@ -1,4 +1,6 @@
-export type CatalogFieldType = 'string' | 'number' | 'boolean' | 'url' | 'secret' | 'file';
+export type CatalogFieldType = 'string' | 'number' | 'boolean' | 'url' | 'secret' | 'file' | 'select' | 'multiselect' | 'time';
+
+export type CatalogFieldOption = { value: string; label: string; disabled?: boolean };
 
 export type CatalogField = {
   key: string;
@@ -7,9 +9,10 @@ export type CatalogField = {
   required?: boolean;
   hint?: string;
   placeholder?: string;
+  options?: CatalogFieldOption[];
 };
 
-export type SourceConnectorKind = 'csv' | 'sql' | 'mcp' | 'trello' | 'none';
+export type SourceConnectorKind = 'csv' | 'sql' | 'mcp' | 'trello' | 'browser' | 'none';
 
 export const SQL_DIALECTS = [
   { value: 'postgres', label: 'PostgreSQL', defaultPort: 5432 },
@@ -179,6 +182,43 @@ export const SOURCE_KINDS: readonly SourceKind[] = [
     selectable: true,
     configFields: [],
     credentialFields: [],
+  },
+  {
+    id: 'torge',
+    label: 'Torge',
+    description: 'ERP Torge por automação de navegador operada pela Tactia.',
+    group: 'business_systems',
+    groupLabel: BUSINESS,
+    connector: 'browser',
+    selectable: true,
+    configFields: [
+      { key: 'accountScope', label: 'Conta/empresa no Torge', type: 'string', required: true, hint: 'Identificação operacional, sem segredo.' },
+      { key: 'branchScope', label: 'Filial autorizada', type: 'string', required: true },
+      { key: 'instanceKey', label: 'Instância dedicada', type: 'string', required: true, hint: 'Chave configurada somente no backend.' },
+      {
+        key: 'isolationMode', label: 'Isolamento de sessão', type: 'select', required: true,
+        options: [{ value: 'dedicated_instance', label: 'Instância e volume dedicados' }],
+      },
+      {
+        key: 'enabledModules', label: 'Módulos', type: 'multiselect', required: true,
+        hint: 'Módulos pendentes aparecem bloqueados até validação real.',
+        options: [
+          { value: 'products', label: 'Produtos — implementado, validação real pendente' },
+          { value: 'inventory_balances', label: 'Estoque — pendente', disabled: true },
+          { value: 'sales_orders', label: 'Pedidos de venda — pendente', disabled: true },
+          { value: 'billing', label: 'Faturamento — pendente', disabled: true },
+          { value: 'receivables', label: 'Contas a receber — pendente', disabled: true },
+        ],
+      },
+      { key: 'timezone', label: 'Fuso', type: 'string', required: true, placeholder: 'America/Sao_Paulo' },
+      { key: 'dailyTime', label: 'Horário diário', type: 'time', required: true, placeholder: '03:00' },
+      { key: 'recentWindowDays', label: 'Janela recente (dias)', type: 'number', required: true, placeholder: '30' },
+      { key: 'reconciliationWindowDays', label: 'Reconciliação histórica (dias)', type: 'number', required: true, placeholder: '30' },
+    ],
+    credentialFields: [
+      { key: 'username', label: 'Usuário Torge', type: 'string', required: true },
+      { key: 'password', label: 'Senha Torge', type: 'secret', required: true },
+    ],
   },
   {
     id: 'erp',

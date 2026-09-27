@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
     : {}),
   transpilePackages: [
     '@tactia/shared',
+    '@tactia/chat',
     '@tactia/domain',
     '@tactia/database',
     '@tactia/connectors',

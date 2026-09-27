@@ -104,6 +104,7 @@ function bool(value: unknown): boolean {
 }
 
 const SALE_STATUSES = new Set(['pending', 'confirmed', 'cancelled', 'refunded']);
+const PRODUCT_STATUSES = new Set(['active', 'inactive', 'discontinued']);
 const INTERACTION_CHANNELS = new Set(['whatsapp', 'email', 'note', 'other']);
 const INTERACTION_DIRECTIONS = new Set(['inbound', 'outbound', 'internal']);
 const LEAD_STATUSES = new Set(['new', 'contacted', 'qualified', 'proposal', 'won', 'lost']);
@@ -183,6 +184,8 @@ export async function normalizeToCanonical(
       if (!externalId) return { status: 'skipped', reason: 'missing_external_id' };
       const name = str(normalized['name']);
       if (!name) return { status: 'skipped', reason: 'product_without_name', sample: externalId };
+      const rawStatus = str(normalized['status'])?.toLowerCase();
+      const status = rawStatus && PRODUCT_STATUSES.has(rawStatus) ? rawStatus : undefined;
       const { created } = await repositories.products.upsertByExternalId({
         tenantId,
         dataSourceId,
@@ -193,6 +196,7 @@ export async function normalizeToCanonical(
         supplier: str(normalized['supplier']),
         price: num(normalized['price']),
         cost: num(normalized['cost']),
+        ...(status ? { status: status as 'active' | 'inactive' | 'discontinued' } : {}),
         customData,
       });
       return { status: created ? 'created' : 'updated' };

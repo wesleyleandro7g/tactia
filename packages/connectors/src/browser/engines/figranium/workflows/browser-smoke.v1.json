@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "workflowKey": "tactia.browser-smoke",
+  "workflowVersion": "1",
+  "publishable": true,
+  "task": {
+    "name": "Tactia Browser Smoke v1",
+    "description": "Fluxo controlado sem segredos para qualificar o adaptador Figranium.",
+    "url": "https://example.com/",
+    "mode": "agent",
+    "wait": 0,
+    "actions": [],
+    "variables": {},
+    "schedule": { "enabled": false, "frequency": "daily", "hour": 3, "minute": 0 },
+    "disableRecording": true,
+    "translation": { "enabled": false, "targetLanguage": "portuguese" },
+    "extractionFormat": "json",
+    "extractionScript": "return { title: document.title, complete: document.title === 'Example Domain' };"
+  }
+}

@@ -11,6 +11,7 @@ export type {
   SyncJobStatus,
   SyncJobTrigger,
   SyncJobMode,
+  IntegrationModuleRunStatus,
   ImportStatus,
   InsightType,
   InsightSeverity,
@@ -32,6 +33,12 @@ export type {
   MediaAssetStatus,
   MediaAssetPurpose,
   Metric,
+  AgentSkillKind,
+  ScheduleTarget,
+  ScheduleEffectMode,
+  ScheduleFrequency,
+  ScheduleRepeatMode,
+  ScheduleOccurrenceStatus,
 } from './client';
 export { TenantRepository } from './repositories/tenant-repository';
 export { OperatorRepository } from './repositories/operator-repository';
@@ -71,6 +78,14 @@ export { PlaybookRepository } from './repositories/playbook-repository';
 export { CredentialRepository } from './repositories/credential-repository';
 export { DataSourceRepository } from './repositories/data-source-repository';
 export { SyncJobRepository } from './repositories/sync-job-repository';
+export { IntegrationModuleRunRepository } from './repositories/integration-module-run-repository';
+export { IntegrationArtifactRepository } from './repositories/integration-artifact-repository';
+export { BrowserWorkflowBindingRepository } from './repositories/browser-workflow-binding-repository';
+export { BrowserExecutorInstanceRepository } from './repositories/browser-executor-instance-repository';
+export { BrowserWorkflowRepository } from './repositories/browser-workflow-repository';
+export { BrowserAutomationRepository } from './repositories/browser-automation-repository';
+export { AgentSkillRepository } from './repositories/agent-skill-repository';
+export type { CreateAgentSkillInput } from './repositories/agent-skill-repository';
 export { RawRecordRepository } from './repositories/raw-record-repository';
 export { MappingRepository } from './repositories/mapping-repository';
 export { ImportRepository } from './repositories/import-repository';
@@ -84,6 +99,16 @@ export { MessageRepository } from './repositories/message-repository';
 export { ActionRepository } from './repositories/action-repository';
 export { ActionExecutionRepository } from './repositories/action-execution-repository';
 export { ApprovalRepository } from './repositories/approval-repository';
+export { ScheduleRepository } from './repositories/schedule-repository';
+export type {
+  CreateScheduleInput,
+  UpdateScheduleInput,
+} from './repositories/schedule-repository';
+export { ScheduleOccurrenceRepository } from './repositories/schedule-occurrence-repository';
+export type {
+  CreateScheduleOccurrenceInput,
+  UpdateScheduleOccurrenceInput,
+} from './repositories/schedule-occurrence-repository';
 export type { CreateTenantInput, BackofficeTenantListQuery } from './repositories/tenant-repository';
 export type { CreateOperatorInput, OperatorRecord } from './repositories/operator-repository';
 export type { CreateUserInput } from './repositories/user-repository';
@@ -121,6 +146,17 @@ export type {
 export type { CreateDataSourceInput, DataSourceType } from './repositories/data-source-repository';
 export type { CreateCredentialInput } from './repositories/credential-repository';
 export type { CreateSyncJobInput } from './repositories/sync-job-repository';
+export type { StartIntegrationModuleRunInput, FinishIntegrationModuleRunInput } from './repositories/integration-module-run-repository';
+export type { CreateIntegrationArtifactInput } from './repositories/integration-artifact-repository';
+export type { UpsertBrowserWorkflowBindingInput } from './repositories/browser-workflow-binding-repository';
+export type {
+  CreateBrowserExecutorInstanceInput,
+  UpdateBrowserExecutorInstanceInput,
+} from './repositories/browser-executor-instance-repository';
+export type {
+  BrowserWorkflowIdentity,
+  AddRevisionInput,
+} from './repositories/browser-workflow-repository';
 export type { UpsertRawRecordInput } from './repositories/raw-record-repository';
 export type { CreateMappingInput } from './repositories/mapping-repository';
 export type { CreateImportInput } from './repositories/import-repository';
@@ -153,6 +189,14 @@ export type {
   CreateWhatsappAuthorizedNumberInput,
   WhatsappAuthorizedNumberRecord,
 } from './repositories/whatsapp-authorized-number-repository';
+export { WhatsappAgentConfigRepository } from './repositories/whatsapp-agent-config-repository';
+export type { WhatsappAgentConfigData } from './repositories/whatsapp-agent-config-repository';
+export { WhatsappAgentJobRepository } from './repositories/whatsapp-agent-job-repository';
+export type {
+  CreateWhatsappAgentJobInput,
+  WhatsappAgentJobRecord,
+} from './repositories/whatsapp-agent-job-repository';
+export type { WhatsappAgentJobStatus } from './client';
 export type {
   CreateKnowledgeDocumentInput,
   KnowledgeDocumentRecord,
@@ -163,4 +207,3 @@ export type {
   CreateMediaAssetInput,
   MediaAssetRecord,
 } from './repositories/media-asset-repository';
-

@@ -9,6 +9,8 @@ import type {
   ImportRepository,
   InteractionRepository,
   InventoryLevelRepository,
+  IntegrationArtifactRepository,
+  IntegrationModuleRunRepository,
   LeadRepository,
   MappingRepository,
   PaymentRepository,
@@ -20,7 +22,8 @@ import type {
   SyncJobMode,
   SyncJobTrigger,
 } from '@tactia/database';
-import { AppError, ErrorCode, isAppError, logger, type RequestContext } from '@tactia/shared';
+import { createHash } from 'node:crypto';
+import { AppError, ErrorCode, isAppError, logger, extFromFileName, maxBytesForKind, storageKey, type ObjectStorage, type RequestContext } from '@tactia/shared';
 import {
   canonicalEntityRank,
   CsvConnector,
@@ -30,6 +33,11 @@ import {
   TrelloClient,
   TrelloConnector,
   trelloCallbackUrl,
+  TorgeConnector,
+  createFigraniumExecutorFromEnv,
+  createFigraniumExecutorFromResolved,
+  parseTorgeConnectionConfig,
+  type BrowserCredentialResolver,
   extractCustomData,
   incrementalLookbackSince,
   normalizeRow,
@@ -45,6 +53,7 @@ import { assertTenantContext } from '../authz';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import { trelloAuthFromCredential } from './trello-oauth-credential';
 import { decrypt } from './credential-service';
+import type { BrowserIntegrationService, BrowserSyncSnapshot } from './browser-integration-service';
 import type { CustomDataValidationService } from './custom-data-validation-service';
 
 export type SyncServiceDeps = {
@@ -53,6 +62,16 @@ export type SyncServiceDeps = {
   rawRecords: RawRecordRepository;
   imports: ImportRepository;
   qualityReports: DataQualityReportRepository;
+  moduleRuns?: IntegrationModuleRunRepository;
+  artifacts?: IntegrationArtifactRepository;
+  objectStorage?: ObjectStorage;
+  maxSyncAttempts?: number;
+  /**
+   * Resolves browser executor instances DB-first (with env fallback) and
+   * rebuilds them from an immutable snapshot on retries. When absent, the
+   * legacy env-only path is used.
+   */
+  browserIntegration?: BrowserIntegrationService;
   mappings: MappingRepository;
   credentials: CredentialRepository;
   auditLogs: AuditLogService;
@@ -111,6 +130,7 @@ export type StartSyncOptions = {
   trigger?: SyncJobTrigger;
   timezone?: string;
   now?: Date;
+  idempotencyKey?: string;
 };
 
 export type SyncTenantSourcesOptions = {
@@ -129,6 +149,13 @@ type EntityOutcome = {
   normalized: Record<string, unknown>[];
 };
 
+class RetryableSyncError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RetryableSyncError';
+  }
+}
+
 export class SyncService {
   constructor(private readonly deps: SyncServiceDeps) {}
 
@@ -143,14 +170,24 @@ export class SyncService {
     const tenantId = ctx.tenantId!;
     const ds = await this.deps.dataSources.findById({ tenantId, id: dataSourceId });
     if (!ds) throw new AppError(ErrorCode.NOT_FOUND, 'DataSource not found');
+    if (ds.type === 'torge' && ds.status !== 'active') {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'A conexão Torge precisa estar habilitada.');
+    }
+    if (ds.type === 'torge' && !this.deps.enqueueSync) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'Integrações por navegador exigem JOBS_ENABLED=true.');
+    }
 
-    const job = await this.deps.syncJobs.create({
+    const exclusive = await this.deps.syncJobs.createExclusive({
       tenantId,
       dataSourceId,
       status: 'pending',
       mode: options.mode ?? 'full',
       trigger: options.trigger ?? 'manual',
+      idempotencyKey: options.idempotencyKey ?? null,
+      configSnapshot: await this.buildBrowserSnapshot(ctx, ds),
     });
+    const job = exclusive.job;
+    if (!exclusive.created) return job;
 
     await this.deps.auditLogs.record(ctx, {
       action: AuditAction.SYNC_STARTED,
@@ -241,13 +278,64 @@ export class SyncService {
   }
 
   async cancelSyncJob(ctx: RequestContext, id: string) {
-    assertTenantContext(ctx);
+    if (ctx.operatorId) {
+      if (!ctx.tenantId) throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'An active tenant is required');
+    } else {
+      assertTenantContext(ctx);
+    }
     const job = await this.deps.syncJobs.findById({ tenantId: ctx.tenantId!, id });
     if (!job) throw new AppError(ErrorCode.NOT_FOUND, 'SyncJob not found');
-    if (job.status !== 'pending') {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, 'Only pending sync jobs can be cancelled');
+    if (job.status !== 'pending' && job.status !== 'running') {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'Only pending or running sync jobs can be cancelled');
     }
-    return this.deps.syncJobs.updateStatus({ id, status: 'cancelled' });
+    const cancelled = await this.deps.syncJobs.updateStatus({ id, status: 'cancelled', finishedAt: new Date() });
+    await this.deps.auditLogs.record(ctx, {
+      action: AuditAction.SYNC_CANCELLED,
+      entityType: 'sync_job',
+      entityId: id,
+      metadata: { dataSourceId: job.dataSourceId },
+    });
+    return cancelled;
+  }
+
+  async enqueueDueBrowserSyncs(now = new Date()): Promise<{ enqueued: number }> {
+    if (!this.deps.enqueueSync) return { enqueued: 0 };
+    const sources = await this.deps.dataSources.listActiveBrowserForSchedule();
+    let enqueued = 0;
+    for (const source of sources) {
+      try {
+        const config = parseTorgeConnectionConfig(source.configuration);
+        const local = localScheduleParts(now, config.timezone);
+        if (local.time < config.dailyTime) continue;
+        const exclusive = await this.deps.syncJobs.createExclusive({
+          tenantId: source.tenantId,
+          dataSourceId: source.id,
+          status: 'pending',
+          mode: 'incremental',
+          trigger: 'scheduled',
+          idempotencyKey: `torge-daily:${source.id}:${local.dateKey}`,
+        });
+        if (!exclusive.created) continue;
+        await this.deps.enqueueSync({
+          tenantId: source.tenantId,
+          syncJobId: exclusive.job.id,
+          requestId: `torge-daily-${local.dateKey}`,
+          userId: null,
+          timezone: config.timezone,
+          now: now.toISOString(),
+        });
+        enqueued += 1;
+      } catch (error) {
+        logger.error({
+          tenant_id: source.tenantId,
+          data_source_id: source.id,
+          operation: 'torge_schedule',
+          status: 'failed',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return { enqueued };
   }
 
   /**
@@ -316,6 +404,10 @@ export class SyncService {
     const requestId = meta.requestId;
     let dataSourceId: string | null = null;
 
+    const existingJob = await this.deps.syncJobs.findById({ tenantId, id: syncJobId });
+    if (!existingJob) throw new AppError(ErrorCode.NOT_FOUND, 'SyncJob not found');
+    if (['completed', 'partial', 'failed', 'cancelled', 'needs_attention'].includes(existingJob.status)) return;
+
     await this.deps.syncJobs.updateStatus({
       id: syncJobId,
       status: 'running',
@@ -348,7 +440,7 @@ export class SyncService {
         configuration: m.configuration as unknown as MappingConfig,
       }));
 
-      const connector = await this.buildConnector(tenantId, ds);
+      const connector = await this.buildConnector(tenantId, ds, job.configSnapshot ?? null);
       const mode: SyncMode = job.mode === 'incremental' ? 'incremental' : 'full';
       const clock =
         meta.now instanceof Date ? meta.now : meta.now ? new Date(meta.now) : new Date();
@@ -356,6 +448,12 @@ export class SyncService {
         mode === 'incremental'
           ? incrementalLookbackSince(clock, meta.timezone ?? 'America/Sao_Paulo')
           : undefined;
+
+      const moduleRunIds = new Map<string, string>();
+      const moduleAttempts = new Map<string, number>();
+      if (ds.type === 'torge' && (!this.deps.moduleRuns || !this.deps.artifacts || !this.deps.objectStorage)) {
+        throw new AppError(ErrorCode.INTERNAL_ERROR, 'Persistência de integração por navegador não configurada.');
+      }
 
       // 1. Source → RawRecord (originals preserved, spec §3.3)
       const raw = await connector.sync({
@@ -365,6 +463,69 @@ export class SyncService {
         mappings: syncContextMappings,
         mode,
         ...(since ? { since } : {}),
+        onModuleStart: this.deps.moduleRuns
+          ? async (module) => {
+              const run = await this.deps.moduleRuns!.start({
+                tenantId,
+                dataSourceId: ds.id,
+                syncJobId,
+                moduleKey: module.moduleKey,
+                workflowKey: module.workflowKey,
+                workflowVersion: module.workflowVersion,
+                parserVersion: module.parserVersion,
+                leaseOwner: `${syncJobId}-${module.moduleKey}`,
+                leaseExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+                externalExecutionId: `${syncJobId}-${module.moduleKey}`,
+              });
+              moduleRunIds.set(module.moduleKey, run.id);
+              moduleAttempts.set(module.moduleKey, run.attempt);
+            }
+          : undefined,
+        onArtifact: this.deps.artifacts && this.deps.objectStorage
+          ? async (artifact) => {
+              const moduleRunId = moduleRunIds.get(artifact.moduleKey);
+              if (!moduleRunId) throw new Error('Execução de módulo ausente para artefato.');
+              const max = maxBytesForKind('integration-artifact');
+              if (artifact.body.length > max) throw new Error('Artefato de integração excede 100 MiB.');
+              const checksum = createHash('sha256').update(artifact.body).digest('hex');
+              const key = storageKey({
+                tenantId,
+                kind: 'integration-artifact',
+                id: `${moduleRunId}-${checksum.slice(0, 12)}`,
+                ext: extFromFileName(artifact.fileName),
+              });
+              await this.deps.objectStorage!.put({ key, body: artifact.body, contentType: artifact.contentType });
+              await this.deps.artifacts!.upsert({
+                tenantId,
+                dataSourceId: ds.id,
+                moduleRunId,
+                origin: artifact.originRef,
+                moduleKey: artifact.moduleKey,
+                checksum,
+                mimeType: artifact.contentType,
+                storageKey: key,
+                byteSize: artifact.body.length,
+                retentionUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              });
+            }
+          : undefined,
+        onModuleFinish: this.deps.moduleRuns
+          ? async (module) => {
+              await this.deps.moduleRuns!.finish({
+                syncJobId,
+                moduleKey: module.moduleKey,
+                status: module.status,
+                recordsRead: module.recordsRead,
+                recordsFailed: module.recordsFailed,
+                externalExecutionId: module.externalExecutionId ?? `${syncJobId}-${module.moduleKey}`,
+                evidence: module.evidence,
+                checkpoint: undefined,
+                errorCode: module.errorCode,
+                safeMessage: module.safeMessage,
+                retryable: module.retryable,
+              });
+            }
+          : undefined,
         onProgress: async (counters) => {
           await this.deps.syncJobs.updateCounters({
             id: syncJobId,
@@ -375,6 +536,21 @@ export class SyncService {
           });
         },
       });
+
+      const cancellationCheck = await this.deps.syncJobs.findById({ tenantId, id: syncJobId });
+      if (cancellationCheck?.status === 'cancelled') {
+        logger.info({ tenant_id: tenantId, data_source_id: ds.id, sync_job_id: syncJobId, operation: 'sync_cancelled_before_publish' });
+        return;
+      }
+      if (
+        raw.moduleResults?.length &&
+        raw.moduleResults.every((module) => module.status !== 'succeeded') &&
+        raw.moduleResults.some(
+          (module) => module.retryable && (moduleAttempts.get(module.moduleKey) ?? 1) < (this.deps.maxSyncAttempts ?? 4),
+        )
+      ) {
+        throw new RetryableSyncError('Falha transitória na coleta por navegador.');
+      }
 
       for (const skipped of raw.skippedMappings ?? []) {
         await this.deps.qualityReports.create({
@@ -397,10 +573,13 @@ export class SyncService {
       }
 
       const skippedTargets = new Set((raw.skippedMappings ?? []).map((item) => item.targetEntity));
+      const failedModules = new Set((raw.moduleResults ?? []).filter((item) => item.status !== 'succeeded').map((item) => item.moduleKey));
 
       // 2. RawRecord → normalize → canonical upsert, in dependency order
       const fieldsByEntity = mergeFieldsByTargetEntity(
-        syncContextMappings.filter((mapping) => !skippedTargets.has(mapping.targetEntity)),
+        syncContextMappings.filter(
+          (mapping) => !skippedTargets.has(mapping.targetEntity) && !failedModules.has(mapping.sourceEntity),
+        ),
       );
       const entityTypes = [...fieldsByEntity.keys()].sort(
         (a, b) => canonicalEntityRank(a) - canonicalEntityRank(b),
@@ -443,6 +622,7 @@ export class SyncService {
           syncJobId,
           entityType: outcome.entityType,
           totalRecords: outcome.total,
+          idempotencyKey: `${syncJobId}:${outcome.entityType}`,
         });
         const processed = outcome.created + outcome.updated;
         await this.deps.imports.updateCounters({
@@ -464,6 +644,19 @@ export class SyncService {
         { created: 0, updated: 0, skipped: 0 },
       );
 
+      const moduleResults = raw.moduleResults ?? [];
+      const succeededModules = moduleResults.filter((module) => module.status === 'succeeded');
+      const unfinishedModules = moduleResults.filter((module) => module.status !== 'succeeded');
+      const finalStatus = unfinishedModules.length === 0
+        ? 'completed'
+        : succeededModules.length > 0
+          ? 'partial'
+          : unfinishedModules.every((module) => module.status === 'needs_attention')
+            ? 'needs_attention'
+            : unfinishedModules.every((module) => module.status === 'cancelled')
+              ? 'cancelled'
+              : 'failed';
+
       await this.deps.syncJobs.updateCounters({
         id: syncJobId,
         recordsRead: raw.recordsRead,
@@ -473,10 +666,21 @@ export class SyncService {
       });
       await this.deps.syncJobs.updateStatus({
         id: syncJobId,
-        status: 'completed',
+        status: finalStatus,
         finishedAt: new Date(),
       });
-      await this.deps.dataSources.updateLastSyncAt({ id: ds.id, lastSyncAt: new Date() });
+      if (finalStatus === 'completed') {
+        await this.deps.dataSources.updateLastSyncAt({ id: ds.id, lastSyncAt: new Date() });
+      }
+      if (this.deps.moduleRuns && (finalStatus === 'completed' || finalStatus === 'partial')) {
+        for (const module of succeededModules) {
+          await this.deps.moduleRuns.markPublished({
+            syncJobId,
+            moduleKey: module.moduleKey,
+            checkpoint: { publishedAt: new Date().toISOString(), evidence: module.evidence ?? {} },
+          });
+        }
+      }
 
       if (this.deps.enrichInteractions && outcomes.some((outcome) => outcome.entityType === 'interaction')) {
         try {
@@ -503,6 +707,14 @@ export class SyncService {
         recordsCreated: totals.created,
         recordsUpdated: totals.updated,
         recordsFailed: raw.recordsFailed + totals.skipped,
+        status: finalStatus,
+        modules: moduleResults.map((module) => ({
+          moduleKey: module.moduleKey,
+          status: module.status,
+          recordsRead: module.recordsRead,
+          recordsFailed: module.recordsFailed,
+          errorCode: module.errorCode,
+        })),
         entities: outcomes.map((outcome) => ({
           entityType: outcome.entityType,
           created: outcome.created,
@@ -514,7 +726,7 @@ export class SyncService {
       await this.deps.auditLogs.record(
         { tenantId, userId: meta.userId ?? null },
         {
-          action: AuditAction.SYNC_COMPLETED,
+          action: finalStatus === 'completed' || finalStatus === 'partial' ? AuditAction.SYNC_COMPLETED : AuditAction.SYNC_FAILED,
           entityType: 'sync_job',
           entityId: syncJobId,
           actorType: 'system',
@@ -535,10 +747,14 @@ export class SyncService {
         records_updated: totals.updated,
         records_failed: raw.recordsFailed + totals.skipped,
         duration_ms: Date.now() - started,
-        status: 'completed',
+        status: finalStatus,
       });
 
-      if (this.deps.onSyncCompleted && job.trigger !== 'scheduled') {
+      if (
+        this.deps.onSyncCompleted &&
+        (finalStatus === 'completed' || finalStatus === 'partial') &&
+        (job.trigger !== 'scheduled' || ds.type === 'torge')
+      ) {
         try {
           await this.deps.onSyncCompleted({
             tenantId,
@@ -559,6 +775,22 @@ export class SyncService {
         }
       }
     } catch (err) {
+      if (err instanceof RetryableSyncError) {
+        await this.deps.syncJobs.updateStatus({
+          id: syncJobId,
+          status: 'pending',
+          error: 'CONNECTOR_ERROR: falha transitória; aguardando nova tentativa.',
+        });
+        logger.warn({
+          ...(requestId ? { request_id: requestId } : {}),
+          tenant_id: tenantId,
+          ...(dataSourceId ? { data_source_id: dataSourceId } : {}),
+          sync_job_id: syncJobId,
+          operation: 'sync_retry_scheduled',
+          status: 'pending',
+        });
+        throw err;
+      }
       const code = isAppError(err) ? err.code : ErrorCode.SYNC_ERROR;
       const detail = err instanceof Error ? err.message : String(err);
       // Stored classified and without stack trace (spec §48).
@@ -751,7 +983,8 @@ export class SyncService {
 
   private async buildConnector(
     tenantId: string,
-    ds: { type: string; configuration: unknown; credentialId: string | null },
+    ds: { id: string; type: string; configuration: unknown; credentialId: string | null },
+    snapshot: unknown = null,
   ) {
     const config = (ds.configuration ?? {}) as Record<string, unknown>;
 
@@ -807,6 +1040,34 @@ export class SyncService {
       );
     }
 
+    if (ds.type === 'torge') {
+      if (!ds.credentialId) throw new AppError(ErrorCode.VALIDATION_ERROR, 'Credencial Torge obrigatória.');
+      const credentialId = ds.credentialId;
+      const decrypted = await this.decryptCredentials(tenantId, credentialId);
+      const resolver: BrowserCredentialResolver = {
+        resolve: async (connectionId, refs) => {
+          if (connectionId !== ds.id || refs.length !== 1 || refs[0] !== credentialId) {
+            throw new AppError(ErrorCode.AUTHORIZATION_ERROR, 'Referência de credencial inválida.');
+          }
+          return decrypted;
+        },
+      };
+      let torgeConfig;
+      try {
+        torgeConfig = parseTorgeConnectionConfig(ds.configuration);
+      } catch (error) {
+        throw new AppError(ErrorCode.VALIDATION_ERROR, error instanceof Error ? error.message : 'Configuração Torge inválida.');
+      }
+      const executor = await this.buildBrowserExecutor(tenantId, torgeConfig.instanceKey, resolver, snapshot);
+      return new TorgeConnector(
+        ds.id,
+        credentialId,
+        torgeConfig,
+        executor,
+        this.deps.rawRecords,
+      );
+    }
+
     throw new AppError(ErrorCode.CONNECTOR_ERROR, `Connector type '${ds.type}' not supported yet`);
   }
 
@@ -818,6 +1079,78 @@ export class SyncService {
     const cred = await this.deps.credentials.findById({ tenantId, id: credentialId });
     if (!cred) return {};
     return JSON.parse(decrypt(cred.encryptedData)) as Record<string, unknown>;
+  }
+
+  /**
+   * Minimal tenant-scoped context for BrowserIntegrationService calls made from
+   * the worker path, where the original RequestContext is not threaded through.
+   */
+  private browserCtx(tenantId: string): RequestContext {
+    return { requestId: 'sync-worker', tenantId, userId: null, role: null, operatorId: 'system-sync-worker' };
+  }
+
+  /**
+   * Captures the immutable browser configuration snapshot at SyncJob creation
+   * time. Only torge (browser) sources carry a snapshot; it never contains a
+   * secret value, only credential references and resolved task IDs.
+   */
+  private async buildBrowserSnapshot(
+    ctx: RequestContext,
+    ds: { id: string; type: string; configuration: unknown; credentialId: string | null },
+  ): Promise<Record<string, unknown> | null> {
+    if (ds.type !== 'torge' || !this.deps.browserIntegration) return null;
+    let torgeConfig;
+    try {
+      torgeConfig = parseTorgeConnectionConfig(ds.configuration);
+    } catch {
+      return null;
+    }
+    const environment = process.env['TACTIA_ENVIRONMENT'] || process.env['NODE_ENV'] || 'development';
+    try {
+      const { snapshot } = await this.deps.browserIntegration.resolveFigranium(ctx, {
+        provider: 'torge',
+        environment,
+        instanceKey: torgeConfig.instanceKey,
+        sourceCredentialId: ds.credentialId,
+      });
+      return snapshot as unknown as Record<string, unknown>;
+    } catch (error) {
+      logger.warn({
+        operation: 'browser_snapshot_skipped',
+        tenant_id: ctx.tenantId,
+        data_source_id: ds.id,
+        reason: error instanceof Error ? error.message : 'unknown',
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Builds the Figranium executor for a torge sync. On retries it rehydrates the
+   * exact instance/bindings from the SyncJob snapshot; otherwise it resolves
+   * DB-first (with env fallback). When no browser integration service is wired,
+   * it falls back to the legacy env-only executor.
+   */
+  private async buildBrowserExecutor(
+    tenantId: string,
+    instanceKey: string,
+    resolver: BrowserCredentialResolver,
+    snapshot: unknown,
+  ) {
+    const integration = this.deps.browserIntegration;
+    if (integration) {
+      const ctx = this.browserCtx(tenantId);
+      const snap = snapshot && typeof snapshot === 'object' ? (snapshot as BrowserSyncSnapshot) : null;
+      const resolved = snap && snap.instanceKey
+        ? await integration.resolveFromSnapshot(ctx, snap)
+        : (await integration.resolveFigranium(ctx, {
+            provider: 'torge',
+            environment: process.env['TACTIA_ENVIRONMENT'] || process.env['NODE_ENV'] || 'development',
+            instanceKey,
+          })).resolved;
+      return createFigraniumExecutorFromResolved(resolved, resolver);
+    }
+    return createFigraniumExecutorFromEnv(instanceKey, resolver);
   }
 }
 
@@ -851,4 +1184,18 @@ function mergeFieldsByTargetEntity(
     byEntity.set(mapping.targetEntity, current);
   }
   return byEntity;
+}
+
+function localScheduleParts(now: Date, timeZone: string): { dateKey: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return { dateKey: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` };
 }

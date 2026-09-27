@@ -161,4 +161,24 @@ describe('WhatsappAuthorizedNumberService', () => {
       code: ErrorCode.VALIDATION_ERROR,
     });
   });
+
+  it('persists and updates contact name and role', async () => {
+    const created = await service.create(ownerCtx, {
+      userId: ownerId,
+      phone: '5511988887777',
+      contactName: 'João Silva',
+      contactRole: 'Gerente Comercial',
+    });
+    expect(created.contactName).toBe('João Silva');
+    expect(created.contactRole).toBe('Gerente Comercial');
+
+    const updated = await service.update(ownerCtx, created.id, {
+      contactRole: 'Diretor',
+    });
+    expect(updated.contactName).toBe('João Silva');
+    expect(updated.contactRole).toBe('Diretor');
+
+    const cleared = await service.update(ownerCtx, created.id, { contactName: null });
+    expect(cleared.contactName).toBeNull();
+  });
 });

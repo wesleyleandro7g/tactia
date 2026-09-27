@@ -2,7 +2,7 @@
 
 import type { CatalogField } from '@tactia/domain/data-sources/catalog';
 import { Field } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 
 export function CatalogFieldsForm({
   fields,
@@ -48,6 +48,32 @@ export function CatalogFieldsForm({
             </label>
           );
         }
+        if (field.type === 'select' || field.type === 'multiselect') {
+          const selected = new Set((values[field.key] ?? '').split(',').filter(Boolean));
+          return (
+            <Field key={field.key} htmlFor={id} label={field.label} hint={field.hint}>
+              <Select
+                id={id}
+                multiple={field.type === 'multiselect'}
+                required={field.required}
+                value={field.type === 'multiselect' ? [...selected] : values[field.key] ?? ''}
+                onChange={(event) => {
+                  const value = field.type === 'multiselect'
+                    ? [...event.currentTarget.selectedOptions].map((option) => option.value).join(',')
+                    : event.currentTarget.value;
+                  onChange(field.key, value);
+                }}
+              >
+                {field.type === 'select' ? <option value="">Selecione</option> : null}
+                {(field.options ?? []).map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          );
+        }
         return (
           <Field key={field.key} htmlFor={id} label={field.label} hint={field.hint}>
             <Input
@@ -55,6 +81,8 @@ export function CatalogFieldsForm({
               type={
                 field.type === 'number'
                   ? 'number'
+                  : field.type === 'time'
+                    ? 'time'
                   : field.type === 'secret'
                     ? 'password'
                     : field.type === 'url'

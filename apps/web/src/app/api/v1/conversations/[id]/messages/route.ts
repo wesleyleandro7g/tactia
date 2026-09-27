@@ -1,8 +1,7 @@
-import type { ChatAnswer, ChatTurn } from '@tactia/ai';
-import { logChatTurn } from '@tactia/ai';
+import type { ChatTurn } from '@tactia/ai';
+import { runChatTurnSync, streamChatTurn } from '@tactia/chat/server';
 import { sendMessageSchema } from '@tactia/domain';
-import { AppError, ErrorCode, isAppError } from '@tactia/shared';
-import { answerMetadata, getOrchestrator, toToolContext } from '@/lib/ai';
+import { answerMetadata, chatRuntime, toToolContext } from '@/lib/ai';
 import { createApiHandler, readJson } from '@/lib/api';
 import { RATE_LIMITS } from '@/lib/rate-limit';
 import { conversationService } from '@/lib/services';
@@ -28,11 +27,10 @@ export const GET = createApiHandler({ auth: 'tenant' }, async (_request, ctx, pa
 export const POST = createApiHandler(
   { auth: 'tenant', rateLimit: RATE_LIMITS.chat },
   async (request, ctx, params) => {
-    const startedAt = Date.now();
     const conversationId = params['id']!;
     const { content, stream } = sendMessageSchema.parse(await readJson(request));
 
-    const toolCtx = toToolContext(ctx);
+    const toolCtx = { ...toToolContext(ctx), conversationId };
     await conversationService.requireConversation(ctx, conversationId);
 
     // History is read before the new message is stored.
@@ -47,104 +45,29 @@ export const POST = createApiHandler(
     });
     await conversationService.renameFromFirstMessage(ctx, conversationId, content);
 
-    const orchestrator = getOrchestrator();
+    const turn = {
+      runtime: chatRuntime,
+      ctx,
+      toolCtx,
+      question: content,
+      history,
+      persistence: {
+        conversationId,
+        userMessageId: userMessage.id,
+        saveAnswer: (answer: Parameters<typeof answerMetadata>[0]) =>
+          conversationService.appendMessage(ctx, conversationId, {
+            role: 'assistant',
+            content: answer.content,
+            metadata: answerMetadata(answer),
+          }),
+      },
+    };
 
     if (!stream) {
-      let answer: ChatAnswer;
-      try {
-        answer = await orchestrator.run({ ctx: toolCtx, question: content, history });
-      } catch (error) {
-        logChatTurn(ctx, { conversationId, startedAt, mode: 'sync', error });
-        throw error;
-      }
-
-      const assistantMessage = await conversationService.appendMessage(ctx, conversationId, {
-        role: 'assistant',
-        content: answer.content,
-        metadata: answerMetadata(answer),
-      });
-      logChatTurn(ctx, { conversationId, startedAt, mode: 'sync', answer });
-
-      return {
-        userMessage,
-        message: assistantMessage,
-        answer: {
-          content: answer.content,
-          followUps: answer.followUps,
-          sources: answer.sources,
-          toolCalls: answer.toolCalls,
-          proposals: answer.proposals,
-          attachments: answer.attachments,
-          provider: answer.provider,
-          model: answer.model,
-          ...(answer.guardrail ? { guardrail: answer.guardrail } : {}),
-        },
-      };
+      const result = await runChatTurnSync(turn);
+      return { userMessage, message: result.message, answer: result.answer };
     }
 
-    const encoder = new TextEncoder();
-    const body = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const send = (payload: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
-
-        try {
-          send({ type: 'start', conversationId, userMessageId: userMessage.id });
-
-          let answer: ChatAnswer | null = null;
-          for await (const event of orchestrator.stream({
-            ctx: toolCtx,
-            question: content,
-            history,
-          })) {
-            if (event.type === 'done') {
-              answer = event.answer;
-              continue;
-            }
-            send(event);
-          }
-
-          if (answer) {
-            const assistantMessage = await conversationService.appendMessage(ctx, conversationId, {
-              role: 'assistant',
-              content: answer.content,
-              metadata: answerMetadata(answer),
-            });
-            send({
-              type: 'done',
-              messageId: assistantMessage.id,
-              content: answer.content,
-              followUps: answer.followUps,
-              sources: answer.sources,
-              toolCalls: answer.toolCalls.map((call) => ({ name: call.name, input: call.input })),
-              proposals: answer.proposals,
-              attachments: answer.attachments,
-              provider: answer.provider,
-              model: answer.model,
-              ...(answer.guardrail ? { guardrail: answer.guardrail } : {}),
-            });
-          }
-          logChatTurn(ctx, { conversationId, startedAt, mode: 'stream', answer });
-        } catch (error) {
-          const appError = isAppError(error)
-            ? error
-            : new AppError(ErrorCode.AI_ERROR, 'Falha ao gerar a resposta');
-          logChatTurn(ctx, { conversationId, startedAt, mode: 'stream', error });
-          send({ type: 'error', code: appError.code, message: appError.message });
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(body, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/event-stream; charset=utf-8',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
-        'X-Accel-Buffering': 'no',
-      },
-    });
+    return streamChatTurn(turn);
   },
 );

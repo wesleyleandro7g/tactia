@@ -1,8 +1,8 @@
-export { assertAuthenticated, assertTenantContext, assertRole, assertOwnerOrAdmin, assertOperator, assertTenantScope, assertOperatorForTenant, assertCanManageConnections, hasMinRole } from './authz';
+export { assertAuthenticated, assertTenantContext, assertTenantUser, assertRole, assertOwnerOrAdmin, assertOperator, assertTenantScope, assertOperatorForTenant, assertCanManageConnections, hasMinRole } from './authz';
 export { AuditLogService, AuditAction } from './services/audit-log-service';
 export { TenantService } from './services/tenant-service';
 export { OperatorService } from './services/operator-service';
-export { BackofficeService } from './services/backoffice-service';
+export { BackofficeService, type TenantSyncIndicator } from './services/backoffice-service';
 export { UserService } from './services/user-service';
 export { MembershipService } from './services/membership-service';
 export { CustomerService } from './services/customer-service';
@@ -73,14 +73,31 @@ export type {
   RunPipelineOptions,
 } from './services/intelligence-pipeline-service';
 export { CredentialService, encrypt, decrypt } from './services/credential-service';
+export {
+  EmailConfigService,
+  EMAIL_CREDENTIAL_PROVIDER,
+  type StoredEmailConfig,
+  type EmailConfigView,
+} from './services/email-config-service';
+export {
+  emailConfigSchema,
+  sendTestEmailSchema,
+  SMTP_PROVIDER_ENUM,
+  type EmailConfigInput,
+  type SendTestEmailInput,
+  type SmtpProviderId,
+} from './schemas/email';
 export { TenantApiKeyService } from './services/tenant-api-key-service';
 export { trelloAuthFromCredential, trelloOAuthConfigFromEnv } from './services/trello-oauth-credential';
 export type { VerifiedTenantApiKey } from './services/tenant-api-key-service';
 export { WhatsappAuthorizedNumberService } from './services/whatsapp-authorized-number-service';
+export { WhatsappAgentConfigService } from './services/whatsapp-agent-config-service';
+export { WhatsappAgentJobService } from './services/whatsapp-agent-job-service';
 export { normalizeWhatsappPhone, INVALID_WHATSAPP_PHONE } from './whatsapp/phone';
 export {
   createWhatsappNumberSchema,
   updateWhatsappNumberSchema,
+  whatsappAgentConfigSchema,
 } from './schemas/whatsapp';
 export {
   parseTenantApiKeyToken,
@@ -90,6 +107,22 @@ export {
 export { createApiKeySchema, API_KEY_SCOPES } from './schemas/api-keys';
 export type { ApiKeyScope } from './schemas/api-keys';
 export { DataSourceService } from './services/data-source-service';
+export { BrowserIntegrationService, currentBrowserEnvironment } from './services/browser-integration-service';
+export { AgentSkillService, SkillResourceResolverRegistry, createSkillResourceRegistry, normalizeAgentSkillMarkdown, referencedSkillSlugs, agentSkillSlugSchema, createAgentSkillSchema, updateAgentSkillSchema, createAgentSkillBindingSchema } from './services/agent-skill-service';
+export type { SkillResource, SkillResourceResolver } from './services/agent-skill-service';
+export type { BrowserIntegrationDeps, BrowserSyncSnapshot, BrowserHealthResult } from './services/browser-integration-service';
+export {
+  createBrowserExecutorInstanceSchema,
+  updateBrowserExecutorInstanceSchema,
+  importBrowserWorkflowSchema,
+  publishBrowserWorkflowSchema,
+  testBrowserExecutorHealthSchema,
+  setActiveRevisionSchema,
+} from './schemas/browser-integration';
+export type {
+  ImportBrowserWorkflowInput,
+  CreateBrowserExecutorInstanceRequest,
+} from './schemas/browser-integration';
 export { SyncService } from './services/sync-service';
 export type { StartSyncOptions, SyncTenantSourcesOptions } from './services/sync-service';
 export { ImportService } from './services/import-service';
@@ -116,6 +149,27 @@ export { ThresholdCalibrator, RULE_THRESHOLD_KEY, loosenThreshold } from './serv
 export { RecommendationService } from './services/recommendation-service';
 export { IntelligencePipelineService } from './services/intelligence-pipeline-service';
 export { ConversationService } from './services/conversation-service';
+export {
+  ScheduleService,
+  createScheduleSchema,
+  updateScheduleSchema,
+  type ScheduleServiceDeps,
+  type CreateScheduleRequest,
+  type UpdateScheduleRequest,
+} from './services/schedule-service';
+export {
+  isDue,
+  computePeriodKey,
+  recurrenceConfigSchema,
+  nthBusinessDayOfMonth,
+  daysInMonth,
+  isoWeek,
+  localParts,
+  scheduleFrequencyValues,
+  type RecurrenceConfig,
+  type ScheduleRecurrence,
+  type ScheduleFrequencyValue,
+} from './services/schedule-recurrence';
 export type { AuthProvider } from './ports/auth-provider';
 export {
   createTenantSchema,
@@ -188,7 +242,7 @@ export {
   listSelectableSourceKinds,
   groupSelectableSourceKinds,
 } from './data-sources/catalog';
-export type { SourceKind, CatalogField, SourceConnectorKind, SqlDialect } from './data-sources/catalog';
+export type { SourceKind, CatalogField, CatalogFieldOption, SourceConnectorKind, SqlDialect } from './data-sources/catalog';
 export {
   TARGET_ENTITIES,
   targetFieldsFor,

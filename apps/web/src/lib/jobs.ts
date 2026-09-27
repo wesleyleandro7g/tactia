@@ -1,7 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { logger } from '@tactia/shared';
 import { IntelligencePipelineService } from '@tactia/domain';
-import { PgBossJobQueue } from '@tactia/execution';
+import { DEFAULT_JOB_RETRY_LIMIT, PgBossJobQueue } from '@tactia/execution';
+import { BROWSER_TASK_JOB } from '@tactia/chat/server';
 
 /**
  * Background jobs (Etapa 11 — B4). Same Postgres as the app (`pgboss` schema).
@@ -18,6 +19,12 @@ export const JOBS = {
   embedFacts: 'memory.embed_facts',
   ingestDocument: 'knowledge.ingest',
   ingestMedia: 'knowledge.ingest_media',
+  /** One firing of a Schedule occurrence (agendamento de ações). */
+  scheduleRun: 'schedule.run',
+  /** One async WhatsApp agent operation (direct execution + status reply). */
+  whatsappAgent: 'whatsapp.agent',
+  /** Same name the chat package publishes (`BROWSER_TASK_JOB`). */
+  browserTask: BROWSER_TASK_JOB,
 } as const;
 
 export type DailyJob = { tenantId: string; now?: string };
@@ -27,6 +34,14 @@ export type IngestDocumentJob = { tenantId: string; documentId: string };
 export type IngestMediaJob = { tenantId: string; mediaId: string };
 export type TrelloReconcileJob = { tenantId: string; dataSourceId: string; now?: string };
 export type TrelloPrivacyJob = { now?: string };
+export type ScheduleRunJob = {
+  tenantId: string;
+  scheduleId: string;
+  occurrenceId: string;
+  periodKey: string;
+  requestId: string;
+};
+export type WhatsappAgentJobPayload = { tenantId: string; jobId: string };
 export type SyncJob = {
   tenantId: string;
   syncJobId: string;
@@ -72,7 +87,7 @@ export function getJobQueue(): PgBossJobQueue | null {
     queue = null;
     return null;
   }
-  queue = new PgBossJobQueue({ connectionString });
+  queue = new PgBossJobQueue({ connectionString, retryLimit: DEFAULT_JOB_RETRY_LIMIT });
   return queue;
 }
 
@@ -328,15 +343,77 @@ export async function startJobWorkers(): Promise<void> {
     await mediaIngestService.ingest(data);
   });
 
-  await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {
-    const now = data.now ? new Date(data.now) : new Date();
-    await Promise.all([
-      enqueueDailyForDueTenants(now),
-      enqueueTrelloReconciliations(now),
-      enqueueTrelloPrivacy(now),
-    ]);
+  await jobQueue.register<{ tenantId: string; taskId: string }>(JOBS.browserTask, async (data) => {
+    const { browserAutomationService } = await import('./browser-automation');
+    await browserAutomationService.run(data.tenantId, data.taskId);
   });
 
-  await jobQueue.schedule(JOBS.tick, '5 * * * *', {}, { tz: 'UTC', key: 'hourly' });
+  await jobQueue.register<WhatsappAgentJobPayload>(JOBS.whatsappAgent, async (data) => {
+    const { runWhatsappAgentJob } = await import('./whatsapp-worker');
+    await runWhatsappAgentJob(data.tenantId, data.jobId);
+  });
+
+  await jobQueue.register<ScheduleRunJob>(JOBS.scheduleRun, async (data) => {
+    const { scheduleRunner } = await import('./schedules');
+    await scheduleRunner.run(data.tenantId, data.occurrenceId, data.requestId);
+  });
+
+  await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {
+    const now = data.now ? new Date(data.now) : new Date();
+    const daily = await enqueueDailyForDueTenants(now);
+    const { syncService } = await import('./services');
+    const { scheduleService } = await import('./schedules');
+    const { browserAutomationService } = await import('./browser-automation');
+    const browser = await syncService.enqueueDueBrowserSyncs(now);
+    const scheduled = await scheduleService.enqueueDueSchedules(now);
+    const expiredBrowserSessions = await browserAutomationService.cleanupExpiredSessions();
+    const trelloReconcile = await enqueueTrelloReconciliations(now);
+    const trelloPrivacy = await enqueueTrelloPrivacy(now);
+    logger.info({
+      operation: 'scheduler_tick',
+      daily_enqueued: daily.enqueued,
+      browser_enqueued: browser.enqueued,
+      schedules_enqueued: scheduled.enqueued,
+      schedules_evaluated: scheduled.evaluated,
+      expired_browser_sessions: expiredBrowserSessions,
+      trello_reconcile_enqueued: trelloReconcile.enqueued,
+      trello_privacy_enqueued: trelloPrivacy.enqueued,
+    });
+  });
+
+  await jobQueue.unschedule(JOBS.tick, 'hourly');
+  await jobQueue.schedule(JOBS.tick, '*/5 * * * *', {}, { tz: 'UTC', key: 'integration-tick' });
   logger.info({ operation: 'job_workers_started' });
+}
+
+/**
+ * Enqueue a WhatsApp agent operation. When the pg-boss queue is not running
+ * (dev/serverless without JOBS_ENABLED) it runs inline via `after()`-style
+ * fire-and-forget so the webhook still responds fast.
+ */
+export async function enqueueWhatsappAgentJob(payload: WhatsappAgentJobPayload): Promise<void> {
+  const jobQueue = getJobQueue();
+  if (jobQueue && jobQueue.isStarted) {
+    await jobQueue.publish<WhatsappAgentJobPayload>(JOBS.whatsappAgent, payload, {
+      singletonKey: payload.jobId,
+    });
+    logger.info({
+      tenant_id: payload.tenantId,
+      operation: 'wa_job_enqueue',
+      queue: 'pg-boss',
+      job_id: payload.jobId,
+    });
+    return;
+  }
+  logger.info({
+    tenant_id: payload.tenantId,
+    operation: 'wa_job_enqueue',
+    queue: 'inline',
+    job_id: payload.jobId,
+  });
+  const { runWhatsappAgentJob } = await import('./whatsapp-worker');
+  // Do not await: keep the webhook ACK fast; errors are handled inside the runner.
+  void runWhatsappAgentJob(payload.tenantId, payload.jobId).catch((err) => {
+    logger.error({ err, job_id: payload.jobId, operation: 'wa_job_inline_failed' });
+  });
 }

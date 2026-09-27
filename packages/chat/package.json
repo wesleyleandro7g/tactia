@@ -1,0 +1,67 @@
+{
+  "name": "@tactia/chat",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./protocol": {
+      "types": "./src/protocol.ts",
+      "default": "./src/protocol.ts"
+    },
+    "./format": {
+      "types": "./src/format.ts",
+      "default": "./src/format.ts"
+    },
+    "./server": {
+      "types": "./src/server/index.ts",
+      "default": "./src/server/index.ts"
+    },
+    "./ui": {
+      "types": "./src/ui/index.ts",
+      "default": "./src/ui/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tactia/ai": "workspace:*",
+    "@tactia/database": "workspace:*",
+    "@tactia/domain": "workspace:*",
+    "@tactia/execution": "workspace:*",
+    "@tactia/intelligence": "workspace:*",
+    "@tactia/shared": "workspace:*",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "3.25.2"
+  },
+  "peerDependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@shadcn/react": "^0.3.1",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "0.37.0",
+    "react": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@shadcn/react": "^0.3.1",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "eslint": "^9.34.0",
+    "lucide-react": "0.37.0",
+    "react": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "3.6.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

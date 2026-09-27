@@ -14,10 +14,13 @@ import type { MembershipRole, RequestContext } from '@tactia/shared';
  */
 export type ToolContext = RequestContext & {
   tenantId: string;
-  userId: string;
+  /** `null` when the principal is a backoffice operator (`operatorId` is set). */
+  userId: string | null;
   role: MembershipRole;
   /** Set by the MCP adapter so `propose_action` records origin `mcp`. */
   origin?: 'ai' | 'mcp';
+  /** Only the authenticated chat route sets this; browser tasks use it for the status card. */
+  conversationId?: string;
 };
 
 /**
@@ -58,6 +61,7 @@ export type ToolResult<TData = unknown> = {
   proposal?: ActionProposal;
   /** Optional media attachment produced by the tool (infographic PNG, etc.). */
   attachment?: ChatAttachment;
+  browserTaskId?: string;
 };
 
 /** Structured action proposed during the conversation (spec §44). */
@@ -87,6 +91,7 @@ export type ExecutedToolCall = {
   durationMs: number;
   sources: MessageSource[];
   error?: string;
+  browserTaskId?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -114,6 +119,8 @@ export type LLMRequest = {
   system: string;
   messages: LLMMessage[];
   tools?: LLMToolDefinition[];
+  /** Force or require tool selection for deterministic routing policies. */
+  toolChoice?: 'auto' | 'required' | { type: 'tool'; toolName: string };
   temperature?: number;
   maxOutputTokens?: number;
 };
@@ -167,6 +174,7 @@ export type ChatAnswer = {
   proposals: ActionProposal[];
   /** Infographics / media generated during this turn. */
   attachments: ChatAttachment[];
+  browserTaskIds?: string[];
   provider: string;
   model: string;
   usage?: LLMUsage;
@@ -183,6 +191,7 @@ export type ChatStreamEvent =
       durationMs?: number;
       proposal?: ActionProposal;
       attachment?: ChatAttachment;
+      browserTaskId?: string;
       error?: string;
     }
   | { type: 'text'; delta: string }

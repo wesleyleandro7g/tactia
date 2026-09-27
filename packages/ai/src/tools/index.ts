@@ -36,7 +36,9 @@ import {
   createSearchEpisodesTool,
 } from './memory';
 import { createProposeActionTool, type ActionProposalPort } from './propose-action';
+import { createSendEmailTool, type DirectEmailPort } from './send-email';
 import { createGenerateInfographicTool, type InfographicStore } from './generate-infographic';
+import { createScheduleTools, type SchedulePort } from './schedule';
 import {
   createGetAcquisitionTool,
   createGetCashFlowTool,
@@ -105,10 +107,20 @@ export {
   PROPOSABLE_ACTION_TYPES,
   type ActionProposalPort,
 } from './propose-action';
+export { createSendEmailTool, type DirectEmailPort } from './send-email';
 export {
   createGenerateInfographicTool,
   type InfographicStore,
 } from './generate-infographic';
+export {
+  createScheduleTools,
+  createCreateScheduleTool,
+  createListSchedulesTool,
+  createUpdateScheduleTool,
+  createDisableScheduleTool,
+  createTriggerScheduleTool,
+  type SchedulePort,
+} from './schedule';
 export {
   currentMonthPeriod,
   periodInputSchema,
@@ -126,10 +138,22 @@ export type CreateToolsOptions = {
    */
   actionProposer?: ActionProposalPort;
   /**
+   * When provided, `send_email` is registered so the assistant can send an
+   * e-mail directly (no approval) at the user's request. Chat-only — do not
+   * pass it for the MCP registry, which must keep the approval guardrail.
+   */
+  directEmailSender?: DirectEmailPort;
+  /**
    * When provided, `generate_infographic` is registered so the assistant can
    * attach branded PNGs to chat/WhatsApp answers.
    */
   infographicStore?: InfographicStore;
+  /**
+   * When provided, the schedule tools (create/list/update/disable/trigger) are
+   * registered so the assistant can manage the company's schedules from chat.
+   * Chat-only — do not pass it for the MCP registry.
+   */
+  schedulePort?: SchedulePort;
 };
 
 /** Read tools + analytics tools + optional propose_action (Etapa 7). */
@@ -185,8 +209,14 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
   if (options.actionProposer) {
     tools.push(createProposeActionTool(options.actionProposer));
   }
+  if (options.directEmailSender) {
+    tools.push(createSendEmailTool(options.directEmailSender));
+  }
   if (options.infographicStore) {
     tools.push(createGenerateInfographicTool(options.infographicStore));
+  }
+  if (options.schedulePort) {
+    tools.push(...createScheduleTools(options.schedulePort));
   }
 
   return tools;

@@ -1,5 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { generateText, streamText, tool, type ModelMessage, type ToolSet } from 'ai';
+import { asSchema, generateText, jsonSchema, streamText, tool, type ModelMessage, type ToolSet } from 'ai';
 import { AppError, ErrorCode, logger } from '@tactia/shared';
 import type {
   LLMAdapter,
@@ -65,12 +65,27 @@ function toModelMessages(messages: LLMMessage[]): ModelMessage[] {
  * calls and the Tactia orchestrator runs them itself, so validation, tenant
  * scoping and evidence collection stay under our control (spec §41).
  */
-function toToolSet(request: LLMRequest): ToolSet | undefined {
+export function toToolSet(request: LLMRequest): ToolSet | undefined {
   if (!request.tools?.length) return undefined;
-  const entries = request.tools.map((definition) => [
-    definition.name,
-    tool({ description: definition.description, inputSchema: definition.inputSchema }),
-  ]);
+  const entries = request.tools.map((definition) => {
+    const materialized = asSchema(definition.inputSchema).jsonSchema;
+    const rootType = (materialized as { type?: unknown } | null)?.type;
+    if (!materialized || rootType !== 'object') {
+      throw new AppError(
+        ErrorCode.AI_ERROR,
+        `Schema interno inválido para a tool '${definition.name}': a raiz precisa ser type object.`,
+      );
+    }
+    return [
+      definition.name,
+      tool({
+        description: definition.description,
+        // Freeze the provider contract as plain JSON Schema. This avoids provider-
+        // specific or stale Zod conversion paths changing the function root.
+        inputSchema: jsonSchema(materialized),
+      }),
+    ];
+  });
   return Object.fromEntries(entries) as ToolSet;
 }
 
@@ -116,6 +131,7 @@ export class VercelLLMAdapter implements LLMAdapter {
         system: request.system,
         messages: toModelMessages(request.messages),
         tools: toToolSet(request),
+        toolChoice: request.toolChoice,
         temperature: request.temperature ?? this.temperature,
         maxOutputTokens: request.maxOutputTokens ?? this.maxOutputTokens,
       });
@@ -150,6 +166,7 @@ export class VercelLLMAdapter implements LLMAdapter {
         system: request.system,
         messages: toModelMessages(request.messages),
         tools: toToolSet(request),
+        toolChoice: request.toolChoice,
         temperature: request.temperature ?? this.temperature,
         maxOutputTokens: request.maxOutputTokens ?? this.maxOutputTokens,
       });

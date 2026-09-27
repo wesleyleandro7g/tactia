@@ -1,6 +1,6 @@
 import type { TenantApiKeyRepository } from '@tactia/database';
 import { AppError, ErrorCode, type MembershipRole, type RequestContext } from '@tactia/shared';
-import { assertOwnerOrAdmin } from '../authz';
+import { assertOwnerOrAdmin, assertTenantUser } from '../authz';
 import { createApiKeySchema, type ApiKeyScope } from '../schemas/api-keys';
 import { AuditAction, type AuditLogService } from './audit-log-service';
 import {
@@ -31,6 +31,8 @@ export class TenantApiKeyService {
 
   async create(ctx: RequestContext, raw: unknown) {
     assertOwnerOrAdmin(ctx);
+    // A key acts on behalf of the user who created it.
+    assertTenantUser(ctx);
     const input = createApiKeySchema.parse(raw);
     const scopes = uniqueScopes(input.scopes ?? DEFAULT_SCOPES);
     const row = await this.createWithUniquePrefix(ctx, input.name, scopes);

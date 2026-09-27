@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
-import { assertCanManageConnections, assertOperator, assertOwnerOrAdmin, assertRole, assertTenantScope, hasMinRole } from '../authz';
+import {
+  assertCanManageConnections,
+  assertOperator,
+  assertOwnerOrAdmin,
+  assertRole,
+  assertTenantContext,
+  assertTenantScope,
+  assertTenantUser,
+  hasMinRole,
+} from '../authz';
 
 function ctx(role: RequestContext['role']): RequestContext {
   return {
@@ -67,5 +76,40 @@ describe('authorization', () => {
         operatorId: 'op_a',
       }),
     ).not.toThrow();
+  });
+
+  describe('operator principal (admin test chat)', () => {
+    const operator: RequestContext = {
+      requestId: 'req_ops',
+      tenantId: 'tenant_a',
+      userId: null,
+      role: 'owner',
+      operatorId: 'op_a',
+    };
+
+    it('accepts an operator with tenant + role in tenant/role gates', () => {
+      expect(() => assertTenantContext(operator)).not.toThrow();
+      expect(() => assertRole(operator, 'member')).not.toThrow();
+      expect(() => assertOwnerOrAdmin(operator)).not.toThrow();
+    });
+
+    it('still requires a tenant and a role for operators', () => {
+      expect(() => assertTenantContext({ ...operator, tenantId: null })).toThrow(AppError);
+      expect(() => assertTenantContext({ ...operator, role: null })).toThrow(AppError);
+    });
+
+    it('rejects a context with neither user nor operator', () => {
+      try {
+        assertTenantContext({ ...operator, operatorId: null });
+        throw new Error('should have thrown');
+      } catch (error) {
+        expect((error as AppError).code).toBe(ErrorCode.AUTHENTICATION_ERROR);
+      }
+    });
+
+    it('assertTenantUser keeps requiring a real user', () => {
+      expect(() => assertTenantUser(operator)).toThrow(AppError);
+      expect(() => assertTenantUser(ctx('viewer'))).not.toThrow();
+    });
   });
 });
