@@ -3,6 +3,7 @@ FROM node:22-alpine AS builder
 RUN corepack enable
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY patches ./patches
 COPY apps/landing/package.json apps/landing/
 COPY packages/shared/package.json packages/shared/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
