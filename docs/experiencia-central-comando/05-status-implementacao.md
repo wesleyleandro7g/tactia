@@ -128,8 +128,9 @@ desligada, e suas rotas permanecem acessíveis quando ligada.
 
 Evidência: `settings-routes.test.ts` (20/20, incluindo ligar/desligar,
 auditoria, isolamento de empresas e validação) e `command-center-flag.test.ts`
-(2/2, precedência e tenant inexistente). Migração aplicada somente em
-`tactia_test`; regressão web 34/34 nos seis arquivos da seção de verificação.
+(2/2, precedência e tenant inexistente). Migração aplicada em `tactia_test` e,
+posteriormente, no banco local `tactia`; regressão web 34/34 nos seis arquivos
+da seção de verificação.
 Typecheck de database/domain/web/admin e lint dos arquivos alterados passaram.
 
 O Ops agora tem a aba `/tenants/[id]/preparation` para preparar objetivo,
@@ -237,7 +238,7 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 
 | Item | Severidade | Situação |
 |---|---|---|
-| Migrações aplicadas **somente** em `tactia_test` | Alta | Desenvolvimento e produção exigem deploy controlado |
+| Migrações ainda não verificadas em produção | Alta | `tactia_test` e o banco local `tactia` estão atualizados; o estado de produção é desconhecido e exige inspeção antes do deploy |
 | Fallback por env (`COMMAND_CENTER_TENANT_IDS`) | Baixa | Permanece apenas para empresas sem decisão registrada, para desenvolvimento; Ops grava decisão explícita |
 | Lint global de `apps/web` falha | Baixa | **Preexistente** em `components/landing/hero-prompt.tsx` e `web-threads.tsx`; comprovado com `git stash` no HEAD |
 | 6 testes `browser-integration`/Torge falham | Baixa | **Preexistentes**, validação de URL `app.torge.com.br`; comprovado no HEAD |
@@ -247,15 +248,19 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
+1. **Consolidar métricas de eventos** para observar o piloto sem mensagem nem PII:
+   próxima alteração de código, detalhada em `06-prompt-continuacao.md`.
+2. **Implementar a revisão semanal consolidada** da entrega 4, sobre planos,
+   decisões, execução, lacunas e resultado observado.
+3. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
    dois temas, inclusive zoom/leitor de tela; as tabelas equivalentes já estão
    disponíveis nos gráficos.
-2. **Consolidar métricas de eventos** para observar o piloto sem mensagem nem PII.
-3. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
+4. **Inspecionar produção e planejar o piloto** com uma empresa real; não
+   reproduzir o baseline especial do banco local sem verificar o esquema.
 
 ## Definition of Done do primeiro recorte
 
 Ainda **não** atingida de ponta a ponta com dados reais. O ciclo está provado em
-teste de integração com Postgres real, mas falta: empresa real conectada, deploy
-das migrações e observação do resultado comercial em janela real. A validação
-visual do item 1 e o deploy/piloto do item 3 ainda faltam.
+teste de integração com Postgres real, mas falta: empresa real conectada,
+inspeção/deploy em produção e observação do resultado comercial em janela real.
+A validação visual e o piloto também seguem pendentes.

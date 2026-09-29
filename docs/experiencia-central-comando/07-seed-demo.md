@@ -16,21 +16,20 @@ banco. Variáveis exportadas no shell, como `DATABASE_URL` acima, prevalecem.
 Antes de gravar dados, ele verifica se `tenants.command_center_enabled` existe.
 Se faltar, o seed encerra com uma mensagem sobre o esquema desatualizado.
 
-No banco local `localhost:5433/tactia` inspecionado em 29/09/2026, já existem
-as tabelas anteriores à Central, mas não existe `_prisma_migrations`. Assim,
-`prisma migrate deploy` considera todas as 47 migrações pendentes e entra em
-conflito com as tabelas existentes. A correção desse banco exige conferir um
-backup, registrar como aplicadas as 40 migrações anteriores que correspondem
-ao esquema existente e então aplicar as 7 migrações da Central. Confira o
-destino e o esquema antes dessas operações; não execute `migrate deploy`
-diretamente nesse estado.
+Em 29/09/2026, o banco local `localhost:5433/tactia` tinha tabelas sem histórico
+`_prisma_migrations` e a primeira migração da Central já refletida no esquema. Após
+inspeção do esquema, as 40 migrações anteriores e a primeira da Central foram
+registradas como aplicadas; as 6 restantes foram executadas. O comando
+`prisma migrate status` confirmou as 47 migrações e o seed web terminou sem erro.
+Esse baseline foi específico para o estado desse banco e **não** é procedimento
+para produção.
 
 A primeira tentativa de seed nesse banco criou parcialmente o usuário demo
-antes de falhar na criação da empresa. Depois de atualizar o esquema, execute
-o seed novamente: ele completa essa identidade parcial e passa a criar novas
-identidades em uma transação para não repetir a falha.
+antes de falhar na criação da empresa. Após a atualização do esquema, a nova
+execução completou essa identidade. Novas identidades são criadas em uma
+transação para evitar a mesma falha parcial.
 
-Este comando foi executado somente em `tactia_test` em 29/09/2026. Não execute
+O comando foi executado em `tactia_test` e no banco local `tactia`. Não execute
 contra desenvolvimento ou produção sem conferir o `DATABASE_URL` e o propósito
 do ambiente. O seed existente cria `owner@demo.tactia` com a senha de
 demonstração definida em `apps/web/scripts/seed.ts`; ela não é uma credencial

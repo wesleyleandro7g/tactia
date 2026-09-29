@@ -35,25 +35,47 @@ guiada e eventos estão nesta branch.
 
 ## Sua tarefa
 
-Conclua o **próximo passo 1** de `05-status-implementacao.md`: validação
-renderizada e de acessibilidade da Central de Comando e do editor do Ops em
-360, 768 e 1280px, nos temas claro e escuro. A revisão estática já corrigiu
-contrastes de tokens, quebra de cards e foco nos erros; os gráficos existentes
-já oferecem tabela acessível em `<details>`. Nesta sessão o navegador não
-estava disponível, portanto não marque WCAG/visual como concluídos sem nova
-evidência.
+Implemente a **próxima entrega de código** da Central de Comando: transformar os
+eventos já persistidos em métricas operacionais consultáveis para acompanhar o
+piloto. Não gaste esta etapa com uma nova rodada de revisão visual, pesquisa ou
+deploy. O próximo desenvolvimento de produto, depois deste, é a revisão
+semanal consolidada da entrega 4.
 
 Requisitos:
 
-- Verifique em navegador foco, teclado, zoom, contraste renderizado, leitura de
-  estados e ausência de truncamento em decisões e resultados; registre evidência
-  reproduzível e corrija os problemas encontrados.
-- Preserve os contratos de confiança, tenant, versão e snapshot existentes.
-- O editor em `/tenants/[id]/preparation` já publica plano e medição sem
-  recomendação; não duplique essa implementação.
+- Parta de `packages/database/src/repositories/command-center-events.ts` e de
+  `CommandCenterEvent` no schema Prisma. Já existem os eventos deduplicados
+  `plan_created`, `decision_resolved`, `execution_state_changed`,
+  `clarification_requested` e `clarification_received`. Não crie outro mecanismo
+  de registro nem conte reprocessamentos como novos eventos.
+- Crie uma leitura agregada por empresa e período, com limites de intervalo e
+  consulta paginada quando houver detalhamento. Exponha-a em uma superfície
+  operacional do Ops, com autorização de operador no servidor. Toda consulta e
+  link de detalhe devem preservar o isolamento por tenant; um operador sem
+  permissão não pode obter dados por URL direta.
+- Comece por contagens e tendências que os eventos existentes sustentam.
+  Separe plano criado, decisão resolvida, transição de execução e esclarecimento
+  solicitado/recebido. Mostre período, definição e denominador quando calcular
+  taxa. Ausência de eventos ou de cobertura deve aparecer como ausência, nunca
+  como zero de desempenho ou sucesso comercial presumido.
+- Não inclua texto de pergunta/resposta, telefone, nomes ou payloads de ações
+  nas métricas, API, logs ou interface. Use apenas nomes de evento, estados,
+  timestamps, IDs já autorizados e contagens necessárias. Não apresente métricas
+  como tempo até primeiro valor, redução de esforço ou resultado comercial se
+  os eventos atuais não permitem calculá-las; documente essa limitação.
+- Reutilize componentes e padrões de Ops. Preserve o ciclo de execução,
+  aprovação, medição e esclarecimento já implementado. Não altere a semântica
+  de `recommendations/:id/accept` nem reexecute o seed em produção.
+- Cubra, com testes relevantes, agregação, deduplicação, filtro temporal,
+  isolamento entre empresas, autorização e estado vazio. Verifique typecheck e
+  lint dos arquivos/pacotes alterados. Se precisar de migração, aplique-a apenas
+  em `tactia_test` para a verificação; não modifique bancos de desenvolvimento
+  ou produção sem confirmação do usuário.
 
-Se concluir, avance para a consolidação de métricas de eventos sem conteúdo de
-mensagens ou PII, o próximo passo 2 do documento de status.
+Critério de saída: um operador consegue consultar, para uma empresa e janela
+definidas, os indicadores sustentados pelos eventos da Central, entender o que
+cada número mede e ver explicitamente o que ainda não pode ser inferido. A
+consulta não expõe dados de outra empresa nem conteúdo pessoal.
 
 ## Invariantes que não podem ser quebradas
 
@@ -77,8 +99,11 @@ apresentar evidência de que estão erradas:
 
 ## Verificação
 
-O banco de teste já tem as 7 migrações aplicadas. **Nunca aponte migração para o
-banco de desenvolvimento ou produção sem pedir confirmação ao usuário.**
+O banco `tactia_test` e o banco local de desenvolvimento `tactia` já têm as 47
+migrações registradas. A situação de produção é desconhecida. **Nunca aponte
+migração para o banco de desenvolvimento ou produção sem pedir confirmação ao
+usuário.** O baseline especial usado uma vez no banco local não é uma receita
+para produção.
 
 ```bash
 export TEST_DB=postgresql://tactia:tactia@localhost:5433/tactia_test
@@ -106,8 +131,9 @@ pnpm --filter @tactia/database typecheck && pnpm --filter @tactia/domain typeche
   && pnpm --filter @tactia/web typecheck && pnpm --filter @tactia/admin typecheck
 ```
 
-Escreva teste novo para o comportamento que você adicionar, e rode as suítes
-acima como regressão.
+Escreva testes para o comportamento agregado que adicionar. Rode as suítes
+relevantes acima como regressão; não presuma que a lista substitui os testes
+novos de autorização e isolamento.
 
 ## Falhas preexistentes — não gaste tempo nelas
 
