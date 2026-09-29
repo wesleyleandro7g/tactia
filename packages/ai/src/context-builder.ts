@@ -57,6 +57,7 @@ export type ContextGoal = {
   metricKey: string;
   scope: string;
   scopeLabel?: string | null;
+  period?: { from: string; to: string };
   target: number;
   achieved: number;
   progress: number;
@@ -298,6 +299,14 @@ export class ContextBuilder {
       sources: [
         ...mtd.map((result) => sourceFromMetric(result, 'context')),
         ...trailing.map((result) => sourceFromMetric(result, 'context')),
+        ...(goals ?? []).map((goal) => ({
+          metric: 'goal_progress',
+          period: goal.period,
+          value: goal.achieved,
+          tool: 'context',
+          label: `Meta de ${goal.metricKey}`,
+          refId: goal.id,
+        })),
       ],
     };
 

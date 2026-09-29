@@ -1,4 +1,4 @@
-import { buildClaimAllowlist, unsourcedNumbers } from '@tactia/domain';
+import { buildClaimAllowlist, collectAllowedFromValues, unsourcedNumbers } from '@tactia/domain';
 import { AppError, logger, redactSensitive, redactSensitiveDeep } from '@tactia/shared';
 import type { AiContext } from './context-builder';
 import { buildSystemPrompt, FOLLOW_UPS_HEADING, type WhatsappChannelContext } from './system-prompt';
@@ -101,6 +101,19 @@ function allowContextCalendarYears(
   return allowed;
 }
 
+/** Goal figures are injected into the system prompt, so they are valid claims too. */
+function allowContextGoals(allowed: Set<string>, context: AiContext): Set<string> {
+  for (const goal of context.goals) {
+    const values = [goal.target, goal.achieved, goal.requiredDailyPace, goal.projected]
+      .filter((value): value is number => value != null);
+    for (const key of collectAllowedFromValues(values)) allowed.add(key);
+    if (Number.isFinite(goal.progress)) {
+      allowed.add(`p:${Math.round(goal.progress * 100)}`);
+    }
+  }
+  return allowed;
+}
+
 /**
  * Drop attachment IDs/URLs and UUID-like tokens before claim checks.
  * Models often paste `/api/v1/infographics/<id>`; digit fragments then trip claim_mismatch.
@@ -147,7 +160,7 @@ export function extractFollowUps(text: string): { content: string; followUps: st
 function dedupeSources(sources: MessageSource[]): MessageSource[] {
   const seen = new Map<string, MessageSource>();
   for (const source of sources) {
-    const key = `${source.metric}|${source.period?.from ?? ''}|${source.period?.to ?? ''}`;
+    const key = `${source.metric}|${source.period?.from ?? ''}|${source.period?.to ?? ''}|${source.refId ?? ''}`;
     const existing = seen.get(key);
     if (!existing) {
       seen.set(key, source);
@@ -476,7 +489,10 @@ export class Orchestrator {
       flag = 'unsourced_numbers';
     } else if (this.enforceSources) {
       const allowlist = allowContextCalendarYears(
-        buildClaimAllowlist([...context.metrics, ...context.trailing30], deduped),
+        allowContextGoals(
+          buildClaimAllowlist([...context.metrics, ...context.trailing30], deduped),
+          context,
+        ),
         context,
         deduped,
       );

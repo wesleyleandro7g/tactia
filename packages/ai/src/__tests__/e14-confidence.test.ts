@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ErrorCode, createId, type RequestContext } from '@tactia/shared';
 import { MockLLMAdapter } from '../adapters/mock-llm-adapter';
-import type { AiContext } from '../context-builder';
+import { ContextBuilder, type AiContext, type ContextBuilderDeps } from '../context-builder';
 import { CLAIM_MISMATCH_FALLBACK, Orchestrator, type ContextSource } from '../orchestrator';
 import { buildSystemPrompt } from '../system-prompt';
 import { ToolRegistry, defineTool } from '../tool-registry';
@@ -88,6 +88,94 @@ function recordingProposer() {
 }
 
 describe('E14 claim_mismatch', () => {
+  it('carries every active goal as a citable context source', async () => {
+    const goals = [1, 2].map((index) => ({
+      id: `goal-${index}`,
+      metricKey: 'revenue',
+      scope: 'tenant',
+      period: PERIOD,
+      target: index * 100000,
+      achieved: index * 50000,
+      progress: 0.5,
+      requiredDailyPace: 1000,
+      projected: null,
+      onTrack: false,
+      periodEnd: PERIOD.to,
+    }));
+    const builder = new ContextBuilder({
+      tenants: {
+        get: async () => ({
+          id: 'tenant-1',
+          name: 'Demo',
+          currency: 'BRL',
+          timezone: 'America/Sao_Paulo',
+        }),
+      } as unknown as ContextBuilderDeps['tenants'],
+      metrics: {
+        calculate: async (_ctx: unknown, key: string) => ({ key, value: 0, period: PERIOD }),
+      } as unknown as ContextBuilderDeps['metrics'],
+      insights: { list: async () => ({ items: [] }) } as unknown as ContextBuilderDeps['insights'],
+      providers: { goals: async () => goals },
+    });
+
+    const context = await builder.build(toolContext());
+
+    expect(context.sources.filter((source) => source.metric === 'goal_progress')).toEqual([
+      expect.objectContaining({ refId: 'goal-1', period: PERIOD, value: 50000 }),
+      expect.objectContaining({ refId: 'goal-2', period: PERIOD, value: 100000 }),
+    ]);
+  });
+
+  it('accepts the figures of an active goal present in the chat context', async () => {
+    const llm = new MockLLMAdapter({
+      script: [
+        {
+          text: 'A meta é R$ 200.000; realizamos R$ 120.000 (60%), com ritmo de R$ 2.667/dia e projeção de R$ 180.000.',
+        },
+      ],
+    });
+    const goal = {
+      id: 'goal-1',
+      metricKey: 'revenue',
+      scope: 'tenant',
+      period: PERIOD,
+      target: 200000,
+      achieved: 120000,
+      progress: 0.6,
+      requiredDailyPace: 2666.67,
+      projected: 180000,
+      onTrack: false,
+      periodEnd: PERIOD.to,
+    };
+    const orchestrator = new Orchestrator({
+      llm,
+      tools: new ToolRegistry([revenueTool]),
+      contextBuilder: contextSource({
+        goals: [goal],
+        metrics: [],
+        sources: [
+          {
+            metric: 'goal_progress',
+            period: PERIOD,
+            value: goal.achieved,
+            tool: 'context',
+            refId: goal.id,
+          },
+        ],
+      }),
+    });
+
+    const answer = await orchestrator.run({
+      ctx: toolContext(),
+      question: 'Quais são os nossos objetivos?',
+    });
+
+    expect(answer.guardrail).toBeUndefined();
+    expect(answer.content).toContain('R$ 200.000');
+    expect(answer.content).toContain('60%');
+    expect(answer.sources[0]?.refId).toBe(goal.id);
+  });
+
   it('E14: claim_mismatch when answer says 999999 but source.value is 1500', async () => {
     const llm = new MockLLMAdapter({
       script: [{ text: 'A receita foi de R$ 999.999 no mês.' }],

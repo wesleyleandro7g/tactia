@@ -202,6 +202,7 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
           metricKey: goal.metricKey,
           scope: goal.scope,
           scopeLabel: goal.scope === 'tenant' ? null : goal.scope,
+          period: goal.period,
           target: goal.target,
           achieved: goal.achieved,
           progress: goal.progress,

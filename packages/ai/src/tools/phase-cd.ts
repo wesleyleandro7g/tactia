@@ -12,12 +12,13 @@ export function createGetGoalsProgressTool(deps: ToolDeps): Tool {
       const data = await deps.analytics.getGoalsProgress(ctx);
       return {
         data,
-        sources: data.slice(0, 5).map((goal) => ({
-          metric: goal.metricKey,
+        sources: data.map((goal) => ({
+          metric: 'goal_progress',
           period: goal.period,
           value: goal.achieved,
           tool: 'get_goals_progress',
           label: `Meta ${goal.metricKey}`,
+          refId: goal.id,
         })),
       };
     },
