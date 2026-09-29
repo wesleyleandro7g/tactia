@@ -10,6 +10,7 @@ import {
   FileText,
   Files,
   History,
+  Home,
   Key,
   LayoutDashboard,
   ListChecks,
@@ -18,6 +19,7 @@ import {
   MessageSquare,
   PlugZap,
   Target,
+  TrendingUp,
 } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
@@ -36,6 +38,10 @@ import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 export type NavItem = { href: string; label: string };
 
 const NAV_ICONS: Record<string, LucideIcon> = {
+  '/today': Home,
+  '/objectives': Target,
+  '/operations': ListChecks,
+  '/results': TrendingUp,
   '/dashboard': LayoutDashboard,
   '/briefings': FileText,
   '/chat': MessageSquare,

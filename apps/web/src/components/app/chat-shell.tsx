@@ -30,7 +30,16 @@ export function ChatShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const endpoints = useMemo(() => persistentChatEndpoints(), []);
+  const contextType = searchParams.get('contextType');
+  const contextId = searchParams.get('contextId');
+  const endpoints = useMemo(
+    () => persistentChatEndpoints(
+      contextId && (contextType === 'plan' || contextType === 'objective')
+        ? { type: contextType, resourceId: contextId }
+        : undefined,
+    ),
+    [contextId, contextType],
+  );
   // `?q=` (ex.: "Perguntar no chat" de um insight): new conversations send it
   // automatically; existing ones keep it as an editable draft.
   const question = searchParams.get('q')?.trim();

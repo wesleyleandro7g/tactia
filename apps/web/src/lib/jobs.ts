@@ -23,6 +23,8 @@ export const JOBS = {
   scheduleRun: 'schedule.run',
   /** One async WhatsApp agent operation (direct execution + status reply). */
   whatsappAgent: 'whatsapp.agent',
+  /** One prepared evidence clarification message (Ops-authorized). */
+  evidenceClarification: 'evidence.clarification',
   /** Same name the chat package publishes (`BROWSER_TASK_JOB`). */
   browserTask: BROWSER_TASK_JOB,
 } as const;
@@ -42,6 +44,7 @@ export type ScheduleRunJob = {
   requestId: string;
 };
 export type WhatsappAgentJobPayload = { tenantId: string; jobId: string };
+export type EvidenceClarificationJobPayload = { tenantId: string; clarificationId: string };
 export type SyncJob = {
   tenantId: string;
   syncJobId: string;
@@ -138,7 +141,7 @@ export async function runMemoryEmbed(tenantId: string) {
 }
 
 export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
-  const { intelligencePipelineService, snapshotService, syncService, tenantRepository } =
+  const { intelligencePipelineService, snapshotService, syncService, tenantRepository, refreshPlanMeasurements } =
     await import('./services');
   const tenant = await tenantRepository.findById({ tenantId });
   const syncJobs = await syncService.syncTenantSources(tenantId, {
@@ -152,6 +155,7 @@ export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
     windows: IntelligencePipelineService.dailyWindows(now),
     actorCtx: { tenantId, userId: null },
   });
+  const measurements = await refreshPlanMeasurements(tenantId, now);
   const memory = await runMemoryEmbed(tenantId);
   logger.info({
     tenant_id: tenantId,
@@ -160,7 +164,7 @@ export async function runIntelligenceDaily(tenantId: string, now = new Date()) {
     sync_sources: syncJobs.length,
     ...pipeline,
   });
-  return { snapshots, pipeline, memory, sync: { sources: syncJobs.length } };
+  return { snapshots, pipeline, measurements, memory, sync: { sources: syncJobs.length } };
 }
 
 export async function enqueueDailyForDueTenants(now = new Date()) {
@@ -287,9 +291,18 @@ export async function startJobWorkers(): Promise<void> {
 
   await jobQueue.start();
 
-  const { executionEngine, syncService } = await import('./services');
+  const { executionEngine, syncService, commandCenterService } = await import('./services');
   await jobQueue.useActionRunner(async ({ tenantId, executionId }) => {
     await executionEngine.run(tenantId, executionId);
+    await commandCenterService.reconcileExecution(
+      {
+        requestId: `action-reconcile:${executionId}`,
+        tenantId,
+        userId: 'system',
+        role: 'owner',
+      },
+      executionId,
+    );
   });
 
   await jobQueue.register<DailyJob>(JOBS.daily, async (data) => {
@@ -353,6 +366,14 @@ export async function startJobWorkers(): Promise<void> {
     await runWhatsappAgentJob(data.tenantId, data.jobId);
   });
 
+  await jobQueue.register<EvidenceClarificationJobPayload>(
+    JOBS.evidenceClarification,
+    async (data) => {
+      const { runEvidenceClarificationJob } = await import('./clarification-worker');
+      await runEvidenceClarificationJob(data.tenantId, data.clarificationId);
+    },
+  );
+
   await jobQueue.register<ScheduleRunJob>(JOBS.scheduleRun, async (data) => {
     const { scheduleRunner } = await import('./schedules');
     await scheduleRunner.run(data.tenantId, data.occurrenceId, data.requestId);
@@ -369,6 +390,7 @@ export async function startJobWorkers(): Promise<void> {
     const expiredBrowserSessions = await browserAutomationService.cleanupExpiredSessions();
     const trelloReconcile = await enqueueTrelloReconciliations(now);
     const trelloPrivacy = await enqueueTrelloPrivacy(now);
+    const clarifications = await enqueueQueuedClarifications();
     logger.info({
       operation: 'scheduler_tick',
       daily_enqueued: daily.enqueued,
@@ -378,6 +400,7 @@ export async function startJobWorkers(): Promise<void> {
       expired_browser_sessions: expiredBrowserSessions,
       trello_reconcile_enqueued: trelloReconcile.enqueued,
       trello_privacy_enqueued: trelloPrivacy.enqueued,
+      clarifications_enqueued: clarifications.enqueued,
     });
   });
 
@@ -415,5 +438,62 @@ export async function enqueueWhatsappAgentJob(payload: WhatsappAgentJobPayload):
   // Do not await: keep the webhook ACK fast; errors are handled inside the runner.
   void runWhatsappAgentJob(payload.tenantId, payload.jobId).catch((err) => {
     logger.error({ err, job_id: payload.jobId, operation: 'wa_job_inline_failed' });
+  });
+}
+
+/**
+ * Enqueue every clarification Ops already prepared. The send itself revalidates
+ * the gap and the contact policy, so this sweep never decides to contact anyone.
+ */
+export async function enqueueQueuedClarifications(limit = 50) {
+  const { prisma } = await import('@tactia/database');
+  const queued = await prisma.evidenceClarification.findMany({
+    where: { status: 'queued' },
+    select: { id: true, tenantId: true },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+  });
+  for (const item of queued) {
+    await enqueueEvidenceClarification({ tenantId: item.tenantId, clarificationId: item.id });
+  }
+  return { enqueued: queued.length };
+}
+
+/**
+ * Enqueue one prepared evidence clarification. Same pattern as the WhatsApp
+ * agent job: pg-boss when enabled, inline fire-and-forget otherwise, so the Ops
+ * request stays fast and the send is revalidated at delivery time.
+ */
+export async function enqueueEvidenceClarification(
+  payload: EvidenceClarificationJobPayload,
+): Promise<void> {
+  const jobQueue = getJobQueue();
+  if (jobQueue && jobQueue.isStarted) {
+    await jobQueue.publish<EvidenceClarificationJobPayload>(
+      JOBS.evidenceClarification,
+      payload,
+      { singletonKey: payload.clarificationId },
+    );
+    logger.info({
+      tenant_id: payload.tenantId,
+      operation: 'clarification_enqueue',
+      queue: 'pg-boss',
+      clarification_id: payload.clarificationId,
+    });
+    return;
+  }
+  logger.info({
+    tenant_id: payload.tenantId,
+    operation: 'clarification_enqueue',
+    queue: 'inline',
+    clarification_id: payload.clarificationId,
+  });
+  const { runEvidenceClarificationJob } = await import('./clarification-worker');
+  void runEvidenceClarificationJob(payload.tenantId, payload.clarificationId).catch((err) => {
+    logger.error({
+      err,
+      clarification_id: payload.clarificationId,
+      operation: 'clarification_inline_failed',
+    });
   });
 }

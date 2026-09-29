@@ -1,5 +1,5 @@
 import { createApiHandler, readJson } from '@/lib/api';
-import { approvalService } from '@/lib/services';
+import { approvalService, commandCenterService } from '@/lib/services';
 
 /**
  * POST /api/v1/approvals/:id/approve
@@ -10,7 +10,11 @@ import { approvalService } from '@/lib/services';
 export const POST = createApiHandler(
   { auth: 'tenant', roles: ['owner', 'admin'] },
   async (request, ctx, params) => {
+    const approvalId = params['id']!;
     const body = await readJson(request).catch(() => ({}));
-    return approvalService.approve(ctx, params['id']!, body ?? {});
+    const decision = await commandCenterService.assertDecisionCurrent(ctx, approvalId);
+    const execution = await approvalService.approve(ctx, approvalId, body ?? {});
+    const plan = await commandCenterService.reconcileExecution(ctx, execution.id);
+    return { ...execution, decisionContext: decision, plan };
   },
 );

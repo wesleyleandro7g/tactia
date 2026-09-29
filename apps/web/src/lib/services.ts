@@ -17,6 +17,8 @@ import {
   prisma,
   RawRecordRepository,
   ConversationRepository,
+  CommandCenterRepository,
+  EvidenceClarificationRepository,
   MessageRepository,
   SyncJobRepository,
   TenantApiKeyRepository,
@@ -29,6 +31,8 @@ import {
 import {
   ActivityService,
   CampaignService,
+  CommandCenterService,
+  EvidenceClarificationService,
   ConversationService,
   CredentialService,
   CustomFieldDefinitionService,
@@ -130,6 +134,7 @@ const sellerRepository = chatRepositories.sellers;
 const saleRepository = chatRepositories.sales;
 const activityRepository = chatRepositories.activities;
 const goalRepository = new GoalRepository(prisma);
+export const commandCenterRepository = new CommandCenterRepository(prisma);
 const businessFactRepository = chatRepositories.businessFacts;
 const mediaAssetRepository = new MediaAssetRepository(prisma);
 const insightFeedbackRepository = new InsightFeedbackRepository(prisma);
@@ -187,6 +192,102 @@ export const activityService = new ActivityService(
 );
 
 export const goalService = new GoalService(goalRepository);
+export const commandCenterService = new CommandCenterService(commandCenterRepository);
+export const evidenceClarificationService = new EvidenceClarificationService(
+  new EvidenceClarificationRepository(prisma),
+);
+
+async function hasMeasurementData(tenantId: string, metricKey: string): Promise<boolean> {
+  if (metricKey === 'complaint_count') {
+    return (await prisma.interaction.count({ where: { tenantId } })) > 0;
+  }
+  if (metricKey === 'expense_total') {
+    return (await prisma.expense.count({ where: { tenantId } })) > 0;
+  }
+  if (['pending_amount', 'receivables_open', 'overdue_amount', 'dso'].includes(metricKey)) {
+    return (await prisma.payment.count({ where: { tenantId } })) > 0;
+  }
+  if (['operating_profit', 'break_even_revenue'].includes(metricKey)) {
+    const [sales, expenses] = await Promise.all([
+      prisma.sale.count({ where: { tenantId } }),
+      prisma.expense.count({ where: { tenantId } }),
+    ]);
+    return sales > 0 && expenses > 0;
+  }
+  return (await prisma.sale.count({ where: { tenantId } })) > 0;
+}
+
+export async function refreshPlanMeasurements(tenantId: string, now = new Date()) {
+  const definitions = await commandCenterRepository.listMeasurementDefinitions(tenantId);
+  const ctx = {
+    requestId: `measurement-refresh:${tenantId}:${now.toISOString()}`,
+    tenantId,
+    userId: 'system',
+    role: 'owner' as const,
+  };
+  let measured = 0;
+  let unavailable = 0;
+
+  for (const definition of definitions) {
+    const periodTo = now < definition.windowTo ? now : definition.windowTo;
+    if (periodTo <= definition.windowFrom) continue;
+    try {
+      if (!(await hasMeasurementData(tenantId, definition.metricKey))) {
+        throw new Error('measurement dataset unavailable');
+      }
+      const result = await metricService.calculate(ctx, definition.metricKey, {
+        period: { from: definition.windowFrom, to: periodTo },
+      });
+      await commandCenterRepository.upsertAutomaticReview({
+        tenantId,
+        measurementDefinitionId: definition.id,
+        observed: result.value,
+        status: now >= definition.windowTo ? 'measured' : 'measuring',
+        references: [{
+          kind: 'observed',
+          metricKey: definition.metricKey,
+          period: result.period,
+          calculatedAt: now.toISOString(),
+        }],
+        limitation:
+          now >= definition.windowTo
+            ? null
+            : 'Janela de observação ainda em andamento; o valor pode mudar.',
+        reviewedAt: now >= definition.windowTo ? now : null,
+      });
+      await commandCenterRepository.resolveGapByDedupe(
+        tenantId,
+        `measurement:${definition.id}:unavailable`,
+        { source: 'metric_engine', resolvedAt: now.toISOString() },
+      );
+      measured += 1;
+    } catch {
+      const limitation = 'A métrica necessária não está disponível nas fontes atuais.';
+      await commandCenterRepository.upsertAutomaticReview({
+        tenantId,
+        measurementDefinitionId: definition.id,
+        observed: null,
+        status: now >= definition.windowTo ? 'not_measurable' : 'measuring',
+        references: [],
+        limitation,
+        reviewedAt: now >= definition.windowTo ? now : null,
+      });
+      await commandCenterRepository.createGap({
+        tenantId,
+        planId: definition.planId,
+        subject: `Medição de ${definition.indicator}`,
+        reason: limitation,
+        impact: 'high',
+        dedupeKey: `measurement:${definition.id}:unavailable`,
+        sourcesAttempted: [{ source: 'metric_engine', at: now.toISOString() }],
+        nextStep: 'Reconciliar a fonte e recalcular a medição.',
+      });
+      unavailable += 1;
+    }
+  }
+
+  return { evaluated: definitions.length, measured, unavailable };
+}
 export const expenseService = new ExpenseService(expenseRepository);
 export const paymentService = new PaymentService(paymentRepository, saleRepository);
 export const inventoryService = new InventoryService(inventoryLevelRepository, productRepository);
@@ -328,6 +429,7 @@ export const syncService = new SyncService({
   // runs right after a successful sync, and a failure here never fails the sync.
   onSyncCompleted: async ({ tenantId, userId }) => {
     await intelligencePipelineService.run({ tenantId, actorCtx: { tenantId, userId } });
+    await refreshPlanMeasurements(tenantId);
   },
   enqueueSync: jobsEnabled()
     ? async (job) => {

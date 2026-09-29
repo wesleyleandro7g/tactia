@@ -4,7 +4,16 @@ import { type NavItem } from '@/components/app/nav';
 import { getServerContext, listUserTenants } from '@/lib/server-context';
 import { hasMinRole } from '@tactia/domain';
 
-const BASE_NAV: NavItem[] = [
+const COMMAND_CENTER_NAV: NavItem[] = [
+  { href: '/today', label: 'Hoje' },
+  { href: '/objectives', label: 'Objetivos' },
+  { href: '/operations', label: 'Operação' },
+  { href: '/results', label: 'Resultados' },
+  { href: '/chat', label: 'Conversar com a Tactia' },
+  { href: '/dashboard', label: 'Análises' },
+];
+
+const LEGACY_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/briefings', label: 'Briefings' },
   { href: '/chat', label: 'Chat' },
@@ -17,6 +26,17 @@ const BASE_NAV: NavItem[] = [
   { href: '/settings/connections', label: 'Conexões' },
 ];
 
+function hasCommandCenter(tenantId: string | null): boolean {
+  if (!tenantId) return false;
+  const allowed = new Set(
+    (process.env.COMMAND_CENTER_TENANT_IDS ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+  return allowed.has('*') || allowed.has(tenantId);
+}
+
 /**
  * Shell do app: exige sessão, monta a navegação e o seletor de empresa.
  */
@@ -25,7 +45,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!ctx.userId) redirect('/login');
 
   const tenants = await listUserTenants(ctx);
-  const nav: NavItem[] = [...BASE_NAV];
+  const commandCenterEnabled = hasCommandCenter(ctx.tenantId);
+  const nav: NavItem[] = [
+    ...(commandCenterEnabled ? COMMAND_CENTER_NAV : LEGACY_NAV),
+  ];
   if (ctx.role && hasMinRole(ctx.role, 'admin')) {
     nav.push(
       { href: '/settings/api-keys', label: 'API keys' },
@@ -33,7 +56,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
   return (
-    <AppShell nav={nav} tenants={tenants} tenantId={ctx.tenantId}>
+    <AppShell
+      nav={nav}
+      tenants={tenants}
+      tenantId={ctx.tenantId}
+      homeHref={commandCenterEnabled ? '/today' : '/dashboard'}
+    >
       {children}
     </AppShell>
   );

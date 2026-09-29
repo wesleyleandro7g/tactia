@@ -24,16 +24,20 @@ export function AppShell({
   nav,
   tenants,
   tenantId,
+  homeHref,
   children,
 }: {
   nav: NavItem[];
   tenants: { id: string; name: string; role: string }[];
   tenantId: string | null;
+  homeHref: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const isChat = pathname.startsWith('/chat');
-  const isDashboard = pathname.startsWith('/dashboard');
+  const isWide = ['/dashboard', '/today', '/operations', '/results'].some((route) =>
+    pathname.startsWith(route),
+  );
 
   return (
     <SidebarProvider defaultOpen>
@@ -46,7 +50,7 @@ export function AppShell({
 
       <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border">
         <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-          <Link href="/dashboard" className="inline-flex items-center">
+          <Link href={homeHref} className="inline-flex items-center">
             <BrandLogo className="h-7" priority />
           </Link>
         </SidebarHeader>
@@ -98,7 +102,7 @@ export function AppShell({
           className={
             isChat
               ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-              : isDashboard
+              : isWide
                 ? 'flex min-h-0 w-full min-w-0 flex-1 animate-page-enter flex-col overflow-x-hidden overflow-y-auto px-5 py-8 lg:px-8'
                 : 'mx-auto flex w-full max-w-6xl min-h-0 flex-1 animate-page-enter flex-col overflow-y-auto px-5 py-8 lg:px-8'
           }

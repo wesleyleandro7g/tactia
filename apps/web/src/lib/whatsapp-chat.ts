@@ -7,6 +7,7 @@ import { enqueueWhatsappAgentJob } from '@/lib/jobs';
 import { consumeRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import {
   conversationService,
+  evidenceClarificationService,
   infographicService,
   whatsappAgentConfigService,
   whatsappAgentJobService,
@@ -26,6 +27,10 @@ const ERROR_REPLY = 'Não consegui gerar a resposta agora. Tente de novo em inst
 const NEW_THREAD_REPLY = 'Nova conversa iniciada. Pode perguntar.';
 const CANCELLED_REPLY = 'Ação cancelada. Não vou concluir o que estava em andamento.';
 const NOTHING_TO_CANCEL_REPLY = 'Não há nenhuma ação em andamento para cancelar.';
+const CLARIFICATION_THANKS_REPLY =
+  'Obrigado! Registrei sua resposta e não vou perguntar de novo sobre isso.';
+const CLARIFICATION_UNCLEAR_REPLY =
+  'Obrigado pelo retorno. Vou registrar como ainda sem confirmação e a equipe Tactia segue daqui.';
 
 export async function handleWhatsappInbound(input: {
   phone: string;
@@ -78,6 +83,38 @@ export async function handleWhatsappInbound(input: {
     } else {
       await sendWhatsappText(input.phone, NOTHING_TO_CANCEL_REPLY);
     }
+    return;
+  }
+
+  // A pending clarification for this number wins over the general agent: the
+  // answer becomes a `reported` evidence linked to the gap. Silence or an
+  // ambiguous reply never confirms anything (Fluxo D).
+  const clarification = await evidenceClarificationService.receiveInbound({
+    tenantId: number.tenantId,
+    numberId: number.id,
+    text,
+    messageId: input.messageId,
+  });
+  if (clarification.handled) {
+    await whatsappAuthorizedNumberService.bindInbound({
+      tenantId: number.tenantId,
+      id: number.id,
+      conversationId: number.conversationId ?? (await conversationService.create(ctx, { title: 'WhatsApp' })).id,
+      messageId: input.messageId,
+    });
+    logger.info(
+      {
+        tenant_id: number.tenantId,
+        gap_id: clarification.gapId,
+        operation: 'clarification_received',
+        clear: clarification.clear,
+      },
+      'WhatsApp clarification recorded',
+    );
+    await sendWhatsappText(
+      input.phone,
+      clarification.clear ? CLARIFICATION_THANKS_REPLY : CLARIFICATION_UNCLEAR_REPLY,
+    );
     return;
   }
 
