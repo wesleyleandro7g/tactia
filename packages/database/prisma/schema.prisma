@@ -643,6 +643,7 @@ model Operator {
   updatedAt      DateTime       @updatedAt @map("updated_at")
   authUser       OperatorAuthUser @relation(fields: [externalAuthId], references: [id], onDelete: Restrict)
   auditLogs      AuditLog[]
+  evidenceGaps   EvidenceGap[] @relation("EvidenceGapAssignee")
 
   @@unique([email])
   @@index([status])
@@ -688,6 +689,14 @@ model Tenant {
   recommendations Recommendation[]
   briefings      Briefing[]
   goals          Goal[]
+  plans          Plan[]
+  planSteps      PlanStep[]
+  planStepExecutions PlanStepExecution[]
+  measurementDefinitions MeasurementDefinition[]
+  measurementReviews MeasurementReview[]
+  operationalEvidence OperationalEvidence[]
+  evidenceGaps EvidenceGap[]
+  evidenceClarifications EvidenceClarification[]
   businessFacts  BusinessFact[]
   tenantSettings TenantSettings?
   expenses       Expense[]
@@ -786,6 +795,7 @@ model User {
   businessFacts  BusinessFact[]
   createdApiKeys TenantApiKey[]
   whatsappNumbers WhatsappAuthorizedNumber[]
+  ownedGoals      Goal[] @relation("GoalOwner")
 
   @@index([email])
   @@index([createdAt])
@@ -850,6 +860,7 @@ model WhatsappAuthorizedNumber {
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation         Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   agentJobs            WhatsappAgentJob[]
+  evidenceClarifications EvidenceClarification[]
 
   @@unique([phone])
   @@index([tenantId, disabledAt])
@@ -864,6 +875,12 @@ model WhatsappAgentConfig {
   tone           String?
   instructions   String?
   companyContext String?  @map("company_context")
+  clarificationsEnabled Boolean @default(false) @map("clarifications_enabled")
+  clarificationStartHour Int @default(9) @map("clarification_start_hour")
+  clarificationEndHour Int @default(18) @map("clarification_end_hour")
+  clarificationMaxPerDay Int @default(2) @map("clarification_max_per_day")
+  clarificationCooldownHours Int @default(24) @map("clarification_cooldown_hours")
+  clarificationWeekdays Int[] @default([1, 2, 3, 4, 5]) @map("clarification_weekdays")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1763,6 +1780,7 @@ model Insight {
   updatedAt       DateTime        @updatedAt @map("updated_at")
   tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   recommendations Recommendation[]
+  plans           Plan[]
   feedbacks       InsightFeedback[]
 
   @@index([tenantId, status])
@@ -1794,21 +1812,200 @@ model Briefing {
 }
 
 model Goal {
-  id          String   @id @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  scope       String   @default("tenant")
-  scopeId     String?  @map("scope_id") @db.Uuid
-  metricKey   String   @map("metric_key")
-  periodType  String   @map("period_type")
-  periodStart DateTime @map("period_start")
-  target      Decimal  @db.Decimal(18, 4)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String   @id @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  scope         String   @default("tenant")
+  scopeId       String?  @map("scope_id") @db.Uuid
+  metricKey     String   @map("metric_key")
+  periodType    String   @map("period_type")
+  periodStart   DateTime @map("period_start")
+  target        Decimal  @db.Decimal(18, 4)
+  title         String?
+  status        String   @default("preparing")
+  baselineValue Decimal? @map("baseline_value") @db.Decimal(18, 4)
+  baselineRef   Json?    @map("baseline_ref")
+  ownerUserId   String?  @map("owner_user_id") @db.Uuid
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner         User?    @relation("GoalOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  plans         Plan[]
 
   @@index([tenantId, periodStart])
   @@index([tenantId, metricKey])
+  @@index([tenantId, status])
+  @@index([ownerUserId])
   @@map("goals")
+}
+
+model Plan {
+  id                 String   @id @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  goalId             String   @map("goal_id") @db.Uuid
+  insightId          String?  @map("insight_id") @db.Uuid
+  recommendationId   String?  @map("recommendation_id") @db.Uuid
+  title              String
+  summary            String?
+  scope              Json     @default("{}")
+  responsibleLabel   String?  @map("responsible_label")
+  status             String   @default("draft")
+  version            Int      @default(1)
+  nextReviewAt       DateTime? @map("next_review_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  goal               Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  insight            Insight? @relation(fields: [insightId], references: [id], onDelete: SetNull)
+  recommendation     Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
+  steps              PlanStep[]
+  measurementDefinitions MeasurementDefinition[]
+  evidence           OperationalEvidence[]
+  gaps               EvidenceGap[]
+
+  @@index([tenantId, status])
+  @@index([goalId])
+  @@index([recommendationId])
+  @@unique([tenantId, recommendationId])
+  @@map("plans")
+}
+
+model PlanStep {
+  id          String   @id @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  planId      String   @map("plan_id") @db.Uuid
+  position    Int
+  title       String
+  description String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  executions  PlanStepExecution[]
+  evidence    OperationalEvidence[]
+
+  @@unique([planId, position])
+  @@index([tenantId, status])
+  @@map("plan_steps")
+}
+
+model PlanStepExecution {
+  id                String          @id @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  planStepId        String          @map("plan_step_id") @db.Uuid
+  actionExecutionId String          @map("action_execution_id") @db.Uuid
+  planVersion       Int             @map("plan_version")
+  decisionSnapshot  Json            @map("decision_snapshot")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planStep          PlanStep        @relation(fields: [planStepId], references: [id], onDelete: Cascade)
+  actionExecution   ActionExecution @relation(fields: [actionExecutionId], references: [id], onDelete: Cascade)
+
+  @@unique([planStepId, actionExecutionId])
+  @@unique([actionExecutionId])
+  @@index([tenantId])
+  @@map("plan_step_executions")
+}
+
+model MeasurementDefinition {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  planId     String   @map("plan_id") @db.Uuid
+  metricKey  String   @map("metric_key")
+  indicator  String
+  unit       String
+  cohort     Json?
+  windowFrom DateTime @map("window_from")
+  windowTo   DateTime @map("window_to")
+  baseline   Decimal? @db.Decimal(18, 4)
+  target     Decimal? @db.Decimal(18, 4)
+  sources    Json     @default("[]")
+  attribution String
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan       Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  reviews    MeasurementReview[]
+
+  @@index([tenantId])
+  @@index([planId])
+  @@map("measurement_definitions")
+}
+
+model MeasurementReview {
+  id                      String   @id @db.Uuid
+  tenantId                String   @map("tenant_id") @db.Uuid
+  measurementDefinitionId String   @map("measurement_definition_id") @db.Uuid
+  status                  String   @default("measuring")
+  observed                Decimal? @db.Decimal(18, 4)
+  operationalResults      Json     @default("[]") @map("operational_results")
+  references              Json     @default("[]")
+  limitation              String?
+  reviewedAt              DateTime? @map("reviewed_at")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  tenant                   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  measurementDefinition   MeasurementDefinition @relation(fields: [measurementDefinitionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([measurementDefinitionId])
+  @@map("measurement_reviews")
+}
+
+model OperationalEvidence {
+  id           String   @id @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  planId       String?  @map("plan_id") @db.Uuid
+  planStepId   String?  @map("plan_step_id") @db.Uuid
+  kind         String
+  origin       String
+  summary      String
+  sourceLabel  String   @map("source_label")
+  externalRef  String?  @map("external_ref")
+  eventAt      DateTime? @map("event_at")
+  ingestedAt   DateTime @default(now()) @map("ingested_at")
+  validUntil   DateTime? @map("valid_until")
+  payload      Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan         Plan?    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planStep     PlanStep? @relation(fields: [planStepId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, externalRef])
+  @@index([tenantId, kind])
+  @@index([planId, eventAt])
+  @@map("operational_evidence")
+}
+
+model EvidenceGap {
+  id                   String   @id @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  planId               String?  @map("plan_id") @db.Uuid
+  subject              String
+  reason               String
+  impact               String   @default("medium")
+  status               String   @default("new")
+  dedupeKey            String   @map("dedupe_key")
+  sourcesAttempted     Json     @default("[]") @map("sources_attempted")
+  attempts             Int      @default(0)
+  assigneeOperatorId   String?  @map("assignee_operator_id") @db.Uuid
+  nextStep             String?  @map("next_step")
+  nextAttemptAllowedAt DateTime? @map("next_attempt_allowed_at")
+  resolution           Json?
+  resolvedAt           DateTime? @map("resolved_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                 Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  assignee             Operator? @relation("EvidenceGapAssignee", fields: [assigneeOperatorId], references: [id], onDelete: SetNull)
+  clarifications       EvidenceClarification[]
+
+  @@unique([tenantId, dedupeKey])
+  @@index([status, impact, createdAt])
+  @@index([tenantId, status])
+  @@map("evidence_gaps")
 }
 
 model LeadStageTransition {
@@ -1981,6 +2178,7 @@ model Recommendation {
   updatedAt   DateTime               @updatedAt @map("updated_at")
   tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   insight     Insight                @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  plans       Plan[]
 
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
@@ -1997,6 +2195,7 @@ model Conversation {
   tenantId  String    @map("tenant_id") @db.Uuid
   userId    String    @map("user_id") @db.Uuid
   title     String
+  contextRef Json?     @map("context_ref")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2069,6 +2268,7 @@ model ActionExecution {
   action         Action                @relation(fields: [actionId], references: [id], onDelete: Cascade)
   approvals      Approval[]
   episodes       Episode[]
+  planStepLinks  PlanStepExecution[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, status])
@@ -2308,4 +2508,29 @@ model InfographicAsset {
 
   @@index([tenantId, createdAt])
   @@map("infographic_assets")
+}
+
+
+model EvidenceClarification {
+  id                String   @id @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  gapId             String   @unique @map("gap_id") @db.Uuid
+  numberId          String   @map("number_id") @db.Uuid
+  question          String
+  status            String   @default("queued")
+  attempts          Int      @default(0)
+  sentAt            DateTime? @map("sent_at")
+  responseText      String?  @map("response_text")
+  responseMessageId String?  @unique @map("response_message_id")
+  answeredAt        DateTime? @map("answered_at")
+  error             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gap               EvidenceGap @relation(fields: [gapId], references: [id], onDelete: Cascade)
+  number            WhatsappAuthorizedNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([numberId, status, sentAt])
+  @@map("evidence_clarifications")
 }

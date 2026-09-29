@@ -207,3 +207,9 @@ export type {
   CreateMediaAssetInput,
   MediaAssetRecord,
 } from './repositories/media-asset-repository';
+
+export { CommandCenterRepository } from './repositories/command-center-repository';
+export type { CreatePlanInput, CreateEvidenceGapInput } from './repositories/command-center-repository';
+
+export { EvidenceClarificationRepository } from './repositories/evidence-clarification-repository';
+export type { ClarificationPolicy } from './repositories/evidence-clarification-repository';

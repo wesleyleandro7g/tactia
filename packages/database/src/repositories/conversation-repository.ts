@@ -1,10 +1,12 @@
 import { createId } from '@tactia/shared';
 import type { PrismaClient } from '../client';
+import { asJson } from '../json';
 
 export type CreateConversationInput = {
   tenantId: string;
   userId: string;
   title: string;
+  contextRef?: unknown;
 };
 
 export class ConversationRepository {
@@ -17,6 +19,7 @@ export class ConversationRepository {
         tenantId: input.tenantId,
         userId: input.userId,
         title: input.title,
+        contextRef: asJson(input.contextRef) ?? undefined,
       },
     });
   }

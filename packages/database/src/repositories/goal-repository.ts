@@ -9,6 +9,11 @@ export type CreateGoalInput = {
   periodType: string;
   periodStart: Date;
   target: number;
+  title?: string | null;
+  status?: string;
+  baselineValue?: number | null;
+  baselineRef?: unknown;
+  ownerUserId?: string | null;
 };
 
 export class GoalRepository {
@@ -25,6 +30,11 @@ export class GoalRepository {
         periodType: input.periodType,
         periodStart: input.periodStart,
         target: input.target,
+        title: input.title ?? null,
+        status: input.status ?? 'active',
+        baselineValue: input.baselineValue ?? null,
+        baselineRef: input.baselineRef as never,
+        ownerUserId: input.ownerUserId ?? null,
       },
     });
   }
