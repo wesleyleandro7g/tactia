@@ -34,7 +34,7 @@ Em conflito, prevalecem segurança/tenant, capacidade real do backend, ausência
 | `/operations/plans/[id]` | composição de plano, não formulário de tarefas | URL persistente |
 | `/results` | OutcomeReview, análises e briefings históricos | Preservar filtros/links de dashboard e briefings |
 | `/chat/[id]` | ChatPanel + referência contextual persistida | Nunca invalidar links atuais |
-| Admin: `/gaps` e `/tenants/[id]/preparation` | EvidenceGapQueue e editor de objetivo/plano/medição | Preparação escopada por empresa, sem executor no Ops |
+| Admin: `/gaps`, `/tenants/[id]/preparation` e `/tenants/[id]/metrics` | EvidenceGapQueue, editor de objetivo/plano/medição e indicadores do piloto | Preparação e métricas escopadas por empresa, sem executor no Ops |
 
 Desktop: conversa contextual em painel sob demanda, com opção de conversa completa. Celular: tela dedicada e retorno ao objetivo/plano/decisão. Nenhuma ação essencial depende de formular prompt.
 
@@ -132,7 +132,7 @@ recomendação do pipeline (`settings-routes.test.ts`).
 Plano → versão/decisão → execução idempotente → observação automática/relato identificado → medição/revisão.
 
 ### Entregas 4–5
-Operação consolidada, revisão semanal, conversa contextual, piloto ampliado e liberação gradual. A decisão guiada de revisão está implementada (`plan-review-decision.test.ts`); a consolidação semanal permanece pendente. Rollback da UI preserva dados/auditoria/execuções e nunca tenta “reverter” efeito externo.
+Operação consolidada, revisão semanal, conversa contextual, piloto ampliado e liberação gradual. A decisão guiada de revisão está implementada (`plan-review-decision.test.ts`); os indicadores operacionais do piloto estão no Ops (`command-center-metrics-routes.test.ts`); a consolidação semanal permanece pendente. Rollback da UI preserva dados/auditoria/execuções e nunca tenta “reverter” efeito externo.
 
 ## Critérios de aceite funcionais
 
@@ -153,6 +153,7 @@ Estado em 29/09/2026. Evidência reproduzível em `05-status-implementacao.md`.
 - [x] Acompanhamento e revisão continuam sem login ou página aberta. — reconciliação no worker + medição no job diário
 - [x] Revisão de resultado permite continuar, solicitar ajuste ou encerrar com versão e histórico, sem declarar impacto causal. — `plan-review-decision.test.ts` (2 casos)
 - [x] Eventos de plano, decisão, execução e esclarecimento são deduplicados e não guardam mensagem/PII. — `command-center-cycle.test.ts`, `clarification-flow.test.ts`, `plan-review-decision.test.ts`
+- [x] Operador consulta, por empresa e janela, os indicadores que os eventos da Central sustentam, com definição, denominador e ausência explícita; a consulta não vaza outra empresa nem conteúdo pessoal. — `command-center-metrics-routes.test.ts`, `command-center-events.test.ts`, `command-center-metrics-service.test.ts`
 
 ## Critérios de aceite de UX e acessibilidade
 
@@ -197,6 +198,8 @@ No protótipo, pedir ao participante: encontrar prioridade, explicar fonte, dize
 Metas iniciais a calibrar: ≥80% encontram prioridade/próximo passo em 60s; ≥80% concluem sem ajuda; ninguém interpreta aprovação como garantia de crescimento.
 
 Instrumentar sem conteúdo de mensagens/PII: tempo até primeiro valor, ciclos acompanhados, clareza da delegação, confiabilidade operacional, coleta sem intervenção, esforço obrigatório do cliente (alvo zero), carga de interrupções, resolução Ops e continuidade sem acesso.
+
+A consulta operacional no Ops (`/tenants/[id]/metrics`) já cobre contagens e tendências dos eventos persistidos e as taxas de esclarecimento com denominador. Tempo até primeiro valor, redução de esforço e resultado comercial **não** são inferidos desses eventos; a limitação aparece na própria consulta.
 
 ## Estratégia de release
 

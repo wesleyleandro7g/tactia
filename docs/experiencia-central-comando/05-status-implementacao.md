@@ -50,6 +50,16 @@ cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run src/__tests__/pilot-fl
 cd apps/admin && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/lib/__tests__/settings-routes.test.ts \
   src/lib/__tests__/tenant-tabs.test.ts
+
+# métricas operacionais do piloto (eventos da Central)
+cd packages/database && DATABASE_URL=$TEST_DB pnpm exec vitest run \
+  src/__tests__/command-center-events.test.ts
+
+cd packages/domain && pnpm exec vitest run \
+  src/__tests__/command-center-metrics-service.test.ts
+
+cd apps/admin && DATABASE_URL=$TEST_DB pnpm exec vitest run \
+  src/lib/__tests__/command-center-metrics-routes.test.ts
 ```
 
 ## Estado por entrega
@@ -171,6 +181,31 @@ versão obsoleta, revisão obsoleta, isolamento e snapshot), `command-center-cyc
 sem texto e sem duplicação). Regressão web 34/34, Ops 20/20 e domínio 16/16;
 typecheck dos quatro pacotes e lint dos pacotes limpos/arquivos web alterados.
 
+### Métricas operacionais do piloto
+
+O Ops consulta os eventos já gravados em `/tenants/[id]/metrics` (aba **Piloto**)
+e em `GET /api/v1/tenants/[id]/command-center/metrics`. A leitura é agregada por
+empresa e janela (padrão 30 dias UTC, máximo 90), com detalhe paginado. Conta
+separadamente plano criado, decisão resolvida, transição de execução e
+esclarecimento solicitado/recebido. Taxas de resposta e de clareza exigem
+denominador; sem eventos ou sem denominador o valor fica `null` com
+`availability: empty`, nunca como 0% de desempenho. Tempo até primeiro valor,
+redução de esforço e resultado comercial **não** são calculados; a interface
+lista essa limitação. Metadados na API e na tela passam por whitelist (IDs,
+estados, versão, clareza); pergunta, resposta, telefone e nomes são descartados.
+
+Nenhuma migração nova: a consulta usa `command_center_events`. A chave única
+por empresa continua impedindo reprocessamento de contar duas vezes.
+
+Evidência em `tactia_test`: `command-center-events.test.ts` (5/5, deduplicação,
+janela, isolamento, paginação, vazio e sanitização),
+`command-center-metrics-service.test.ts` (6/6, operador, intervalo, tenant da
+URL, vazio, taxas e ausência de PII), `command-center-metrics-routes.test.ts`
+(3/3, isolamento, autorização, 404, paginação e filtro). Regressão web 34/34,
+Ops 30/30 (`settings-routes` 21, `tenant-tabs` 6, métricas 3) e domínio 22/22
+nos arquivos da Central; typecheck de database/domain/web/admin e lint de
+database/domain/admin passaram. Nenhuma migração foi aplicada.
+
 ### Dados sintéticos para demonstração
 
 `pnpm --filter @tactia/web seed` agora gera um cenário da Central na empresa
@@ -212,11 +247,13 @@ zoom, leitor de tela, nem validação visual dos dois temas. Não declarar WCAG
 | `/operations`, `/operations/plans/[id]` | Decisões versionadas, execução, evidência e resultado |
 | `/results` | Revisões com baseline, janela, atribuição e limitação |
 | Ops `/gaps` | Fila de lacunas com estado do esclarecimento e ação de consulta |
+| Ops `/tenants/[id]/metrics` | Indicadores do piloto a partir dos eventos da Central |
 
 APIs novas: `/api/v1/objectives`, `/api/v1/plans`, `/api/v1/plans/[id]`,
 `/api/v1/plans/[id]/steps/[stepId]/execute`, `/api/v1/measurement-reviews`,
 `/api/v1/recommendations/[id]/prepare-plan`, `/api/v1/clarifications/dispatch`,
-Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
+Ops `/api/v1/evidence-gaps`, `/api/v1/evidence-gaps/[id]/clarification` e
+`/api/v1/tenants/[id]/command-center/metrics`.
 
 ## Decisões que devem ser preservadas
 
@@ -242,20 +279,18 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 | Fallback por env (`COMMAND_CENTER_TENANT_IDS`) | Baixa | Permanece apenas para empresas sem decisão registrada, para desenvolvimento; Ops grava decisão explícita |
 | Lint global de `apps/web` falha | Baixa | **Preexistente** em `components/landing/hero-prompt.tsx` e `web-threads.tsx`; comprovado com `git stash` no HEAD |
 | 6 testes `browser-integration`/Torge falham | Baixa | **Preexistentes**, validação de URL `app.torge.com.br`; comprovado no HEAD |
-| Consolidação/consulta dos eventos analíticos | Baixa | Eventos persistidos; painel de leitura e métricas agregadas ainda não existem |
 | Validação visual 360/768/1280, leitor de tela, Web Vitals | Média | Revisão estática e contraste de tokens feitos; navegador indisponível nesta sessão |
 | Agrupar lacunas numa mensagem e reenvio após silêncio | Baixa | Fora do escopo atual por decisão |
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Consolidar métricas de eventos** para observar o piloto sem mensagem nem PII:
-   próxima alteração de código, detalhada em `06-prompt-continuacao.md`.
-2. **Implementar a revisão semanal consolidada** da entrega 4, sobre planos,
-   decisões, execução, lacunas e resultado observado.
-3. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
+1. **Implementar a revisão semanal consolidada** da entrega 4, sobre planos,
+   decisões, execução, lacunas e resultado observado; detalhada em
+   `06-prompt-continuacao.md`.
+2. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
    dois temas, inclusive zoom/leitor de tela; as tabelas equivalentes já estão
    disponíveis nos gráficos.
-4. **Inspecionar produção e planejar o piloto** com uma empresa real; não
+3. **Inspecionar produção e planejar o piloto** com uma empresa real; não
    reproduzir o baseline especial do banco local sem verificar o esquema.
 
 ## Definition of Done do primeiro recorte

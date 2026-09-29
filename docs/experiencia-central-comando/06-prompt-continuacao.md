@@ -1,8 +1,5 @@
 # Prompt de continuação — central de comando
 
-Cole o conteúdo abaixo em uma sessão nova de agente. Ele é autossuficiente: não
-depende do histórico de conversa que originou a implementação.
-
 Mantenha este arquivo atualizado ao final de cada etapa, junto com
 `05-status-implementacao.md`, para que o próximo handoff continue confiável.
 
@@ -15,7 +12,7 @@ Você vai continuar a implementação da **Central de Comando** do Tactia
 
 Branch: `feat/refact-experience`. Nada foi enviado ao remoto. A modelagem,
 serviços, telas, fila do Ops, editor de preparação, flag por empresa, revisão
-guiada e eventos estão nesta branch.
+guiada, eventos e indicadores operacionais do piloto estão nesta branch.
 
 ## Leia nesta ordem antes de escrever código
 
@@ -35,47 +32,36 @@ guiada e eventos estão nesta branch.
 
 ## Sua tarefa
 
-Implemente a **próxima entrega de código** da Central de Comando: transformar os
-eventos já persistidos em métricas operacionais consultáveis para acompanhar o
-piloto. Não gaste esta etapa com uma nova rodada de revisão visual, pesquisa ou
-deploy. O próximo desenvolvimento de produto, depois deste, é a revisão
-semanal consolidada da entrega 4.
+Implemente a **próxima entrega de código** da Central de Comando: a **revisão
+semanal consolidada** da entrega 4. Não gaste esta etapa com uma nova rodada de
+revisão visual, pesquisa ou deploy. O próximo desenvolvimento de produto, depois
+deste, é concluir a validação visual e de acessibilidade nos três breakpoints.
 
 Requisitos:
 
-- Parta de `packages/database/src/repositories/command-center-events.ts` e de
-  `CommandCenterEvent` no schema Prisma. Já existem os eventos deduplicados
-  `plan_created`, `decision_resolved`, `execution_state_changed`,
-  `clarification_requested` e `clarification_received`. Não crie outro mecanismo
-  de registro nem conte reprocessamentos como novos eventos.
-- Crie uma leitura agregada por empresa e período, com limites de intervalo e
-  consulta paginada quando houver detalhamento. Exponha-a em uma superfície
-  operacional do Ops, com autorização de operador no servidor. Toda consulta e
-  link de detalhe devem preservar o isolamento por tenant; um operador sem
-  permissão não pode obter dados por URL direta.
-- Comece por contagens e tendências que os eventos existentes sustentam.
-  Separe plano criado, decisão resolvida, transição de execução e esclarecimento
-  solicitado/recebido. Mostre período, definição e denominador quando calcular
-  taxa. Ausência de eventos ou de cobertura deve aparecer como ausência, nunca
-  como zero de desempenho ou sucesso comercial presumido.
-- Não inclua texto de pergunta/resposta, telefone, nomes ou payloads de ações
-  nas métricas, API, logs ou interface. Use apenas nomes de evento, estados,
-  timestamps, IDs já autorizados e contagens necessárias. Não apresente métricas
-  como tempo até primeiro valor, redução de esforço ou resultado comercial se
-  os eventos atuais não permitem calculá-las; documente essa limitação.
-- Reutilize componentes e padrões de Ops. Preserve o ciclo de execução,
-  aprovação, medição e esclarecimento já implementado. Não altere a semântica
-  de `recommendations/:id/accept` nem reexecute o seed em produção.
-- Cubra, com testes relevantes, agregação, deduplicação, filtro temporal,
-  isolamento entre empresas, autorização e estado vazio. Verifique typecheck e
-  lint dos arquivos/pacotes alterados. Se precisar de migração, aplique-a apenas
-  em `tactia_test` para a verificação; não modifique bancos de desenvolvimento
-  ou produção sem confirmação do usuário.
+- Parta das leituras já existentes de planos, decisões de revisão, execuções,
+  lacunas e revisões de medição em `CommandCenterService` / `CommandCenterRepository`.
+  A consolidação observa o ciclo; não cria executor paralelo, não altera
+  `recommendations/:id/accept` e não reexecuta o seed em produção.
+- Em `/results` (e, se couber um recorte em `/today`), apresente a janela:
+  o que estava em andamento, o que foi decidido, o que a execução fez, o que
+  permanece como lacuna e o que foi observado na medição. Mantenha os eixos
+  independentes; executar não marca objetivo atingido nem impacto causal.
+- Toda consolidação é por empresa, com autorização no servidor. Links
+  persistentes e relações opcionais revalidam o tenant. Ausência de cobertura
+  continua `null`, nunca zero comercial. Use `nullableDecimalToNumber`.
+- Reutilize `OutcomeReview` e os padrões de `apps/web`. Não exponha texto de
+  esclarecimento, telefone ou nomes. Os indicadores operacionais do piloto já
+  existem no Ops (`/tenants/[id]/metrics`); não os recrie no app do cliente
+  como substituto da revisão de resultado.
+- Cubra, com testes relevantes, isolamento entre empresas, janela, estado vazio
+  e a distinção entre eixos. Verifique typecheck e lint dos arquivos/pacotes
+  alterados. Se precisar de migração, aplique-a apenas em `tactia_test`.
 
-Critério de saída: um operador consegue consultar, para uma empresa e janela
-definidas, os indicadores sustentados pelos eventos da Central, entender o que
-cada número mede e ver explicitamente o que ainda não pode ser inferido. A
-consulta não expõe dados de outra empresa nem conteúdo pessoal.
+Critério de saída: o empresário encontra, numa janela definida, o acompanhamento
+consolidado do ciclo sem montar a história a partir de várias telas, e entende
+o que foi observado versus o que ainda não pode ser atribuído. A consulta não
+expõe dados de outra empresa.
 
 ## Invariantes que não podem ser quebradas
 
@@ -118,20 +104,25 @@ cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/lib/__tests__/clarification-flow.test.ts \
   src/__tests__/pilot-flow.test.ts        # esperado: 34/34
 
+cd packages/database && DATABASE_URL=$TEST_DB pnpm exec vitest run \
+  src/__tests__/command-center-events.test.ts
+
 cd packages/domain && pnpm exec vitest run \
   src/__tests__/command-center-service.test.ts \
-  src/__tests__/evidence-clarification-policy.test.ts
+  src/__tests__/evidence-clarification-policy.test.ts \
+  src/__tests__/command-center-metrics-service.test.ts
 
 cd apps/admin && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/lib/__tests__/settings-routes.test.ts \
-  src/lib/__tests__/tenant-tabs.test.ts       # esperado: 27/27
+  src/lib/__tests__/tenant-tabs.test.ts \
+  src/lib/__tests__/command-center-metrics-routes.test.ts   # esperado: 30/30
 
 # typecheck dos 4 pacotes afetados
 pnpm --filter @tactia/database typecheck && pnpm --filter @tactia/domain typecheck \
   && pnpm --filter @tactia/web typecheck && pnpm --filter @tactia/admin typecheck
 ```
 
-Escreva testes para o comportamento agregado que adicionar. Rode as suítes
+Escreva testes para o comportamento consolidado que adicionar. Rode as suítes
 relevantes acima como regressão; não presuma que a lista substitui os testes
 novos de autorização e isolamento.
 
