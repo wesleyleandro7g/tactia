@@ -34,7 +34,7 @@ Em conflito, prevalecem segurança/tenant, capacidade real do backend, ausência
 | `/operations/plans/[id]` | composição de plano, não formulário de tarefas | URL persistente |
 | `/results` | OutcomeReview, análises e briefings históricos | Preservar filtros/links de dashboard e briefings |
 | `/chat/[id]` | ChatPanel + referência contextual persistida | Nunca invalidar links atuais |
-| Admin: rota a fechar | EvidenceGapQueue | Seguir IA operacional existente do admin |
+| Admin: `/gaps` e `/tenants/[id]/preparation` | EvidenceGapQueue e editor de objetivo/plano/medição | Preparação escopada por empresa, sem executor no Ops |
 
 Desktop: conversa contextual em painel sob demanda, com opção de conversa completa. Celular: tela dedicada e retorno ao objetivo/plano/decisão. Nenhuma ação essencial depende de formular prompt.
 
@@ -125,7 +125,8 @@ Corrigir indisponível ≠ zero, regimes reais de autorização e preview/output
 ### Entrega 2 — shell/Hoje/Ops
 Feature flag por empresa (`tenants.command_center_enabled`, Ops e testes de release);
 novo shell com quatro destinos; Hoje e objetivos preparados; EvidenceGapQueue;
-rotas antigas funcionais.
+rotas antigas funcionais. O Ops também prepara objetivo, plano e medição sem
+recomendação do pipeline (`settings-routes.test.ts`).
 
 ### Entrega 3 — ciclo completo
 Plano → versão/decisão → execução idempotente → observação automática/relato identificado → medição/revisão.
@@ -143,6 +144,7 @@ Estado em 29/09/2026. Evidência reproduzível em `05-status-implementacao.md`.
 - [x] Fato, relato, inferência, estimativa e sugestão são distinguíveis por texto. — `EvidencePanel` com rótulo por `kind`
 - [x] Cliente não cadastra tarefas, atualiza status, faz check-in ou redigita relato. — `command-center-cycle.test.ts`: `completes the transaction without a manual status update`
 - [x] Ops recebe lacunas técnicas com impacto, responsável e próximo passo. — Ops `/gaps`
+- [x] Ops prepara objetivo, plano e medição sem recomendação, com fonte ativa, janela e tenant validados; execução continua no web. — `settings-routes.test.ts` (21 casos)
 - [x] Pergunta pontual só ocorre após consulta/reconsulta de fontes e dentro da política; silêncio nunca confirma. — `clarification-flow.test.ts` (7 casos)
 - [x] Aprovação é ligada à versão, tenant, permissão e capacidade; duplo clique/timeout não duplicam efeito. — `blocks approval after the plan version changes` + idempotency key
 - [x] Estado mostrado após comando é o estado efetivo (`approved`, `queued`, `running` etc.), não sucesso presumido. — reconciliação inline nas rotas de decisão

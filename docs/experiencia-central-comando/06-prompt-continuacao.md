@@ -14,7 +14,8 @@ Você vai continuar a implementação da **Central de Comando** do Tactia
 (`/home/wesleyleandro/Projects/Desencoder/Tactia`), iniciada por outro agente.
 
 Branch: `feat/refact-experience`. Nada foi enviado ao remoto. A modelagem,
-serviços, telas, fila do Ops, flag por empresa, revisão guiada e eventos estão nesta branch.
+serviços, telas, fila do Ops, editor de preparação, flag por empresa, revisão
+guiada e eventos estão nesta branch.
 
 ## Leia nesta ordem antes de escrever código
 
@@ -32,19 +33,21 @@ serviços, telas, fila do Ops, flag por empresa, revisão guiada e eventos estã
 
 ## Sua tarefa
 
-Implemente o **próximo passo 1** de `05-status-implementacao.md`: um **editor de
-preparação no Ops** para criar objetivo, plano e medição sem depender de uma
-recomendação produzida pelo pipeline.
+Implemente o **próximo passo 1** de `05-status-implementacao.md`: validação visual
+e de acessibilidade da Central de Comando e do editor do Ops em 360, 768 e
+1280px, nos temas claro e escuro. Corrija os problemas encontrados e ofereça
+tabela acessível equivalente para os gráficos usados nas superfícies novas.
 
 Requisitos:
 
-- Reuse `CommandCenterService` e seus contratos de tenant; não crie executor no Ops.
-- O Ops prepara dados e medição; o cliente decide ações no `apps/web`.
-- Valide objetivo, escopo, fontes e janela antes de publicar a preparação.
-- Preserve versionamento e snapshots de planos e decisões já existentes.
+- Verifique foco, teclado, zoom, contraste, leitura de estados e ausência de
+  truncamento em decisões e resultados; registre evidência reproduzível.
+- Preserve os contratos de confiança, tenant, versão e snapshot existentes.
+- O editor em `/tenants/[id]/preparation` já publica plano e medição sem
+  recomendação; não duplique essa implementação.
 
-Se você concluir e houver orçamento de contexto, siga para a validação visual e
-de acessibilidade do próximo passo 2 do mesmo documento.
+Se concluir, avance para a consolidação de métricas de eventos sem conteúdo de
+mensagens ou PII, o próximo passo 2 do documento de status.
 
 ## Invariantes que não podem ser quebradas
 
@@ -89,7 +92,8 @@ cd packages/domain && pnpm exec vitest run \
   src/__tests__/evidence-clarification-policy.test.ts
 
 cd apps/admin && DATABASE_URL=$TEST_DB pnpm exec vitest run \
-  src/lib/__tests__/settings-routes.test.ts  # esperado: 20/20
+  src/lib/__tests__/settings-routes.test.ts \
+  src/lib/__tests__/tenant-tabs.test.ts       # esperado: 27/27
 
 # typecheck dos 4 pacotes afetados
 pnpm --filter @tactia/database typecheck && pnpm --filter @tactia/domain typecheck \

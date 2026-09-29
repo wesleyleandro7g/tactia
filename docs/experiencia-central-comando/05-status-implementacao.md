@@ -43,6 +43,11 @@ cd packages/domain && pnpm exec vitest run \
 
 # regressão do fluxo anterior (não deve quebrar)
 cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run src/__tests__/pilot-flow.test.ts
+
+# preparação operacional sem recomendação
+cd apps/admin && DATABASE_URL=$TEST_DB pnpm exec vitest run \
+  src/lib/__tests__/settings-routes.test.ts \
+  src/lib/__tests__/tenant-tabs.test.ts
 ```
 
 ## Estado por entrega
@@ -125,6 +130,23 @@ auditoria, isolamento de empresas e validação) e `command-center-flag.test.ts`
 `tactia_test`; regressão web 34/34 nos seis arquivos da seção de verificação.
 Typecheck de database/domain/web/admin e lint dos arquivos alterados passaram.
 
+O Ops agora tem a aba `/tenants/[id]/preparation` para preparar objetivo,
+plano e medição sem recomendação do pipeline. A API valida operador, empresa,
+objetivo, fonte ativa, escopo e janela. A publicação ativa objetivo e plano na
+mesma transação, mantém a versão inicial e congela a ação `create_task` no
+escopo; o cliente decide sua execução no web, pelo executor existente. O valor
+inicial pode ser `null`. A fonte escolhida é uma **referência prevista de
+cobertura**, não um filtro exclusivo da métrica; essa limitação acompanha a
+atribuição e o resultado exibido ao cliente.
+
+Evidência: `settings-routes.test.ts` (21/21, incluindo preparação sem
+recomendação/execução, ação imutável, fonte e objetivo de outra empresa,
+operador obrigatório, indicador e janela inválidos), `tenant-tabs.test.ts`
+(6/6). Typecheck de database/domain/web/admin, lint de admin e do componente
+web alterado, e build de admin passaram. O build emite avisos do cliente Prisma
+gerado sobre CommonJS e acesso dinâmico ao filesystem. Nenhuma migração
+adicional foi necessária.
+
 ### Revisão guiada e eventos
 
 `/results` apresenta baseline, observado, janela, fontes e limitações antes de
@@ -185,21 +207,18 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 | 6 testes `browser-integration`/Torge falham | Baixa | **Preexistentes**, validação de URL `app.torge.com.br`; comprovado no HEAD |
 | Consolidação/consulta dos eventos analíticos | Baixa | Eventos persistidos; painel de leitura e métricas agregadas ainda não existem |
 | Validação visual 360/768/1280, leitor de tela, Web Vitals | Média | Não executada; exige navegador real |
-| Editor de planos/medição no Ops | Média | Preparação ainda depende de recomendação existente |
 | Agrupar lacunas numa mensagem e reenvio após silêncio | Baixa | Fora do escopo atual por decisão |
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Editor de preparação no Ops**, para criar objetivo/plano/medição sem depender
-   de uma recomendação gerada pelo pipeline.
-2. **Validação visual e de acessibilidade** nos três breakpoints e nos dois temas,
+1. **Validação visual e de acessibilidade** nos três breakpoints e nos dois temas,
    com tabela equivalente nos gráficos.
-3. **Consolidar métricas de eventos** para observar o piloto sem mensagem nem PII.
-4. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
+2. **Consolidar métricas de eventos** para observar o piloto sem mensagem nem PII.
+3. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
 
 ## Definition of Done do primeiro recorte
 
 Ainda **não** atingida de ponta a ponta com dados reais. O ciclo está provado em
 teste de integração com Postgres real, mas falta: empresa real conectada, deploy
-das migrações e observação do resultado comercial em janela real. Os itens 1 e
-4 acima são o caminho mais curto até lá.
+das migrações e observação do resultado comercial em janela real. A validação
+visual do item 1 e o deploy/piloto do item 3 ainda faltam.
