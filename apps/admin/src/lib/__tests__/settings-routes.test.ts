@@ -50,6 +50,7 @@ import {
   DELETE as emailDelete,
 } from '@/app/api/v1/tenants/[id]/email/route';
 import { sendTenantTestEmail } from '@/lib/tenant-email';
+import { GET as releaseGet, PUT as releasePut } from '@/app/api/v1/tenants/[id]/command-center/route';
 import type { SmtpTransport } from '@tactia/execution';
 
 type Handler = (request: Request, ctx: RequestContext, params: Record<string, string>) => Promise<unknown>;
@@ -131,6 +132,38 @@ afterAll(async () => {
   await prisma.user.deleteMany({ where: { id: ownerUserId } });
   await prisma.authUser.deleteMany({ where: { id: ownerAuthId } });
   await prisma.$disconnect();
+});
+
+describe('command center release', () => {
+  it('switches one company on and off and audits the operator', async () => {
+    const get = () => call(releaseGet)(new Request('http://localhost/api'), operatorSession(), { id: tenantId });
+    expect(await get()).toEqual({ enabled: null });
+
+    await call(releasePut)(jsonRequest({ enabled: true }), operatorSession(), { id: tenantId });
+    expect(await get()).toEqual({ enabled: true });
+    expect(await call(releaseGet)(new Request('http://localhost/api'), operatorSession(), { id: otherTenantId }))
+      .toEqual({ enabled: null });
+
+    await call(releasePut)(jsonRequest({ enabled: false }), operatorSession(), { id: tenantId });
+    expect(await get()).toEqual({ enabled: false });
+    const audit = await prisma.auditLog.findMany({
+      where: { tenantId, action: 'COMMAND_CENTER_RELEASE_CHANGED' },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(audit).toHaveLength(2);
+    expect(audit.map((row) => row.metadata)).toEqual([
+      { previous: null, enabled: true },
+      { previous: true, enabled: false },
+    ]);
+    expect(audit.every((row) => row.operatorId === operatorId && row.actorType === 'operator')).toBe(true);
+  });
+
+  it('rejects invalid input and an unknown company', async () => {
+    await expect(call(releasePut)(jsonRequest({ enabled: 'true' }), operatorSession(), { id: tenantId }))
+      .rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+    await expect(call(releasePut)(jsonRequest({ enabled: true }), operatorSession(), { id: createId() }))
+      .rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
+  });
 });
 
 describe('admin API keys', () => {
