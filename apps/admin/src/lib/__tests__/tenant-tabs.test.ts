@@ -11,6 +11,7 @@ describe('tenant tabs', () => {
   it('lists the tabs in order with Cadastro as default', () => {
     expect(TENANT_TABS.map((tab) => tab.label)).toEqual([
       'Cadastro',
+      'Preparação',
       'Usuários',
       'Integrações',
       'Sincronização',
@@ -29,6 +30,7 @@ describe('tenant tabs', () => {
 
   it('builds hrefs', () => {
     expect(tenantTabHref('t1', '')).toBe('/tenants/t1');
+    expect(tenantTabHref('t1', 'preparation')).toBe('/tenants/t1/preparation');
     expect(tenantTabHref('t1', 'users')).toBe('/tenants/t1/users');
     expect(tenantTabHref('t1', 'chat')).toBe('/tenants/t1/chat');
     expect(tenantTabHref('t1', 'whatsapp')).toBe('/tenants/t1/whatsapp');

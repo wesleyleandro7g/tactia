@@ -51,6 +51,10 @@ import {
 } from '@/app/api/v1/tenants/[id]/email/route';
 import { sendTenantTestEmail } from '@/lib/tenant-email';
 import { GET as releaseGet, PUT as releasePut } from '@/app/api/v1/tenants/[id]/command-center/route';
+import { GET as preparationGet, POST as objectivePost } from '@/app/api/v1/tenants/[id]/command-center/objectives/route';
+import { POST as planPost } from '@/app/api/v1/tenants/[id]/command-center/plans/route';
+import { commandCenterService } from '@/lib/services';
+import { operatorTenantContext } from '@/lib/operator-tenant';
 import type { SmtpTransport } from '@tactia/execution';
 
 type Handler = (request: Request, ctx: RequestContext, params: Record<string, string>) => Promise<unknown>;
@@ -163,6 +167,83 @@ describe('command center release', () => {
       .rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
     await expect(call(releasePut)(jsonRequest({ enabled: true }), operatorSession(), { id: createId() }))
       .rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
+  });
+});
+
+describe('Ops command center preparation', () => {
+  it('prepares an objective, plan and measurement without a pipeline recommendation or execution', async () => {
+    const sourceId = createId();
+    await prisma.dataSource.create({
+      data: { id: sourceId, tenantId, name: 'Vendas ERP', type: 'csv', status: 'active' },
+    });
+    const objective = await call(objectivePost)(jsonRequest({
+      title: 'Recuperar receita de clientes inativos',
+      metricKey: 'revenue',
+      periodType: 'month',
+      periodStart: '2026-09-01',
+      target: 10000,
+      baselineValue: null,
+    }), operatorSession(), { id: tenantId }) as { id: string; status: string };
+    expect(objective.status).toBe('preparing');
+    const request = {
+      goalId: objective.id,
+      sourceId,
+      title: 'Retomar contatos',
+      summary: 'Preparação baseada nas vendas existentes.',
+      cohort: 'Clientes sem compra há 90 dias',
+      responsibleLabel: 'Equipe comercial',
+      actionTitle: 'Criar tarefa de contato',
+      actionDescription: 'Contatar clientes inativos no processo comercial existente.',
+      actionReason: 'Investigar recuperação de receita.',
+      windowFrom: '2026-09-01',
+      windowTo: '2026-09-30',
+    };
+    const plan = await call(planPost)(jsonRequest(request), operatorSession(), { id: tenantId }) as {
+      id: string; version: number; recommendationId: string | null;
+      scope: { suggestedAction: { actionType: string; input: { title: string }; reason: string } };
+      steps: Array<{ id: string }>;
+      measurementDefinitions: Array<{ baseline: number | null; sources: unknown }>;
+    };
+    expect(plan).toMatchObject({
+      version: 1,
+      status: 'active',
+      recommendationId: null,
+      scope: { suggestedAction: { actionType: 'create_task', input: { title: request.actionTitle } } },
+      measurementDefinitions: [{ baseline: null, sources: [{ dataSourceId: sourceId, label: 'Vendas ERP', type: 'csv', role: 'intended' }] }],
+    });
+    expect(await prisma.actionExecution.count({ where: { tenantId } })).toBe(0);
+    await expect(commandCenterService.validatePreparedExecution(
+      operatorTenantContext(operatorSession(), tenantId), plan.id, plan.steps[0]!.id,
+      plan.scope.suggestedAction,
+    )).resolves.toMatchObject({ actionType: 'create_task' });
+    await expect(commandCenterService.validatePreparedExecution(
+      operatorTenantContext(operatorSession(), tenantId), plan.id, plan.steps[0]!.id,
+      { ...plan.scope.suggestedAction, input: { title: 'Ação adulterada' } },
+    )).rejects.toMatchObject({ code: ErrorCode.CONFLICT });
+    expect((await prisma.goal.findUnique({ where: { id: objective.id } }))?.status).toBe('active');
+    expect(await prisma.commandCenterEvent.count({ where: { tenantId, name: 'plan_created', entityId: plan.id } })).toBe(1);
+    const listed = await call(preparationGet)(new Request('http://localhost/api'), operatorSession(), { id: tenantId }) as {
+      objectives: Array<{ id: string }>; plans: Array<{ id: string }>;
+    };
+    expect(listed.objectives.map((item) => item.id)).toContain(objective.id);
+    expect(listed.plans.map((item) => item.id)).toContain(plan.id);
+
+    const otherSourceId = createId();
+    await prisma.dataSource.create({ data: {
+      id: otherSourceId, tenantId: otherTenantId, name: 'Fonte alheia', type: 'csv', status: 'active',
+    } });
+    await expect(call(planPost)(jsonRequest({ ...request, sourceId: otherSourceId }), operatorSession(), { id: tenantId }))
+      .rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
+    await expect(call(planPost)(jsonRequest({ ...request, windowTo: '2026-08-30' }), operatorSession(), { id: tenantId }))
+      .rejects.toThrow('A janela deve terminar depois do início.');
+    await expect(call(planPost)(jsonRequest({ ...request, goalId: createId() }), operatorSession(), { id: tenantId }))
+      .rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
+    await expect(call(planPost)(jsonRequest(request), { ...operatorSession(), operatorId: null }, { id: tenantId }))
+      .rejects.toMatchObject({ code: ErrorCode.AUTHENTICATION_ERROR });
+    await expect(call(objectivePost)(jsonRequest({
+      title: 'Métrica arbitrária', metricKey: 'unknown_metric', periodType: 'month',
+      periodStart: '2026-09-01', target: 1,
+    }), operatorSession(), { id: tenantId })).rejects.toThrow();
   });
 });
 

@@ -5,6 +5,7 @@ import {
   BrowserWorkflowBindingRepository,
   BrowserWorkflowRepository,
   CommandCenterRepository,
+  GoalRepository,
   EvidenceClarificationRepository,
   CampaignRepository,
   CredentialRepository,
@@ -43,6 +44,7 @@ import {
   DataCatalogService,
   DataSourceService,
   CommandCenterService,
+  GoalService,
   EvidenceClarificationService,
   EvidenceGapService,
   OperatorService,
@@ -83,9 +85,11 @@ const browserExecutorInstanceRepository = new BrowserExecutorInstanceRepository(
 const browserWorkflowRepository = new BrowserWorkflowRepository(prisma);
 const browserWorkflowBindingRepository = new BrowserWorkflowBindingRepository(prisma);
 const commandCenterRepository = new CommandCenterRepository(prisma);
+const goalRepository = new GoalRepository(prisma);
 
 export const auditLogService = new AuditLogService(auditLogRepository);
 export const commandCenterService = new CommandCenterService(commandCenterRepository);
+export const goalService = new GoalService(goalRepository);
 export const evidenceGapService = new EvidenceGapService(commandCenterRepository);
 export const evidenceClarificationService = new EvidenceClarificationService(
   new EvidenceClarificationRepository(prisma),

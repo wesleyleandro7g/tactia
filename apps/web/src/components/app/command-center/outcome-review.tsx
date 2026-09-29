@@ -16,7 +16,9 @@ function sourceLabels(value: unknown): string[] {
     if (!source || typeof source !== 'object') return null;
     const row = source as Record<string, unknown>;
     const label = row.label ?? row.source ?? row.type;
-    return typeof label === 'string' ? label : null;
+    return typeof label === 'string'
+      ? row.role === 'intended' ? `${label} (referência prevista)` : label
+      : null;
   }).filter((label): label is string => label !== null);
 }
 

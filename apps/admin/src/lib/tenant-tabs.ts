@@ -13,7 +13,8 @@ export type TenantTabKey =
   | 'connections'
   | 'documents'
   | 'playbooks'
-  | 'schedules';
+  | 'schedules'
+  | 'preparation';
 
 export type TenantTabSegment =
   | ''
@@ -28,7 +29,8 @@ export type TenantTabSegment =
   | 'connections'
   | 'documents'
   | 'playbooks'
-  | 'schedules';
+  | 'schedules'
+  | 'preparation';
 
 export type TenantTab = {
   key: TenantTabKey;
@@ -39,6 +41,7 @@ export type TenantTab = {
 
 export const TENANT_TABS: readonly TenantTab[] = [
   { key: 'profile', label: 'Cadastro', segment: '' },
+  { key: 'preparation', label: 'Preparação', segment: 'preparation' },
   { key: 'users', label: 'Usuários', segment: 'users' },
   { key: 'integrations', label: 'Integrações', segment: 'integrations' },
   { key: 'sync', label: 'Sincronização', segment: 'sync' },
