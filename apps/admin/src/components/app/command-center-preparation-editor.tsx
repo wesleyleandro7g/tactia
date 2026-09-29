@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -59,8 +59,13 @@ export function CommandCenterPreparationEditor({
   const [goalError, setGoalError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const goalErrorRef = useRef<HTMLDivElement>(null);
+  const planErrorRef = useRef<HTMLDivElement>(null);
   const activeGoalId = goalId || availableGoals[0]?.id || '';
   const selectedGoal = availableGoals.find((goal) => goal.id === activeGoalId);
+
+  useEffect(() => { if (goalError) goalErrorRef.current?.focus(); }, [goalError]);
+  useEffect(() => { if (planError) planErrorRef.current?.focus(); }, [planError]);
 
   async function createObjective(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -126,7 +131,7 @@ export function CommandCenterPreparationEditor({
       <section className="flex flex-col gap-3" aria-labelledby="prepare-goal-title">
         <h3 id="prepare-goal-title" className="font-display text-xl">1. Objetivo</h3>
         <p className="text-sm text-muted-foreground">Prepare o objetivo de negócio. O valor inicial pode ficar vazio quando ainda não há dado confiável.</p>
-        <form onSubmit={(event) => void createObjective(event)} className="grid max-w-3xl gap-4 sm:grid-cols-2">
+        <form onSubmit={(event) => void createObjective(event)} aria-busy={goalPending} className="grid max-w-3xl gap-4 sm:grid-cols-2">
           <Field htmlFor="goal-title" label="Objetivo" className="sm:col-span-2">
             <Input id="goal-title" name="title" required minLength={3} maxLength={160} placeholder="Ex.: Recuperar receita de clientes inativos" />
           </Field>
@@ -147,10 +152,10 @@ export function CommandCenterPreparationEditor({
             <Input id="goal-target" name="target" type="number" step="any" required />
           </Field>
           <Field htmlFor="goal-baseline" label="Valor inicial" hint="Deixe vazio se ainda não há medição confiável.">
-            <Input id="goal-baseline" name="baselineValue" type="number" step="any" />
+            <Input id="goal-baseline" name="baselineValue" type="number" step="any" aria-describedby="goal-baseline-hint" />
           </Field>
           <div className="flex items-end"><Button type="submit" loading={goalPending} disabled={goalPending}>Preparar objetivo</Button></div>
-          {goalError ? <div className="sm:col-span-2"><Alert tone="danger">{goalError}</Alert></div> : null}
+          {goalError ? <div ref={goalErrorRef} tabIndex={-1} className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:col-span-2"><Alert tone="danger">{goalError}</Alert></div> : null}
         </form>
       </section>
 
@@ -159,7 +164,7 @@ export function CommandCenterPreparationEditor({
         <p className="text-sm text-muted-foreground">O plano define a ação a apresentar para decisão no app da empresa. A medição usa uma fonte ativa e mantém limitações explícitas quando não houver dados.</p>
         {availableGoals.length === 0 ? <Alert tone="info">Prepare um objetivo para continuar.</Alert> : null}
         {sources.length === 0 ? <Alert tone="warning">Conecte uma fonte ativa antes de preparar a medição.</Alert> : null}
-        <form onSubmit={(event) => void createPlan(event)} className="grid max-w-3xl gap-4 sm:grid-cols-2">
+        <form onSubmit={(event) => void createPlan(event)} aria-busy={planPending} className="grid max-w-3xl gap-4 sm:grid-cols-2">
           <Field htmlFor="plan-goal" label="Objetivo" className="sm:col-span-2">
             <Select id="plan-goal" name="goalId" value={activeGoalId} onChange={(event) => setGoalId(event.target.value)} required>
               {availableGoals.length === 0 ? <option value="">Nenhum objetivo disponível</option> : null}
@@ -174,7 +179,7 @@ export function CommandCenterPreparationEditor({
             <Textarea id="plan-summary" name="summary" required minLength={3} maxLength={1200} />
           </Field>
           <Field htmlFor="plan-cohort" label="Escopo ou coorte" hint="Quem ou o que entra no plano?" className="sm:col-span-2">
-            <Input id="plan-cohort" name="cohort" required minLength={3} maxLength={300} />
+            <Input id="plan-cohort" name="cohort" required minLength={3} maxLength={300} aria-describedby="plan-cohort-hint" />
           </Field>
           <Field htmlFor="plan-responsible" label="Responsável no processo existente" className="sm:col-span-2">
             <Input id="plan-responsible" name="responsibleLabel" required minLength={3} maxLength={160} />
@@ -202,7 +207,7 @@ export function CommandCenterPreparationEditor({
             <Input id="plan-window-to" name="windowTo" type="date" required />
           </Field>
           <div className="sm:col-span-2"><Button type="submit" loading={planPending} disabled={planPending || !selectedGoal || sources.length === 0}>Preparar plano e medição</Button></div>
-          {planError ? <div className="sm:col-span-2"><Alert tone="danger">{planError}</Alert></div> : null}
+          {planError ? <div ref={planErrorRef} tabIndex={-1} className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:col-span-2"><Alert tone="danger">{planError}</Alert></div> : null}
         </form>
       </section>
 
@@ -210,7 +215,7 @@ export function CommandCenterPreparationEditor({
         <h3 id="prepared-plans-title" className="font-display text-xl">Planos preparados</h3>
         {plans.length ? <ul className="divide-y divide-border rounded-lg border border-border">
           {plans.map((plan) => <li key={plan.id} className="flex flex-wrap justify-between gap-2 p-3 text-sm">
-            <span>{plan.title}</span><span className="text-muted-foreground">{plan.status} · versão {plan.version} · {plan.measurementCount} medição(ões)</span>
+            <span className="min-w-0 break-words">{plan.title}</span><span className="min-w-0 break-words text-muted-foreground">{plan.status} · versão {plan.version} · {plan.measurementCount} medição(ões)</span>
           </li>)}
         </ul> : <p className="text-sm text-muted-foreground">Ainda não há planos preparados para esta empresa.</p>}
       </section>

@@ -21,7 +21,7 @@ export function Field({
       <label htmlFor={htmlFor} className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </label>
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? <p id={`${htmlFor}-hint`} className="text-xs text-muted-foreground">{hint}</p> : null}
       {children}
       {error ? (
         <p role="alert" className="text-xs text-danger">
