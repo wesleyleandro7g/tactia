@@ -5,5 +5,9 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
     fileParallelism: false,
+    env: {
+      DATABASE_URL:
+        process.env.DATABASE_URL ?? 'postgresql://tactia:tactia@localhost:5433/tactia_test',
+    },
   },
 });

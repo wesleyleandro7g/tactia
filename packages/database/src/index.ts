@@ -211,5 +211,22 @@ export type {
 export { CommandCenterRepository } from './repositories/command-center-repository';
 export type { CreatePlanInput, CreateEvidenceGapInput } from './repositories/command-center-repository';
 
+export {
+  CommandCenterEventRepository,
+  COMMAND_CENTER_EVENT_NAMES,
+  COMMAND_CENTER_EVENT_METADATA_KEYS,
+  isCommandCenterEventName,
+  recordCommandCenterEvent,
+  sanitizeCommandCenterEventMetadata,
+} from './repositories/command-center-events';
+export type {
+  CommandCenterEventAggregate,
+  CommandCenterEventListQuery,
+  CommandCenterEventMetadata,
+  CommandCenterEventName,
+  CommandCenterEventRecord,
+  CommandCenterEventWindow,
+} from './repositories/command-center-events';
+
 export { EvidenceClarificationRepository } from './repositories/evidence-clarification-repository';
 export type { ClarificationPolicy } from './repositories/evidence-clarification-repository';
