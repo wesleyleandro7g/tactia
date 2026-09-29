@@ -1,4 +1,4 @@
-import { buildClaimAllowlist, collectAllowedFromValues, unsourcedNumbers } from '@tactia/domain';
+import { buildClaimAllowlist, canonicalizeNumber, collectAllowedFromValues, extractNumberTokens, unsourcedNumbers } from '@tactia/domain';
 import { AppError, logger, redactSensitive, redactSensitiveDeep } from '@tactia/shared';
 import type { AiContext } from './context-builder';
 import { buildSystemPrompt, FOLLOW_UPS_HEADING, type WhatsappChannelContext } from './system-prompt';
@@ -18,6 +18,7 @@ import type {
   ToolContext,
 } from './types';
 import { wrapToolOutput, wrapUntrusted } from './untrusted';
+import { periodLabel } from './tools/shared';
 
 /**
  * Minimal contract the orchestrator needs from the context builder — keeps it
@@ -71,8 +72,128 @@ export const CLAIM_MISMATCH_FALLBACK =
 const EMPTY_FALLBACK =
   'Não consegui formular uma resposta para essa pergunta. Tente reformulá-la com mais detalhes.';
 
+const MAX_RECOVERY_TOOL_BATCHES = 2;
+const MAX_RECOVERY_TOOL_CALLS = 4;
+const MAX_RECOVERY_REVISIONS = 2;
+const EXPLICIT_PERIOD = /\b(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|ontem|hoje|semana|trimestre|ano|passado|anterior|últim[oa]s?|dias?|meses|bimestre|semestre)\b|\d{1,2}\/\d{1,2}|\b20\d{2}\b/;
+
+function contextualClarification(question: string, context: AiContext, history: ChatTurn[] = []): string {
+  const previous = [...history].reverse().find((turn) => turn.role === 'user')?.content ?? '';
+  const normalized = `${question} ${previous}`.toLocaleLowerCase('pt-BR');
+  if (/\b(ela|ele|dela|dele)\b/.test(question.toLocaleLowerCase('pt-BR')) && previous) {
+    if (/meta|objetiv/.test(previous.toLocaleLowerCase('pt-BR'))) return 'A qual meta mencionada antes você está se referindo?';
+    if (/client/.test(previous.toLocaleLowerCase('pt-BR'))) return 'A qual cliente da conversa você está se referindo?';
+    if (/vendedor/.test(previous.toLocaleLowerCase('pt-BR'))) return 'A qual vendedor mencionado antes você está se referindo?';
+    return 'A qual pessoa ou indicador mencionado antes você está se referindo?';
+  }
+  if (/meta|objetiv/.test(normalized) || context.goals.length > 0 && /como estamos|progresso/.test(normalized)) {
+    return 'Sobre as metas, você quer saber os objetivos definidos, o progresso até agora ou a projeção de fechamento?';
+  }
+  if (/vendedor|quem mais vendeu|quem vendeu/.test(normalized)) {
+    return 'Sobre os vendedores, você quer o ranking por receita ou por quantidade de vendas?';
+  }
+  if (/projeç|previs|estimativ|fechamento|fechamos/.test(normalized) && /receita|fatur|vend/.test(normalized)) {
+    return 'Para a projeção de vendas, você quer estimar o fechamento do mês atual ou outro período?';
+  }
+  if (/receita|fatur|vend/.test(normalized)) {
+    if (EXPLICIT_PERIOD.test(question.toLocaleLowerCase('pt-BR'))) {
+      return 'Para o período que você indicou, quer a receita de vendas confirmadas, a quantidade de vendas ou ambos?';
+    }
+    return 'Sobre as vendas, posso analisar o período atual ou comparar com outro período. Qual recorte você prefere?';
+  }
+  if (/client/.test(normalized)) {
+    return 'Sobre os clientes, você quer analisar quantidade, novos clientes ou comportamento de compra?';
+  }
+  return 'Para seguir com sua análise, qual indicador ou parte do negócio você quer examinar? Posso começar pelo período atual.';
+}
+
+function groundedPartialAnswer(question: string, context: AiContext, sources: MessageSource[]): string | null {
+  const normalized = question.toLocaleLowerCase('pt-BR');
+  if (/\b(pdf|documento|segundo|conforme)\b/.test(normalized)) return null;
+  if (EXPLICIT_PERIOD.test(normalized)) return null;
+  if (/projeç|previs|estimativ|fechamento|fechamos|vamos|tendência|crescimento|compar|por que|causa|motivo|impacto/.test(normalized)) return null;
+  const period = periodLabel(context.period);
+  const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+  const percent = new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 });
+  const money = (value: number) => new Intl.NumberFormat('pt-BR', {
+    style: 'currency', currency: context.company.currency, maximumFractionDigits: 0,
+  }).format(value);
+  const metricValue = (key: string, tool: string): number | undefined => {
+    const fresh = [...sources].reverse().find((source) => source.metric === key
+      && source.tool === tool
+      && source.period?.from === context.period.from
+      && source.period?.to === context.period.to);
+    return fresh?.value ?? context.metrics.find((metric) => metric.key === key)?.value;
+  };
+
+  if (/meta|objetiv/.test(normalized) && context.goals.length > 0) {
+    const labels: Record<string, string> = {
+      revenue: 'receita', sales_count: 'vendas', customer_count: 'clientes',
+      new_customers: 'novos clientes', gross_margin: 'margem bruta',
+      average_ticket: 'ticket médio', complaint_count: 'reclamações',
+      cancellation_rate: 'taxa de cancelamento', refund_rate: 'taxa de reembolso',
+      revenue_growth: 'crescimento de receita', sales_growth: 'crescimento de vendas',
+    };
+    const lines = context.goals.slice(0, 5).map((goal) => {
+      const isRate = ['cancellation_rate', 'refund_rate', 'sales_growth', 'revenue_growth'].includes(goal.metricKey);
+      const isMoney = ['revenue', 'average_ticket', 'discount_total', 'gross_margin', 'pending_amount', 'expense_total', 'operating_profit', 'break_even_revenue', 'receivables_open', 'overdue_amount'].includes(goal.metricKey);
+      const format = isRate ? percent.format : isMoney ? money : number.format;
+      const scope = goal.scopeLabel ? ` (${goal.scopeLabel})` : '';
+      const goalPeriod = goal.period ? `, ${periodLabel(goal.period)}` : '';
+      return `- ${labels[goal.metricKey] ?? goal.metricKey}${scope}${goalPeriod}: objetivo ${format(goal.target)}, realizado ${format(goal.achieved)}.`;
+    });
+    return `Estas são as metas registradas que consigo confirmar:\n${lines.join('\n')}`;
+  }
+
+  if (/\b(quem|quais|ranking|maior|menor|top|mais|menos)\b/.test(normalized)) return null;
+
+  if (/receita|fatur|vend/.test(normalized)) {
+    const revenue = metricValue('revenue', 'get_revenue');
+    const sales = metricValue('sales_count', 'get_sales');
+    const facts = [
+      revenue != null ? `receita confirmada de ${money(revenue)}` : null,
+      sales != null ? `${number.format(sales)} vendas confirmadas` : null,
+    ].filter(Boolean);
+    if (facts.length > 0) return `No período de ${period}, os dados confirmados mostram ${facts.join(' e ')}.`;
+  }
+
+  if (/client/.test(normalized)) {
+    const customers = metricValue('customer_count', 'get_customers');
+    if (customers != null) return `No período de ${period}, há ${number.format(customers)} clientes com compras confirmadas.`;
+  }
+  return null;
+}
+
+function unlabeledEstimates(content: string, context: AiContext, sources: MessageSource[]): string[] {
+  if (/estimativ|projeç|aproximad|previst|simulaç/i.test(content)) return [];
+  const estimated = new Set<string>();
+  const observed = new Set<string>();
+  const key = (value: number, unit: 'number' | 'percent') => `${unit === 'percent' ? 'p' : 'n'}:${Math.round(value)}`;
+  for (const metric of [...context.metrics, ...context.trailing30]) observed.add(key(metric.value, 'number'));
+  for (const goal of context.goals) {
+    observed.add(key(goal.target, 'number'));
+    observed.add(key(goal.achieved, 'number'));
+  }
+  for (const source of sources) {
+    if (source.value != null && source.tool !== 'get_forecast') observed.add(key(source.value, 'number'));
+    for (const claim of source.numericEvidence ?? []) {
+      (claim.kind === 'estimated' ? estimated : observed).add(key(claim.value, claim.unit));
+    }
+  }
+  return [...new Set(extractNumberTokens(content).filter((token) => {
+    const canonical = canonicalizeNumber(token);
+    return estimated.has(canonical) && !observed.has(canonical);
+  }))];
+}
+
 function containsNumber(text: string): boolean {
   return /\d/.test(text);
+}
+
+function isUnhelpfulFailure(content: string): boolean {
+  const trimmed = content.trim();
+  if (/^não (?:consegui|consigo) (?:registrar|enviar|criar|executar|iniciar)\b/i.test(trimmed)) return false;
+  return /^(?:não (?:consegui|consigo|entendi|tenho (?:dados|informações)|há dados suficientes)|não foi possível|sem dados suficientes)/i.test(trimmed);
 }
 
 /** Years from company "today" and cited periods — prose like "setembro de 2026". */
@@ -107,6 +228,9 @@ function allowContextGoals(allowed: Set<string>, context: AiContext): Set<string
     const values = [goal.target, goal.achieved, goal.requiredDailyPace, goal.projected]
       .filter((value): value is number => value != null);
     for (const key of collectAllowedFromValues(values)) allowed.add(key);
+    if (['cancellation_rate', 'refund_rate', 'sales_growth', 'revenue_growth'].includes(goal.metricKey)) {
+      for (const value of values) allowed.add(`p:${Math.round(value * 100)}`);
+    }
     if (Number.isFinite(goal.progress)) {
       allowed.add(`p:${Math.round(goal.progress * 100)}`);
     }
@@ -128,6 +252,24 @@ function scrubClaimNoise(content: string, attachments: ChatAttachment[]): string
     .replace(/\/api\/v1\/infographics\/[A-Za-z0-9_-]+/gi, ' ')
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ')
     .replace(/\b01[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ');
+}
+
+function claimOffenders(
+  content: string,
+  sources: MessageSource[],
+  context: AiContext,
+  attachments: ChatAttachment[],
+): string[] {
+  const allowlist = allowContextCalendarYears(
+    allowContextGoals(buildClaimAllowlist([...context.metrics, ...context.trailing30], sources), context),
+    context,
+    sources,
+  );
+  const claimText = scrubClaimNoise(content, attachments);
+  return [...new Set([
+    ...unsourcedNumbers(claimText, allowlist),
+    ...unlabeledEstimates(claimText, context, sources),
+  ])];
 }
 
 const FOLLOW_UPS_PATTERN = new RegExp(
@@ -239,7 +381,7 @@ export class Orchestrator {
       usage = sumUsage(usage, completion.usage);
 
       if (completion.toolCalls.length === 0) {
-        return this.finalize(completion.text, sources, executed, proposals, attachments, usage, context);
+        return this.consumeResolution(this.resolveAnswer(request, system, messages, completion.text, sources, executed, proposals, attachments, usage, context));
       }
 
       messages.push({
@@ -270,16 +412,7 @@ export class Orchestrator {
     // Tool budget exhausted: force a final answer with the data already gathered.
     const forced = await this.deps.llm.complete({ system, messages });
     usage = sumUsage(usage, forced.usage);
-    return this.finalize(
-      forced.text,
-      sources,
-      executed,
-      proposals,
-      attachments,
-      usage,
-      context,
-      'max_iterations',
-    );
+    return this.consumeResolution(this.resolveAnswer(request, system, messages, forced.text, sources, executed, proposals, attachments, usage, context, 'max_iterations'));
   }
 
   /**
@@ -314,7 +447,6 @@ export class Orchestrator {
         for await (const chunk of this.deps.llm.stream(request$)) {
           if (chunk.type === 'text-delta') {
             text += chunk.delta;
-            yield { type: 'text', delta: chunk.delta };
           } else if (chunk.type === 'tool-call') {
             toolCalls.push(chunk.toolCall);
           } else {
@@ -327,15 +459,19 @@ export class Orchestrator {
         usage = sumUsage(usage, completion.usage);
         text = completion.text;
         toolCalls.push(...completion.toolCalls);
-        if (completion.toolCalls.length === 0 && text) {
-          yield { type: 'text', delta: text };
-        }
       }
 
       if (toolCalls.length === 0) {
+        const resolution = this.resolveAnswer(request, system, messages, text, sources, executed, proposals, attachments, usage, context);
+        let next = await resolution.next();
+        while (!next.done) {
+          yield next.value;
+          next = await resolution.next();
+        }
+        if (next.value.content) yield { type: 'text', delta: next.value.content };
         yield {
           type: 'done',
-          answer: this.finalize(text, sources, executed, proposals, attachments, usage, context),
+          answer: next.value,
         };
         return;
       }
@@ -376,19 +512,173 @@ export class Orchestrator {
 
     const forced = await this.deps.llm.complete({ system, messages });
     usage = sumUsage(usage, forced.usage);
-    if (forced.text) yield { type: 'text', delta: forced.text };
+    const resolution = this.resolveAnswer(request, system, messages, forced.text, sources, executed, proposals, attachments, usage, context, 'max_iterations');
+    let next = await resolution.next();
+    while (!next.done) {
+      yield next.value;
+      next = await resolution.next();
+    }
+    if (next.value.content) yield { type: 'text', delta: next.value.content };
     yield {
       type: 'done',
-      answer: this.finalize(
-        forced.text,
-        sources,
-        executed,
-        proposals,
-        attachments,
-        usage,
-        context,
-        'max_iterations',
-      ),
+      answer: next.value,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+
+  private async consumeResolution(
+    resolution: AsyncGenerator<ChatStreamEvent, ChatAnswer>,
+  ): Promise<ChatAnswer> {
+    let next = await resolution.next();
+    while (!next.done) next = await resolution.next();
+    return next.value;
+  }
+
+  /** Recheck a rejected draft using only tenant-scoped read tools. */
+  private async *resolveAnswer(
+    request: ChatRequest,
+    system: string,
+    messages: LLMMessage[],
+    text: string,
+    sources: MessageSource[],
+    executed: ExecutedToolCall[],
+    proposals: ActionProposal[],
+    attachments: ChatAttachment[],
+    initialUsage: LLMUsage | undefined,
+    context: AiContext,
+    guardrail?: ChatAnswer['guardrail'],
+  ): AsyncGenerator<ChatStreamEvent, ChatAnswer> {
+    let usage = initialUsage;
+    const first = this.finalize(text, sources, executed, proposals, attachments, usage, context, guardrail);
+    const rejected = first.guardrail === 'claim_mismatch' || first.guardrail === 'unsourced_numbers' || !text.trim() || isUnhelpfulFailure(first.content);
+    if (!rejected) {
+      const clarification = /^(você quer|você se refere|qual |a qual |quando você diz)/i.test(first.content) && first.content.trim().endsWith('?');
+      return { ...first, resolution: clarification ? 'clarification' : 'direct', recoveryAttempts: 0 };
+    }
+
+    const repairMessages: LLMMessage[] = [...messages, { role: 'assistant', content: text }];
+    const seen = new Set(executed.map((call) => `${call.name}:${JSON.stringify(call.input)}`));
+    let toolBatches = 0;
+    let toolCalls = 0;
+    let revisions = 0;
+    let attempts = 0;
+    let disputed = claimOffenders(text, dedupeSources(sources), context, attachments);
+
+    while (revisions < MAX_RECOVERY_REVISIONS && attempts < 7) {
+      const available = toolBatches < MAX_RECOVERY_TOOL_BATCHES && toolCalls < MAX_RECOVERY_TOOL_CALLS
+        ? this.deps.tools.recoveryDefinitions(request.ctx.role)
+        : [];
+      const repairSystem = `${system}\n\n## Revisão obrigatória da resposta\n` +
+        'A resposta anterior foi rejeitada porque um número não está nas evidências ou porque não houve resposta. ' +
+        (disputed.length > 0 ? `Valores que precisam de conferência: ${disputed.slice(0, 6).join(', ')}. ` : '') +
+        'Releia a pergunta e o histórico. Consulte outra ferramenta de leitura se ela puder resolver a divergência. ' +
+        'Se houver suspeita de dados antigos ou fontes conflitantes, consulte get_data_freshness quando disponível e explique o conflito sem escolher um valor arbitrário. ' +
+        'Use valores exatos apenas quando estiverem nas evidências estruturadas. Estimativas numéricas só podem vir de ferramentas de projeção ou simulação e devem ser identificadas como estimativas, com período. ' +
+        'Quando apenas parte estiver confirmada, responda essa parte e explique especificamente a dúvida restante, sem repetir números contestados. ' +
+        'Trate interpretações qualitativas como hipóteses, nunca como causas comprovadas. ' +
+        'Se duas interpretações da pergunta levarem a respostas diferentes e o histórico não resolver, faça uma pergunta curta com as opções relevantes. ' +
+        'Não repita uma consulta já feita com os mesmos parâmetros. Não proponha nem execute ações nesta revisão.';
+      let completion;
+      try {
+        completion = await this.deps.llm.complete({
+          system: repairSystem,
+          messages: repairMessages,
+          ...(available.length > 0 ? { tools: available } : {}),
+        });
+      } catch (error) {
+        logger.warn({
+          operation: 'ai_recovery',
+          reason: 'llm_error',
+          error: error instanceof AppError ? error.code : 'AI_ERROR',
+        }, 'answer recovery failed');
+        break;
+      }
+      attempts += 1;
+      usage = sumUsage(usage, completion.usage);
+
+      const candidatesSeen = new Set(seen);
+      const safeCalls = completion.toolCalls
+        .filter((call) => this.deps.tools.isRecoverySafe(call.name, request.ctx.role))
+        .filter((call) => {
+          const key = `${call.name}:${JSON.stringify(call.input)}`;
+          if (candidatesSeen.has(key)) return false;
+          candidatesSeen.add(key);
+          return true;
+        })
+        .slice(0, MAX_RECOVERY_TOOL_CALLS - toolCalls);
+      for (const call of safeCalls) seen.add(`${call.name}:${JSON.stringify(call.input)}`);
+
+      if (available.length > 0 && safeCalls.length > 0) {
+        repairMessages.push({ role: 'assistant', content: completion.text, toolCalls: safeCalls });
+        for (const call of safeCalls) yield { type: 'tool_call', name: call.name, input: call.input };
+        const outcomes = await Promise.all(safeCalls.map((call) => this.executeToolCall(request.ctx, call)));
+        safeCalls.forEach((call, index) => {
+          const outcome = outcomes[index]!;
+          repairMessages.push({ role: 'tool', toolCallId: call.id, toolName: call.name, output: outcome.output });
+          executed.push(outcome.executed);
+          sources.push(...outcome.executed.sources);
+        });
+        for (let index = 0; index < safeCalls.length; index += 1) {
+          const outcome = outcomes[index]!;
+          yield {
+            type: 'tool_result',
+            name: safeCalls[index]!.name,
+            sources: outcome.executed.sources,
+            durationMs: outcome.executed.durationMs,
+            ...(outcome.executed.error ? { error: outcome.executed.error } : {}),
+          };
+        }
+        toolBatches += 1;
+        toolCalls += safeCalls.length;
+        continue;
+      }
+
+      if (completion.toolCalls.length > 0) {
+        // Do not accept text that describes a tool call we deliberately skipped.
+        revisions += 1;
+        continue;
+      }
+
+      revisions += 1;
+      const reviewed = this.finalize(completion.text, sources, executed, proposals, attachments, usage, context);
+      if (completion.text.trim() && reviewed.guardrail == null && reviewed.content !== EMPTY_FALLBACK && !isUnhelpfulFailure(reviewed.content)) {
+        const isQuestion = /^(você quer|você se refere|qual |a qual |quando você diz)/i.test(reviewed.content) && reviewed.content.trim().endsWith('?');
+        const resolution = isQuestion
+          ? 'clarification'
+          : /\d/.test(reviewed.content) ? 'recovered' : 'partial';
+        return {
+          ...reviewed,
+          ...(first.guardrail ? { guardrail: first.guardrail } : {}),
+          resolution,
+          recoveryAttempts: attempts,
+        };
+      }
+      disputed = claimOffenders(completion.text, dedupeSources(sources), context, attachments);
+      repairMessages.push({ role: 'assistant', content: completion.text });
+    }
+
+    const partial = groundedPartialAnswer(request.question, context, sources);
+    const grounded = partial
+      ? this.finalize(partial, sources, executed, proposals, attachments, usage, context)
+      : null;
+    if (grounded && grounded.guardrail == null) {
+      return {
+        ...grounded,
+        ...(first.guardrail ? { guardrail: first.guardrail } : {}),
+        resolution: 'partial',
+        recoveryAttempts: attempts,
+      };
+    }
+    const fallback = this.finalize(
+      contextualClarification(request.question, context, request.history),
+      sources, executed, proposals, attachments, usage, context,
+    );
+    return {
+      ...fallback,
+      ...(first.guardrail ? { guardrail: first.guardrail } : {}),
+      resolution: 'clarification',
+      recoveryAttempts: attempts,
     };
   }
 
@@ -488,16 +778,7 @@ export class Orchestrator {
       followUps = [];
       flag = 'unsourced_numbers';
     } else if (this.enforceSources) {
-      const allowlist = allowContextCalendarYears(
-        allowContextGoals(
-          buildClaimAllowlist([...context.metrics, ...context.trailing30], deduped),
-          context,
-        ),
-        context,
-        deduped,
-      );
-      const claimText = scrubClaimNoise(content, attachments);
-      const offenders = unsourcedNumbers(claimText, allowlist);
+      const offenders = claimOffenders(content, deduped, context, attachments);
       if (offenders.length > 0) {
         logger.warn({
           operation: 'ai_guardrail',

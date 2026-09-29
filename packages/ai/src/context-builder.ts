@@ -299,16 +299,51 @@ export class ContextBuilder {
       sources: [
         ...mtd.map((result) => sourceFromMetric(result, 'context')),
         ...trailing.map((result) => sourceFromMetric(result, 'context')),
-        ...(goals ?? []).map((goal) => ({
-          metric: 'goal_progress',
-          period: goal.period,
-          value: goal.achieved,
-          tool: 'context',
-          label: `Meta de ${goal.metricKey}`,
-          refId: goal.id,
-        })),
+        ...(goals ?? []).map((goal) => {
+          const isRate = ['cancellation_rate', 'refund_rate', 'sales_growth', 'revenue_growth'].includes(goal.metricKey);
+          return {
+            metric: 'goal_progress',
+            period: goal.period,
+            value: goal.achieved,
+            tool: 'context',
+            label: `Meta de ${goal.metricKey}`,
+            refId: goal.id,
+            numericEvidence: [
+              ...[goal.target, goal.achieved, goal.requiredDailyPace]
+                .filter((value): value is number => value != null)
+                .map((value) => ({ value: isRate ? value * 100 : value, unit: isRate ? 'percent' as const : 'number' as const, kind: 'observed' as const, metric: goal.metricKey, period: goal.period })),
+              ...(goal.projected != null ? [{ value: isRate ? goal.projected * 100 : goal.projected, unit: isRate ? 'percent' as const : 'number' as const, kind: 'estimated' as const, metric: goal.metricKey, period: goal.period }] : []),
+              {
+                value: goal.progress * 100,
+                unit: 'percent' as const,
+                kind: 'observed' as const,
+                metric: goal.metricKey,
+                period: goal.period,
+              },
+            ],
+          };
+        }),
       ],
     };
+
+    context.sources.push(...context.insights.map((insight) => ({
+      metric: 'insight',
+      tool: 'context',
+      refId: insight.id,
+      label: insight.title,
+      numericEvidence: [
+        ...(insight.impactAmount != null ? [{
+          value: insight.impactAmount,
+          unit: 'number' as const,
+          kind: 'estimated' as const,
+          metric: 'impact_amount',
+        }] : []),
+        ...(insight.topDrivers ?? []).flatMap((driver) => [
+          { value: driver.delta, unit: 'number' as const, kind: 'observed' as const, metric: 'insight_driver' },
+          { value: driver.share * 100, unit: 'percent' as const, kind: 'observed' as const, metric: 'insight_driver' },
+        ]),
+      ],
+    })));
 
     return context;
   }

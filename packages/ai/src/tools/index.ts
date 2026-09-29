@@ -158,7 +158,7 @@ export type CreateToolsOptions = {
 
 /** Read tools + analytics tools + optional propose_action (Etapa 7). */
 export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions = {}): Tool[] {
-  const tools = [
+  const tools: Tool[] = [
     createGetRevenueTool(deps),
     createGetSalesTool(deps),
     createGetCustomersTool(deps),
@@ -191,7 +191,6 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
     createGetLatestBriefingTool(deps),
     createGetGoalsProgressTool(deps),
     createGetFunnelTool(deps),
-    createRememberFactTool(deps),
     createListBusinessFactsTool(deps),
     createSearchBusinessFactsTool(deps),
     createSearchEpisodesTool(deps),
@@ -204,7 +203,9 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
     createGetCashFlowTool(deps),
     createGetInventoryRiskTool(deps),
     createGetAcquisitionTool(deps),
-  ];
+  ].map((tool) => ({ ...tool, recoverySafe: true }));
+
+  tools.push(createRememberFactTool(deps));
 
   if (options.actionProposer) {
     tools.push(createProposeActionTool(options.actionProposer));

@@ -74,6 +74,7 @@ export type NumberSourceLike = {
   excerpt?: string;
   metric?: string;
   tool?: string;
+  numericEvidence?: Array<{ value: number; unit: 'number' | 'percent' }>;
 };
 
 /** Allowlist for chat `claim_mismatch`: context metrics + cited sources, plus prose small ints. */
@@ -97,6 +98,10 @@ export function buildClaimAllowlist(
       continue;
     }
     if (source.value != null) values.push(source.value);
+    for (const claim of source.numericEvidence ?? []) {
+      if (claim.unit === 'percent') formatted.push(`${claim.value}%`);
+      else values.push(claim.value);
+    }
     if (source.label) formatted.push(source.label);
     if (source.excerpt) formatted.push(source.excerpt);
   }

@@ -192,7 +192,7 @@ describe('Orchestrator', () => {
     expect(answer.sources).toHaveLength(0);
   });
 
-  it('E14: text without digits untouched', async () => {
+  it('asks for a useful clarification when the model gives a generic inability response', async () => {
     const llm = new MockLLMAdapter({ script: [{ text: 'Sem dados suficientes para responder.' }] });
     const orchestrator = new Orchestrator({
       llm,
@@ -202,7 +202,8 @@ describe('Orchestrator', () => {
 
     const answer = await orchestrator.run({ ctx: toolContext(), question: 'E aí?' });
     expect(answer.guardrail).toBeUndefined();
-    expect(answer.content).toBe('Sem dados suficientes para responder.');
+    expect(answer.resolution).toBe('clarification');
+    expect(answer.content).toContain('indicador');
   });
 
   it('reports tool failures to the model instead of breaking the chat', async () => {
@@ -221,7 +222,8 @@ describe('Orchestrator', () => {
     const answer = await orchestrator.run({ ctx: toolContext(), question: 'Quem mais vendeu?' });
 
     expect(answer.toolCalls[0]?.error).toContain('database unavailable');
-    expect(answer.content).toContain('Não consegui');
+    expect(answer.resolution).toBe('clarification');
+    expect(answer.content).toContain('vendedores');
     expect(JSON.stringify(llm.requests[1]!.messages)).toContain('database unavailable');
   });
 

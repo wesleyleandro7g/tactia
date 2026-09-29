@@ -13,6 +13,7 @@ export function defineTool<TSchema extends z.ZodTypeAny, TData>(definition: {
   description: string;
   inputSchema: TSchema;
   minRole?: MembershipRole;
+  recoverySafe?: boolean;
   execute: (context: ToolContext, input: z.infer<TSchema>) => Promise<ToolResult<TData>>;
 }): Tool {
   return {
@@ -20,6 +21,7 @@ export function defineTool<TSchema extends z.ZodTypeAny, TData>(definition: {
     description: definition.description,
     inputSchema: definition.inputSchema,
     ...(definition.minRole ? { minRole: definition.minRole } : {}),
+    ...(definition.recoverySafe ? { recoverySafe: true } : {}),
     async execute(context: ToolContext, input: unknown) {
       const parsed = definition.inputSchema.parse(input ?? {}) as z.infer<TSchema>;
       return definition.execute(context, parsed);
@@ -78,6 +80,16 @@ export class ToolRegistry {
       description: tool.description,
       inputSchema: tool.inputSchema,
     }));
+  }
+
+  recoveryDefinitions(role: MembershipRole): LLMToolDefinition[] {
+    return this.visible(role)
+      .filter((tool) => tool.recoverySafe)
+      .map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema }));
+  }
+
+  isRecoverySafe(name: string, role: MembershipRole): boolean {
+    return this.visible(role).some((tool) => tool.name === name && tool.recoverySafe === true);
   }
 
   private visible(role?: MembershipRole): Tool[] {

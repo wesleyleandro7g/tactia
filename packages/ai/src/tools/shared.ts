@@ -100,9 +100,9 @@ export function resolvePeriod(input: PeriodInput, now = new Date()): ResolvedPer
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
-  const day = `${date.getDate()}`.padStart(2, '0');
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  return `${day}/${month}/${date.getFullYear()}`;
+  const day = `${date.getUTCDate()}`.padStart(2, '0');
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+  return `${day}/${month}/${date.getUTCFullYear()}`;
 }
 
 export function periodLabel(period: { from: string; to: string }): string {
@@ -111,12 +111,36 @@ export function periodLabel(period: { from: string; to: string }): string {
 
 /** Turns a MetricResult into citable evidence (spec §43). */
 export function sourceFromMetric(result: MetricResult, tool: string): MessageSource {
+  const rate = ['sales_growth', 'revenue_growth', 'cancellation_rate', 'refund_rate'].includes(result.key);
+  const claim = (value: number, period: MetricResult['period']): NonNullable<MessageSource['numericEvidence']>[number] => ({
+    value: rate ? value * 100 : value,
+    unit: rate ? 'percent' : 'number',
+    kind: 'observed',
+    metric: result.key,
+    period,
+  });
   return {
     metric: result.key,
     period: result.period,
     value: result.value,
     tool,
     label: `${result.key} — ${periodLabel(result.period)}`,
+    numericEvidence: [
+      claim(result.value, result.period),
+      ...(result.comparison
+        ? [
+            claim(result.comparison.value, result.comparison.period),
+            {
+              value: result.comparison.change * 100,
+              unit: 'percent' as const,
+              kind: 'observed' as const,
+              metric: result.key,
+              period: result.period,
+            },
+          ]
+        : []),
+      ...(result.breakdown?.items.map((item) => claim(item.value, result.period)) ?? []),
+    ],
   };
 }
 

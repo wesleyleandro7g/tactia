@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { ErrorCode, createId, type RequestContext } from '@tactia/shared';
 import { MockLLMAdapter } from '../adapters/mock-llm-adapter';
 import { ContextBuilder, type AiContext, type ContextBuilderDeps } from '../context-builder';
-import { CLAIM_MISMATCH_FALLBACK, Orchestrator, type ContextSource } from '../orchestrator';
+import { Orchestrator, type ContextSource } from '../orchestrator';
 import { buildSystemPrompt } from '../system-prompt';
 import { ToolRegistry, defineTool } from '../tool-registry';
 import { createDefaultTools } from '../tools/index';
@@ -189,7 +189,8 @@ describe('E14 claim_mismatch', () => {
     const answer = await orchestrator.run({ ctx: toolContext(), question: 'Quanto vendemos?' });
 
     expect(answer.guardrail).toBe('claim_mismatch');
-    expect(answer.content).toBe(CLAIM_MISMATCH_FALLBACK);
+    expect(answer.content).toMatch(/R\$\s+1\.500/);
+    expect(answer.resolution).toBe('partial');
     expect(answer.content).not.toContain('999');
     expect(answer.followUps).toEqual([]);
   });
@@ -399,6 +400,16 @@ describe('E14 roles', () => {
     expect(names).not.toContain('propose_action');
     expect(names).not.toContain('remember_fact');
     expect(names).toContain('get_revenue');
+  });
+
+  it('recovery offers only read tools even to an owner', () => {
+    const registry = new ToolRegistry(
+      createDefaultTools({} as ToolDeps, { actionProposer: recordingProposer() }),
+    );
+    const names = registry.recoveryDefinitions('owner').map((tool) => tool.name);
+    expect(names).toContain('get_revenue');
+    expect(names).not.toContain('remember_fact');
+    expect(names).not.toContain('propose_action');
   });
 
   it('E14: viewer execute propose_action throws AUTHORIZATION_ERROR', async () => {

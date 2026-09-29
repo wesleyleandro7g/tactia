@@ -49,6 +49,7 @@ export function publicAnswer(answer: ChatAnswer) {
     provider: answer.provider,
     model: answer.model,
     ...(answer.guardrail ? { guardrail: answer.guardrail } : {}),
+    ...(answer.resolution ? { resolution: answer.resolution } : {}),
   };
 }
 

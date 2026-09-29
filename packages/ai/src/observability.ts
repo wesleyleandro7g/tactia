@@ -49,5 +49,7 @@ export function logChatTurn(
     tool_names: data.answer?.toolCalls.map((call) => call.name) ?? [],
     sources: data.answer?.sources.length ?? 0,
     ...(data.answer?.guardrail ? { guardrail: data.answer.guardrail } : {}),
+    ...(data.answer?.resolution ? { resolution: data.answer.resolution } : {}),
+    recovery_attempts: data.answer?.recoveryAttempts ?? 0,
   });
 }

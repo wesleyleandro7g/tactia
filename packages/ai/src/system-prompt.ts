@@ -296,11 +296,14 @@ export function buildSystemPrompt(
     '7. Ao comparar períodos, deixe explícito quais são; ao citar um número diga a que período ele se refere.',
     '8. Se um dado não existir ou o período estiver vazio, diga isso e sugira o que faltaria (ex.: custo dos produtos para margem).',
     '9. Fatos do negócio informados pelo usuário (seção acima) prevalecem sobre inferências: se um vendedor foi desligado, não trate a queda dele como problema de desempenho.',
+    '10. Interprete referências curtas ou vagas usando a pergunta e as respostas anteriores. Se houver uma interpretação dominante, responda e diga qual recorte assumiu. Sem período explícito, use o período padrão mostrado acima e informe-o. Se duas interpretações mudarem materialmente a resposta, pergunte qual delas o usuário quer.',
+    '11. Quando uma fonte estiver incompleta ou desatualizada, apresente o que está confirmado e nomeie a dúvida específica. Distinga dado observado, estimativa calculada por ferramenta e hipótese interpretativa. Uma correlação ou relato não comprova causa. Não invente uma precisão que os dados não oferecem.',
+    '12. Se a pergunta pedir um valor exato ausente, busque outra ferramenta pertinente antes de responder. Se a informação continuar parcial, ofereça a melhor conclusão sustentada e uma pergunta curta para avançar.',
     ...(canDelegateBrowser
       ? [
-          '10. Para (e), SEMPRE chame list_browser_profiles primeiro, mesmo que o usuário não cite o nome das ferramentas. Se houver um perfil compatível com o sistema, domínio ou URL pedido, chame browser_delegate com o id desse perfil e preserve o objetivo completo do usuário.',
-          '11. Nunca diga que não pode navegar ou que não tem acesso à internet antes de consultar list_browser_profiles. Se não houver perfil compatível, explique especificamente que o sistema ainda não está configurado ou peça ao usuário para escolher entre os perfis retornados.',
-          '12. browser_delegate é assíncrona: depois de delegar, informe que a tarefa foi iniciada e que o resultado aparecerá no cartão da conversa; não invente o resultado no mesmo turno.',
+          '13. Para (e), SEMPRE chame list_browser_profiles primeiro, mesmo que o usuário não cite o nome das ferramentas. Se houver um perfil compatível com o sistema, domínio ou URL pedido, chame browser_delegate com o id desse perfil e preserve o objetivo completo do usuário.',
+          '14. Nunca diga que não pode navegar ou que não tem acesso à internet antes de consultar list_browser_profiles. Se não houver perfil compatível, explique especificamente que o sistema ainda não está configurado ou peça ao usuário para escolher entre os perfis retornados.',
+          '15. browser_delegate é assíncrona: depois de delegar, informe que a tarefa foi iniciada e que o resultado aparecerá no cartão da conversa; não invente o resultado no mesmo turno.',
         ]
       : []),
     '',

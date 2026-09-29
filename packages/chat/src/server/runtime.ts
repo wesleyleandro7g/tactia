@@ -50,6 +50,8 @@ export function answerMetadata(answer: ChatAnswer) {
     model: answer.model,
     ...(answer.usage ? { usage: answer.usage } : {}),
     ...(answer.guardrail ? { guardrail: answer.guardrail } : {}),
+    ...(answer.resolution ? { resolution: answer.resolution } : {}),
+    ...(answer.recoveryAttempts != null ? { recoveryAttempts: answer.recoveryAttempts } : {}),
   };
 }
 
@@ -132,6 +134,7 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
     defineTool({
       name: 'load_company_skill',
       minRole: 'member',
+      recoverySafe: true,
       description:
         'Carrega a orientação operacional completa de uma skill secundária habilitada desta empresa. Use o slug exato do catálogo quando a pergunta envolver um sistema, processo ou procedimento descrito por essa skill.',
       inputSchema: z.object({ slug: z.string().regex(/^[a-z][a-z0-9_]{2,63}$/) }).strict(),

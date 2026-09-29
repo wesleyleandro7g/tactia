@@ -54,6 +54,16 @@ export function createExplainChangeTool(deps: ToolDeps): Tool {
             value: drivers.current,
             tool: 'explain_change',
             label: `${input.metric} no período analisado`,
+            numericEvidence: [
+              { value: drivers.current, unit: 'number', kind: 'observed', metric: input.metric, period: serializePeriod(period) },
+              { value: drivers.delta, unit: 'number', kind: 'observed', metric: input.metric, period: serializePeriod(period) },
+              { value: drivers.change * 100, unit: 'percent', kind: 'observed', metric: input.metric, period: serializePeriod(period) },
+              ...drivers.byDimension.flatMap((dimension) => dimension.contributors.flatMap((contributor) => [
+                ...[contributor.current, contributor.previous, contributor.delta].map((value) => ({ value, unit: 'number' as const, kind: 'observed' as const, metric: input.metric, period: serializePeriod(period) })),
+                { value: contributor.share * 100, unit: 'percent' as const, kind: 'observed' as const, metric: input.metric, period: serializePeriod(period) },
+              ])),
+              ...(drivers.priceVolumeMix ? Object.values(drivers.priceVolumeMix).map((value) => ({ value, unit: 'number' as const, kind: 'observed' as const, metric: input.metric, period: serializePeriod(period) })) : []),
+            ],
           },
           {
             metric: input.metric,

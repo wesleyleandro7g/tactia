@@ -42,13 +42,24 @@ export function createGetInsightDetailTool(deps: ToolDeps): Tool {
         value: item.value,
         tool: 'get_insight_detail',
         label: `${item.key} — evidência do insight`,
+        numericEvidence: [
+          { value: item.value, unit: 'number', kind: 'observed', metric: item.key, period: item.period },
+          ...(item.comparison ? [
+            { value: item.comparison.value, unit: 'number' as const, kind: 'observed' as const, metric: item.key },
+            { value: item.comparison.change * 100, unit: 'percent' as const, kind: 'observed' as const, metric: item.key },
+          ] : []),
+        ],
       }));
+      const impactAmount = toNumber(insight.impactAmount);
       sources.push({
         metric: 'insight',
         refId: insight.id,
         tool: 'get_insight_detail',
         label: insight.title,
         excerpt: insight.description,
+        numericEvidence: impactAmount != null ? [{
+          value: impactAmount, unit: 'number', kind: 'estimated', metric: 'impact_amount',
+        }] : [],
       });
 
       return {

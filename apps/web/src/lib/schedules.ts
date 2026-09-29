@@ -76,7 +76,9 @@ const scheduleAgentRunner: ScheduleAgentRunner = {
     });
 
     return {
-      summary: answer.content,
+      summary: answer.resolution === 'clarification'
+        ? `Informação pendente para aprofundar a análise: ${answer.content}`
+        : answer.content,
       proposals: answer.proposals?.length ?? 0,
       toolCalls: answer.toolCalls?.map((call) => call.name) ?? [],
       provider: answer.provider,

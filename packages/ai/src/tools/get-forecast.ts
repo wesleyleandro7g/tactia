@@ -45,6 +45,12 @@ export function createGetForecastTool(deps: ToolDeps): Tool {
             value: forecast.total.expected,
             tool: 'get_forecast',
             label: `${input.metric} — projeção ${forecast.method} para ${input.horizonDays} dias (P10 ${forecast.total.low} · P90 ${forecast.total.high}; histórico ${forecast.historyDays} dias, fonte ${forecast.source})`,
+            numericEvidence: [
+              ...[forecast.total.expected, forecast.total.low, forecast.total.high]
+                .map((value) => ({ value, unit: 'number' as const, kind: 'estimated' as const, metric: input.metric, period: { from: forecast.from, to: forecast.to } })),
+              { value: forecast.previous.value, unit: 'number' as const, kind: 'observed' as const, metric: input.metric },
+              ...(forecast.previous.change != null ? [{ value: forecast.previous.change * 100, unit: 'percent' as const, kind: 'estimated' as const, metric: input.metric }] : []),
+            ],
           },
         ],
       };

@@ -24,7 +24,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MockLLMAdapter } from '../adapters/mock-llm-adapter';
-import { CLAIM_MISMATCH_FALLBACK, Orchestrator } from '../orchestrator';
+import { Orchestrator } from '../orchestrator';
 import { ToolRegistry } from '../tool-registry';
 import { createDefaultTools } from '../tools/index';
 import { createSearchCatalogTool } from '../tools/search-catalog';
@@ -188,9 +188,7 @@ describe('E16 tools and guardrails', () => {
     expect(['unsourced_numbers', 'claim_mismatch']).toContain(answer.guardrail);
     expect(answer.content).not.toContain('10.000.000');
     expect(answer.sources.some((source) => source.value != null)).toBe(false);
-    if (answer.guardrail === 'claim_mismatch') {
-      expect(answer.content).toBe(CLAIM_MISMATCH_FALLBACK);
-    }
+    expect(answer.content).not.toContain('Não consegui cruzar');
   });
 
   it('E16: search_catalog keyword fallback without embedder', async () => {

@@ -705,8 +705,10 @@ describe('V0.1 tools', () => {
     expect(context.metrics.find((metric) => metric.key === 'revenue')?.value).toBe(1000);
     expect(context.metrics.find((metric) => metric.key === 'sales_count')?.value).toBe(3);
     expect(context.insights[0]?.ruleKey).toBe('revenue_drop');
-    // MTD + trailing-30 sources for every context metric
-    expect(context.sources.length).toBe(context.metrics.length + context.trailing30.length);
+    // Metrics, active goals and insights all carry sources.
+    expect(context.sources.length).toBe(
+      context.metrics.length + context.trailing30.length + context.goals.length + context.insights.length,
+    );
     expect(context.trailing30.find((metric) => metric.key === 'revenue')).toBeDefined();
     expect(context.company.daysLeftInMonth).toBeGreaterThan(0);
     expect(context.sources.every((source) => source.tool === 'context')).toBe(true);

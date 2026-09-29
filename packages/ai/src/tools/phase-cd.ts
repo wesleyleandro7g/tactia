@@ -12,14 +12,24 @@ export function createGetGoalsProgressTool(deps: ToolDeps): Tool {
       const data = await deps.analytics.getGoalsProgress(ctx);
       return {
         data,
-        sources: data.map((goal) => ({
-          metric: 'goal_progress',
-          period: goal.period,
-          value: goal.achieved,
-          tool: 'get_goals_progress',
-          label: `Meta ${goal.metricKey}`,
-          refId: goal.id,
-        })),
+        sources: data.map((goal) => {
+          const isRate = ['cancellation_rate', 'refund_rate', 'sales_growth', 'revenue_growth'].includes(goal.metricKey);
+          return {
+            metric: 'goal_progress',
+            period: goal.period,
+            value: goal.achieved,
+            tool: 'get_goals_progress',
+            label: `Meta ${goal.metricKey}`,
+            refId: goal.id,
+            numericEvidence: [
+              ...[goal.target, goal.achieved, goal.requiredDailyPace]
+                .filter((value): value is number => value != null)
+                .map((value) => ({ value: isRate ? value * 100 : value, unit: isRate ? 'percent' as const : 'number' as const, kind: 'observed' as const, metric: goal.metricKey, period: goal.period })),
+              ...(goal.projected != null ? [{ value: isRate ? goal.projected * 100 : goal.projected, unit: isRate ? 'percent' as const : 'number' as const, kind: 'estimated' as const, metric: goal.metricKey, period: goal.period }] : []),
+              { value: goal.progress * 100, unit: 'percent' as const, kind: 'observed' as const, metric: goal.metricKey, period: goal.period },
+            ],
+          };
+        }),
       };
     },
   });

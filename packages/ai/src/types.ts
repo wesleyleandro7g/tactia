@@ -38,6 +38,14 @@ export type MessageSource = {
   /** Canonical record cited as qualitative evidence */
   refId?: string;
   excerpt?: string;
+  /** Numeric claims extracted from trusted structured results, not from document prose. */
+  numericEvidence?: Array<{
+    value: number;
+    unit: 'number' | 'percent';
+    kind: 'observed' | 'estimated';
+    metric: string;
+    period?: { from: string; to: string };
+  }>;
 };
 
 /** Media produced by a tool (e.g. generate_infographic) for chat/WhatsApp delivery. */
@@ -82,6 +90,8 @@ export type Tool = {
   readonly inputSchema: z.ZodTypeAny;
   /** Lowest membership that may see/call this tool. Default: viewer. */
   readonly minRole?: MembershipRole;
+  /** Safe to call again while recovering a rejected answer. Defaults to false. */
+  readonly recoverySafe?: boolean;
   execute(context: ToolContext, input: unknown): Promise<ToolResult>;
 };
 
@@ -180,6 +190,8 @@ export type ChatAnswer = {
   usage?: LLMUsage;
   /** Set when a safety guardrail changed the answer (spec §43). */
   guardrail?: 'unsourced_numbers' | 'max_iterations' | 'claim_mismatch';
+  resolution?: 'direct' | 'recovered' | 'partial' | 'clarification';
+  recoveryAttempts?: number;
 };
 
 export type ChatStreamEvent =

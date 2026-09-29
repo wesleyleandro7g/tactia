@@ -59,6 +59,13 @@ export function createGetTrendTool(deps: ToolDeps): Tool {
             value: trend.mean,
             tool: 'get_trend',
             label: `${input.metric} — média por ${input.granularity} na janela (${trend.points.length} pontos)`,
+            numericEvidence: [
+              ...[trend.mean, trend.slope, trend.min?.value, trend.max?.value]
+                .filter((value): value is number => value != null)
+                .map((value) => ({ value, unit: 'number' as const, kind: 'observed' as const, metric: input.metric, period: { from: from.toISOString(), to: to.toISOString() } })),
+              ...(trend.halfOverHalfChange != null ? [{ value: trend.halfOverHalfChange * 100, unit: 'percent' as const, kind: 'observed' as const, metric: input.metric }] : []),
+              ...trend.anomalies.slice(0, 10).map((anomaly) => ({ value: anomaly.value, unit: 'number' as const, kind: 'observed' as const, metric: input.metric })),
+            ],
           },
         ],
       };
