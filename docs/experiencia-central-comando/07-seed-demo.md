@@ -11,6 +11,9 @@ DATABASE_URL=postgresql://tactia:tactia@localhost:5433/tactia_test \
   pnpm --filter @tactia/web seed
 ```
 
+O comando web carrega `apps/web/.env.local` antes de importar autenticação e
+banco. Variáveis exportadas no shell, como `DATABASE_URL` acima, prevalecem.
+
 Este comando foi executado somente em `tactia_test` em 29/09/2026. Não execute
 contra desenvolvimento ou produção sem conferir o `DATABASE_URL` e o propósito
 do ambiente. O seed existente cria `owner@demo.tactia` com a senha de

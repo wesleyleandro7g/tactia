@@ -9,13 +9,14 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed-env.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@better-auth/cimd": "1.7.5",
     "@better-auth/mcp": "1.7.5",
     "@better-auth/oauth-provider": "1.7.5",
+    "@next/env": "16.3.3",
     "@resvg/resvg-js": "^2.6.2",
     "@shadcn/react": "^0.3.1",
     "@tactia/ai": "workspace:*",
