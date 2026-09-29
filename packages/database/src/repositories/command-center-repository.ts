@@ -31,6 +31,7 @@ export type CreatePlanInput = {
   scope?: unknown;
   responsibleLabel?: string | null;
   nextReviewAt?: Date | null;
+  publish?: boolean;
   steps: Array<{ title: string; description?: string | null }>;
   measurement?: {
     metricKey: string;
@@ -96,6 +97,12 @@ export class CommandCenterRepository {
 
   async createPlan(input: CreatePlanInput) {
     return this.db.$transaction(async (tx) => {
+      if (input.publish) {
+        await tx.goal.updateMany({
+          where: { id: input.goalId, tenantId: input.tenantId, status: 'preparing' },
+          data: { status: 'active' },
+        });
+      }
       const plan = await tx.plan.create({
       data: {
         id: createId(),
@@ -107,6 +114,7 @@ export class CommandCenterRepository {
         summary: input.summary ?? null,
         scope: (input.scope ?? {}) as Prisma.InputJsonValue,
         responsibleLabel: input.responsibleLabel ?? null,
+        status: input.publish ? 'active' : 'draft',
         nextReviewAt: input.nextReviewAt ?? null,
         steps: {
           create: input.steps.map((step, index) => ({

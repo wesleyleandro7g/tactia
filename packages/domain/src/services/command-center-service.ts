@@ -246,7 +246,7 @@ export class CommandCenterService {
     return serializePlan(plan);
   }
 
-  async createPlan(ctx: RequestContext, raw: unknown) {
+  async createPlan(ctx: RequestContext, raw: unknown, options: { publish?: boolean } = {}) {
     assertOwnerOrAdmin(ctx);
     const input = createPlanSchema.parse(raw);
     const [goal, insight, recommendation] = await Promise.all([
@@ -261,7 +261,7 @@ export class CommandCenterService {
     if (input.recommendationId && !recommendation) {
       throw new AppError(ErrorCode.NOT_FOUND, 'Recommendation not found');
     }
-    const plan = await this.repository.createPlan({ tenantId: ctx.tenantId, ...input });
+    const plan = await this.repository.createPlan({ tenantId: ctx.tenantId, ...input, publish: options.publish });
     return serializePlan(plan);
   }
 
