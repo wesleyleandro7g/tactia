@@ -663,6 +663,7 @@ model Tenant {
   status       TenantStatus @default(active)
   timezone     String       @default("America/Sao_Paulo")
   currency     String       @default("BRL")
+  commandCenterEnabled Boolean? @map("command_center_enabled")
   browserAgentSkillMarkdown String @default("") @map("browser_agent_skills") @db.Text
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
