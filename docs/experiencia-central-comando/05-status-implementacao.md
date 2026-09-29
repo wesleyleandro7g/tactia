@@ -168,6 +168,30 @@ versão obsoleta, revisão obsoleta, isolamento e snapshot), `command-center-cyc
 sem texto e sem duplicação). Regressão web 34/34, Ops 20/20 e domínio 16/16;
 typecheck dos quatro pacotes e lint dos pacotes limpos/arquivos web alterados.
 
+### Acessibilidade — revisão estática parcial
+
+Os cinco gráficos do dashboard já tinham tabela apenas para leitor de tela;
+agora oferecem o controle nativo **“Ver dados em tabela”**, acessível por
+teclado, com cabeçalhos e linhas semânticas. Os cards da Central quebram o
+cabeçalho e mostram valores de objetivo/resultado em uma coluna em larguras
+menores que 480px, evitando compressão de números. O editor Ops anuncia estados
+assíncronos, associa dicas a campos e leva o foco ao erro de envio.
+
+Uma checagem numérica dos pares de tokens usados em texto/ações corrigiu
+contrastes insuficientes: link web claro 4,86:1; botão web claro 5,37:1; link
+Ops claro 5,13:1; botão Ops claro (branco no primário) acima de 4,5:1. Textos
+de status sobre seus fundos suaves ficaram acima de 5:1 nos pares avaliados.
+Regressão após as alterações: web 34/34, Ops 27/27, typecheck dos dois apps,
+lint de Ops/arquivos web alterados e builds de produção dos dois apps passaram.
+Os builds mantêm avisos do Prisma gerado sobre CommonJS e acesso dinâmico ao
+filesystem.
+
+**Limite da evidência:** não havia navegador disponível para esta sessão
+(`cua.getState()` sem browsers; `createBrowserTab('iab')` retornou “Browser is
+not available”). Portanto, não houve inspeção renderizada em 360/768/1280px,
+zoom, leitor de tela, nem validação visual dos dois temas. Não declarar WCAG
+2.2 AA concluída até executar essas verificações.
+
 | Rota | Papel |
 |---|---|
 | `/today` | Síntese, objetivo, até 3 prioridades, trabalho delegado |
@@ -206,13 +230,14 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 | Lint global de `apps/web` falha | Baixa | **Preexistente** em `components/landing/hero-prompt.tsx` e `web-threads.tsx`; comprovado com `git stash` no HEAD |
 | 6 testes `browser-integration`/Torge falham | Baixa | **Preexistentes**, validação de URL `app.torge.com.br`; comprovado no HEAD |
 | Consolidação/consulta dos eventos analíticos | Baixa | Eventos persistidos; painel de leitura e métricas agregadas ainda não existem |
-| Validação visual 360/768/1280, leitor de tela, Web Vitals | Média | Não executada; exige navegador real |
+| Validação visual 360/768/1280, leitor de tela, Web Vitals | Média | Revisão estática e contraste de tokens feitos; navegador indisponível nesta sessão |
 | Agrupar lacunas numa mensagem e reenvio após silêncio | Baixa | Fora do escopo atual por decisão |
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Validação visual e de acessibilidade** nos três breakpoints e nos dois temas,
-   com tabela equivalente nos gráficos.
+1. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
+   dois temas, inclusive zoom/leitor de tela; as tabelas equivalentes já estão
+   disponíveis nos gráficos.
 2. **Consolidar métricas de eventos** para observar o piloto sem mensagem nem PII.
 3. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
 

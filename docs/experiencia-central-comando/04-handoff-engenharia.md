@@ -165,10 +165,10 @@ visual foi executada.
 - [x] Foco visível e não encoberto; skip link preservado; zoom não perde conteúdo/ação. — `:focus-visible` global e skip link do shell mantidos
 - [x] Estados, severidade, tendência e evidência não dependem apenas de cor. — `Badge` sempre com texto
 - [x] Atualizações assíncronas têm anúncio resumido; streaming não narra token a token. — `aria-busy` e `Alert` com `role`
-- [ ] Gráficos possuem tabela acessível equivalente. — pendente nas novas superfícies
+- [x] Gráficos possuem tabela acessível equivalente. — cinco gráficos do dashboard usam `AccessibleChartTable`, agora disponível também em `<details>` visível e operável por teclado; as telas novas da Central não usam gráfico
 - [x] Conteúdo de decisão, destinatários, condições e limites não é truncado silenciosamente. — `DecisionCard` expande o payload formatado
 - [x] Loading mantém dimensão; erro preserva conteúdo; disabled explica impedimento. — `loading.tsx` e `error.tsx` do grupo `(app)`
-- [ ] WCAG 2.2 AA e contrastes são verificados nas combinações finais. — pendente (exige ferramenta de contraste)
+- [ ] WCAG 2.2 AA e contrastes são verificados nas combinações finais. — pares de tokens de texto/ação foram calculados; inspeção renderizada e leitor de tela seguem pendentes por indisponibilidade de navegador
 
 ## Critérios de teste de engenharia
 

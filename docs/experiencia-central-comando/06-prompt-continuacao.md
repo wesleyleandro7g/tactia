@@ -33,15 +33,19 @@ guiada e eventos estão nesta branch.
 
 ## Sua tarefa
 
-Implemente o **próximo passo 1** de `05-status-implementacao.md`: validação visual
-e de acessibilidade da Central de Comando e do editor do Ops em 360, 768 e
-1280px, nos temas claro e escuro. Corrija os problemas encontrados e ofereça
-tabela acessível equivalente para os gráficos usados nas superfícies novas.
+Conclua o **próximo passo 1** de `05-status-implementacao.md`: validação
+renderizada e de acessibilidade da Central de Comando e do editor do Ops em
+360, 768 e 1280px, nos temas claro e escuro. A revisão estática já corrigiu
+contrastes de tokens, quebra de cards e foco nos erros; os gráficos existentes
+já oferecem tabela acessível em `<details>`. Nesta sessão o navegador não
+estava disponível, portanto não marque WCAG/visual como concluídos sem nova
+evidência.
 
 Requisitos:
 
-- Verifique foco, teclado, zoom, contraste, leitura de estados e ausência de
-  truncamento em decisões e resultados; registre evidência reproduzível.
+- Verifique em navegador foco, teclado, zoom, contraste renderizado, leitura de
+  estados e ausência de truncamento em decisões e resultados; registre evidência
+  reproduzível e corrija os problemas encontrados.
 - Preserve os contratos de confiança, tenant, versão e snapshot existentes.
 - O editor em `/tenants/[id]/preparation` já publica plano e medição sem
   recomendação; não duplique essa implementação.
