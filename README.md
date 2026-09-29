@@ -85,6 +85,7 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 
 | Documento | Para quê |
 |---|---|
+| [docs/experiencia-central-comando/05-status-implementacao.md](docs/experiencia-central-comando/05-status-implementacao.md) | **Central de comando: o que está pronto, evidências, riscos e próximos passos** |
 | [docs/deploy-producao.md](docs/deploy-producao.md) | Deploy em produção com Docker Compose e TLS |
 | [docs/onboarding-cliente.md](docs/onboarding-cliente.md) | Passo a passo para colocar um cliente real |
 | [docs/email-smtp-empresa.md](docs/email-smtp-empresa.md) | Envio de e-mails por empresa via SMTP (Gmail, Outlook, M365, custom) |
@@ -95,6 +96,7 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 | [docs/skills-hierarquicas-empresa.md](docs/skills-hierarquicas-empresa.md) | Skill global, catálogo secundário, vínculos, segurança e migração por empresa |
 | [docs/agendamento-acoes.md](docs/agendamento-acoes.md) | Agendamento de ações por empresa: recorrência, resiliência/reset, targets e criação pelo chat |
 | [docs/whatsapp-agente-assincrono.md](docs/whatsapp-agente-assincrono.md) | Agente WhatsApp assíncrono: fila de jobs, status, cancelamento, config por empresa e tratamento por número |
+| [docs/esclarecimento-lacunas-whatsapp.md](docs/esclarecimento-lacunas-whatsapp.md) | Esclarecimento pontual de lacunas: política de contato, deduplicação, correlação da resposta e registro de evidência |
 | [docs/integrations/torge/operations.md](docs/integrations/torge/operations.md) | Implantação, workflows, segurança e operação Torge/Figranium |
 | [docs/integrations/torge/acceptance-report.md](docs/integrations/torge/acceptance-report.md) | Cobertura, evidências, bloqueios e estado de produção |
 | [docs/integracao-chatgpt-mcp.md](docs/integracao-chatgpt-mcp.md) | OAuth 2.1, deploy e publicação do app MCP no ChatGPT |
