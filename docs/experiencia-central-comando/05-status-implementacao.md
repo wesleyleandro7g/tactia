@@ -10,6 +10,10 @@ Leia antes: `00-contexto-e-arquitetura.md` (premissas), `04-handoff-engenharia.m
 (contratos e critérios de aceite) e `docs/plano-experiencia-central-de-comando.md`
 (estratégia de produto).
 
+Para iniciar uma sessão nova de agente, use `06-prompt-continuacao.md`: ele já
+reúne contexto, tarefa, invariantes, comandos de verificação e falhas
+preexistentes que não devem consumir tempo.
+
 ## Como reproduzir a verificação
 
 Os testes de integração exigem o banco de teste, que já tem as 4 migrações novas
