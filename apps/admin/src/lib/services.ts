@@ -4,6 +4,8 @@ import {
   BrowserExecutorInstanceRepository,
   BrowserWorkflowBindingRepository,
   BrowserWorkflowRepository,
+  CommandCenterRepository,
+  EvidenceClarificationRepository,
   CampaignRepository,
   CredentialRepository,
   CustomFieldDefinitionRepository,
@@ -40,6 +42,9 @@ import {
   CustomFieldDefinitionService,
   DataCatalogService,
   DataSourceService,
+  CommandCenterService,
+  EvidenceClarificationService,
+  EvidenceGapService,
   OperatorService,
   SyncService,
 } from '@tactia/domain';
@@ -77,8 +82,14 @@ const customFieldDefinitionRepository = new CustomFieldDefinitionRepository(pris
 const browserExecutorInstanceRepository = new BrowserExecutorInstanceRepository(prisma);
 const browserWorkflowRepository = new BrowserWorkflowRepository(prisma);
 const browserWorkflowBindingRepository = new BrowserWorkflowBindingRepository(prisma);
+const commandCenterRepository = new CommandCenterRepository(prisma);
 
 export const auditLogService = new AuditLogService(auditLogRepository);
+export const commandCenterService = new CommandCenterService(commandCenterRepository);
+export const evidenceGapService = new EvidenceGapService(commandCenterRepository);
+export const evidenceClarificationService = new EvidenceClarificationService(
+  new EvidenceClarificationRepository(prisma),
+);
 
 export const operatorService = new OperatorService(operatorRepository, operatorAuthProvider);
 

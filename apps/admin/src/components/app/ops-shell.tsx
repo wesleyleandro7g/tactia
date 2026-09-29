@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, LayoutTemplate, LogOut, Shield, Users } from 'lucide-react';
+import { AlertTriangle, Building2, LayoutTemplate, LogOut, Shield, Users } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 const NAV = [
   { href: '/', label: 'Empresas', icon: Building2 },
   { href: '/leads', label: 'Leads', icon: Users },
+  { href: '/gaps', label: 'Lacunas', icon: AlertTriangle },
   { href: '/operators', label: 'Operadores', icon: Shield },
   { href: '/infographics', label: 'Infográficos', icon: LayoutTemplate },
 ];
