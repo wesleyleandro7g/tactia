@@ -14,6 +14,7 @@ export const POST = createApiHandler(
     const body = await readJson(request).catch(() => ({}));
     const decision = await commandCenterService.assertDecisionCurrent(ctx, approvalId);
     const execution = await chatServices.rejectApproval(ctx, approvalId, body ?? {});
+    if (decision) await commandCenterService.recordApprovalDecision(ctx, approvalId, 'rejected');
     const plan = await commandCenterService.reconcileExecution(ctx, execution.id);
     return { ...execution, decisionContext: decision, plan };
   },

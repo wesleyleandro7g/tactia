@@ -156,6 +156,11 @@ describe('recommendation → plan → decision → execution → evidence → me
     });
     const completed = await executionEngine.approve(ctx, approvalId);
     expect(completed.status).toBe('completed');
+    await commandCenter.recordApprovalDecision(ctx, approvalId, 'approved');
+    await commandCenter.recordApprovalDecision(ctx, approvalId, 'approved');
+    expect(await prisma.commandCenterEvent.count({
+      where: { tenantId, entityId: approvalId, name: 'decision_resolved' },
+    })).toBe(1);
 
     const reconciled = await commandCenter.reconcileExecution(ctx, completed.id);
     expect(reconciled?.status).toBe('active');
@@ -169,6 +174,9 @@ describe('recommendation → plan → decision → execution → evidence → me
       status: 'measuring',
       observed: null,
     });
+    expect(await prisma.commandCenterEvent.findFirst({
+      where: { tenantId, entityId: completed.id, name: 'execution_state_changed' },
+    })).toMatchObject({ metadata: { status: 'completed', planId: plan.id } });
 
     const measurement = await refreshPlanMeasurements(
       tenantId,

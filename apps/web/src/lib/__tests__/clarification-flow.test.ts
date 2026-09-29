@@ -190,6 +190,13 @@ describe('evidence clarification', () => {
 
     const refreshed = await prisma.evidenceGap.findUnique({ where: { id: gap.id } });
     expect(refreshed?.status).toBe('resolved');
+    const events = await prisma.commandCenterEvent.findMany({
+      where: { tenantId, entityId: prepared.id },
+      orderBy: { occurredAt: 'asc' },
+    });
+    expect(events.map((event) => event.name)).toEqual(['clarification_requested', 'clarification_received']);
+    expect(events[1]?.metadata).toEqual({ gapId: gap.id, clear: true });
+    expect(JSON.stringify(events)).not.toContain('cliente respondeu');
 
     // A replay of the same inbound must not duplicate anything.
     const replay = await service.receiveInbound({
@@ -200,6 +207,7 @@ describe('evidence clarification', () => {
     });
     expect(replay.handled).toBe(false);
     expect(await prisma.operationalEvidence.count({ where: { tenantId } })).toBe(1);
+    expect(await prisma.commandCenterEvent.count({ where: { tenantId, entityId: prepared.id } })).toBe(2);
   });
 
   it('keeps an ambiguous reply without confirmation and does not close the gap', async () => {

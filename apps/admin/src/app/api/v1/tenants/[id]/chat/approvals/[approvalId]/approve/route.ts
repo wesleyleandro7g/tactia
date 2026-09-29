@@ -19,6 +19,7 @@ export const POST = createApiHandler(
       approvalId,
       body ?? {},
     );
+    if (decision) await commandCenterService.recordApprovalDecision(tenantCtx, approvalId, 'approved');
     const plan = await commandCenterService.reconcileExecution(tenantCtx, execution.id);
     return { ...execution, decisionContext: decision, plan };
   },

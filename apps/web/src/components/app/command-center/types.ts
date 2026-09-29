@@ -66,6 +66,7 @@ export type MeasurementDefinitionView = {
   windowFrom: string;
   windowTo: string;
   attribution: string;
+  sources: unknown;
   version: number;
   reviews: MeasurementReviewView[];
 };
@@ -85,5 +86,13 @@ export type PlanView = {
   steps: PlanStepView[];
   evidence: EvidenceView[];
   measurementDefinitions: MeasurementDefinitionView[];
+  reviewDecisions: Array<{
+    id: string;
+    choice: string;
+    reason: string | null;
+    fromVersion: number;
+    toVersion: number;
+    createdAt: string;
+  }>;
   gaps: Array<{ id: string; subject: string; reason: string; impact: string; status: string }>;
 };

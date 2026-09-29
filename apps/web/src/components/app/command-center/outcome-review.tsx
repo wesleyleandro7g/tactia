@@ -10,6 +10,16 @@ function display(value: number | null, unit: string) {
   return `${value.toLocaleString('pt-BR')} ${unit}`;
 }
 
+function sourceLabels(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((source) => {
+    if (!source || typeof source !== 'object') return null;
+    const row = source as Record<string, unknown>;
+    const label = row.label ?? row.source ?? row.type;
+    return typeof label === 'string' ? label : null;
+  }).filter((label): label is string => label !== null);
+}
+
 export function OutcomeReview({ definition }: { definition: MeasurementDefinitionView }) {
   const review = definition.reviews[0];
   const status = review?.status ?? 'measuring';
@@ -19,6 +29,7 @@ export function OutcomeReview({ definition }: { definition: MeasurementDefinitio
       <CardHeader><div><CardTitle>{definition.indicator}</CardTitle><CardDescription>{new Date(definition.windowFrom).toLocaleDateString('pt-BR')} a {new Date(definition.windowTo).toLocaleDateString('pt-BR')} · definição v{definition.version}</CardDescription></div><Badge tone={tone}>{status === 'measured' ? 'Medido' : status === 'not_measurable' ? 'Não foi possível medir' : status === 'review_needed' ? 'Revisão necessária' : 'Em medição'}</Badge></CardHeader>
       <CardContent className="flex flex-col gap-4">
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3"><div><dt className="text-xs uppercase tracking-wide text-muted-foreground">Baseline</dt><dd className="mt-1 text-lg font-medium tabular">{display(definition.baseline, definition.unit)}</dd></div><div><dt className="text-xs uppercase tracking-wide text-muted-foreground">Alvo</dt><dd className="mt-1 text-lg font-medium tabular">{display(definition.target, definition.unit)}</dd></div><div><dt className="text-xs uppercase tracking-wide text-muted-foreground">Observado</dt><dd className="mt-1 text-lg font-medium tabular">{display(review?.observed ?? null, definition.unit)}</dd></div></dl>
+        <p className="text-sm text-muted-foreground">Fontes: {sourceLabels(definition.sources).join(', ') || 'Ainda não identificadas'}</p>
         <Alert tone="info" title="Limite de atribuição">{definition.attribution}</Alert>
         {review?.limitation ? <Alert tone="warning" title="Limitação da medição">{review.limitation}</Alert> : null}
         {!review ? <p className="text-sm text-muted-foreground">A Tactia continua coletando evidências nas fontes conectadas. Nenhum check-in é necessário.</p> : null}
