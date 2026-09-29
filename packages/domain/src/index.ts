@@ -280,6 +280,19 @@ export {
 } from './services/command-center-service';
 
 export {
+  CommandCenterMetricsService,
+  COMMAND_CENTER_METRICS_MAX_DAYS,
+  COMMAND_CENTER_METRICS_DEFAULT_DAYS,
+  UNSUPPORTED_PILOT_METRICS,
+  resolveCommandCenterMetricsWindow,
+} from './services/command-center-metrics-service';
+export type {
+  OperationalMetric,
+  OperationalMetricAvailability,
+  UnsupportedPilotMetric,
+} from './services/command-center-metrics-service';
+
+export {
   EvidenceClarificationService,
   prepareEvidenceClarificationSchema,
   clarificationResponseIsClear,
