@@ -12,6 +12,7 @@ describe('tenant tabs', () => {
     expect(TENANT_TABS.map((tab) => tab.label)).toEqual([
       'Cadastro',
       'Preparação',
+      'Piloto',
       'Usuários',
       'Integrações',
       'Sincronização',
@@ -31,6 +32,7 @@ describe('tenant tabs', () => {
   it('builds hrefs', () => {
     expect(tenantTabHref('t1', '')).toBe('/tenants/t1');
     expect(tenantTabHref('t1', 'preparation')).toBe('/tenants/t1/preparation');
+    expect(tenantTabHref('t1', 'metrics')).toBe('/tenants/t1/metrics');
     expect(tenantTabHref('t1', 'users')).toBe('/tenants/t1/users');
     expect(tenantTabHref('t1', 'chat')).toBe('/tenants/t1/chat');
     expect(tenantTabHref('t1', 'whatsapp')).toBe('/tenants/t1/whatsapp');
@@ -50,8 +52,9 @@ describe('tenant tabs', () => {
     expect(isTenantTabActive('/tenants/t1/integrations/x', 't1', 'integrations')).toBe(true);
     expect(isTenantTabActive('/tenants/t1/integrations-foo', 't1', 'integrations')).toBe(false);
     expect(isTenantTabActive('/tenants/t2/users', 't1', 'users')).toBe(false);
-    expect(isTenantTabActive('/tenants/t1/chat', 't1', 'chat')).toBe(true);
-    expect(isTenantTabActive('/tenants/t1/chat', 't1', '')).toBe(false);
+    expect(isTenantTabActive('/tenants/t1/preparation', 't1', 'preparation')).toBe(true);
+    expect(isTenantTabActive('/tenants/t1/metrics', 't1', 'metrics')).toBe(true);
+    expect(isTenantTabActive('/tenants/t1/metrics', 't1', '')).toBe(false);
   });
 
   it('maps counts to tabs', () => {

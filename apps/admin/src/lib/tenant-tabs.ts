@@ -2,6 +2,7 @@ import type { TenantSyncIndicator } from '@tactia/domain';
 
 export type TenantTabKey =
   | 'profile'
+  | 'metrics'
   | 'users'
   | 'integrations'
   | 'sync'
@@ -18,6 +19,7 @@ export type TenantTabKey =
 
 export type TenantTabSegment =
   | ''
+  | 'metrics'
   | 'users'
   | 'integrations'
   | 'sync'
@@ -42,6 +44,7 @@ export type TenantTab = {
 export const TENANT_TABS: readonly TenantTab[] = [
   { key: 'profile', label: 'Cadastro', segment: '' },
   { key: 'preparation', label: 'Preparação', segment: 'preparation' },
+  { key: 'metrics', label: 'Piloto', segment: 'metrics' },
   { key: 'users', label: 'Usuários', segment: 'users' },
   { key: 'integrations', label: 'Integrações', segment: 'integrations' },
   { key: 'sync', label: 'Sincronização', segment: 'sync' },

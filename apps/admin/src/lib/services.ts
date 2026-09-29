@@ -4,6 +4,7 @@ import {
   BrowserExecutorInstanceRepository,
   BrowserWorkflowBindingRepository,
   BrowserWorkflowRepository,
+  CommandCenterEventRepository,
   CommandCenterRepository,
   GoalRepository,
   EvidenceClarificationRepository,
@@ -43,6 +44,7 @@ import {
   CustomFieldDefinitionService,
   DataCatalogService,
   DataSourceService,
+  CommandCenterMetricsService,
   CommandCenterService,
   GoalService,
   EvidenceClarificationService,
@@ -89,6 +91,9 @@ const goalRepository = new GoalRepository(prisma);
 
 export const auditLogService = new AuditLogService(auditLogRepository);
 export const commandCenterService = new CommandCenterService(commandCenterRepository);
+export const commandCenterMetricsService = new CommandCenterMetricsService(
+  new CommandCenterEventRepository(prisma),
+);
 export const goalService = new GoalService(goalRepository);
 export const evidenceGapService = new EvidenceGapService(commandCenterRepository);
 export const evidenceClarificationService = new EvidenceClarificationService(

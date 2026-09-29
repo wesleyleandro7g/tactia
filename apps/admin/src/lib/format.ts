@@ -13,6 +13,16 @@ export function formatInteger(value: number): string {
   return INTEGER.format(value);
 }
 
+export function formatRatio(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 0 }).format(value);
+}
+
+export function formatMetricValue(value: number | null, unit: 'count' | 'ratio'): string {
+  if (value == null) return '—';
+  return unit === 'ratio' ? formatRatio(value) : formatInteger(value);
+}
+
 export function formatDateTime(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '—';
@@ -58,3 +68,17 @@ export const TENANT_STATUS_LABELS: Record<string, string> = {
   suspended: 'Suspensa',
   deleted: 'Excluída',
 };
+
+export const COMMAND_CENTER_EVENT_LABELS: Record<string, string> = {
+  plan_created: 'Plano criado',
+  decision_resolved: 'Decisão resolvida',
+  execution_state_changed: 'Transição de execução',
+  clarification_requested: 'Esclarecimento solicitado',
+  clarification_received: 'Esclarecimento recebido',
+};
+
+export const METRIC_AVAILABILITY_LABELS: Record<string, string> = {
+  ready: 'Com cobertura',
+  empty: 'Sem eventos',
+};
+
