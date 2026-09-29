@@ -41,9 +41,9 @@ export function ObjectiveProgress({
         </Badge>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <dl className="grid grid-cols-2 gap-4">
-          <div><dt className="text-xs uppercase tracking-wide text-muted-foreground">Realizado</dt><dd className="mt-1 text-2xl font-medium tabular">{evaluable ? valueLabel(actual, objective.metricKey) : '—'}</dd></div>
-          <div><dt className="text-xs uppercase tracking-wide text-muted-foreground">Meta</dt><dd className="mt-1 text-2xl font-medium tabular">{valueLabel(objective.target, objective.metricKey)}</dd></div>
+        <dl className="grid gap-4 min-[480px]:grid-cols-2">
+          <div className="min-w-0"><dt className="text-xs uppercase tracking-wide text-muted-foreground">Realizado</dt><dd className="mt-1 break-words text-2xl font-medium tabular">{evaluable ? valueLabel(actual, objective.metricKey) : '—'}</dd></div>
+          <div className="min-w-0"><dt className="text-xs uppercase tracking-wide text-muted-foreground">Meta</dt><dd className="mt-1 break-words text-2xl font-medium tabular">{valueLabel(objective.target, objective.metricKey)}</dd></div>
         </dl>
         {ratio !== null ? <div><div role="progressbar" aria-label="Progresso do objetivo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ratio * 100)} className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${ratio * 100}%` }} /></div><p className="mt-2 text-sm text-muted-foreground">{Math.round(ratio * 100)}% da meta observada{updatedAt ? ` · fonte até ${updatedAt}` : ''}</p></div> : null}
         {limitation || !evaluable ? <Alert tone="warning" title={evaluable ? 'Cobertura limitada' : 'Não foi possível avaliar'}>{limitation ?? 'A fonte necessária está sendo verificada pela equipe Tactia. Nenhum valor foi substituído por zero.'}</Alert> : null}
