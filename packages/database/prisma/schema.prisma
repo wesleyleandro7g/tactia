@@ -695,6 +695,8 @@ model Tenant {
   planStepExecutions PlanStepExecution[]
   measurementDefinitions MeasurementDefinition[]
   measurementReviews MeasurementReview[]
+  planReviewDecisions PlanReviewDecision[]
+  commandCenterEvents CommandCenterEvent[]
   operationalEvidence OperationalEvidence[]
   evidenceGaps EvidenceGap[]
   evidenceClarifications EvidenceClarification[]
@@ -797,6 +799,7 @@ model User {
   createdApiKeys TenantApiKey[]
   whatsappNumbers WhatsappAuthorizedNumber[]
   ownedGoals      Goal[] @relation("GoalOwner")
+  planReviewDecisions PlanReviewDecision[]
 
   @@index([email])
   @@index([createdAt])
@@ -1861,6 +1864,7 @@ model Plan {
   recommendation     Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
   steps              PlanStep[]
   measurementDefinitions MeasurementDefinition[]
+  reviewDecisions    PlanReviewDecision[]
   evidence           OperationalEvidence[]
   gaps               EvidenceGap[]
 
@@ -1949,10 +1953,48 @@ model MeasurementReview {
   updatedAt               DateTime @updatedAt @map("updated_at")
   tenant                   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   measurementDefinition   MeasurementDefinition @relation(fields: [measurementDefinitionId], references: [id], onDelete: Cascade)
+  planReviewDecisions PlanReviewDecision[]
 
   @@index([tenantId, status])
   @@index([measurementDefinitionId])
   @@map("measurement_reviews")
+}
+
+model PlanReviewDecision {
+  id             String   @id @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  planId         String   @map("plan_id") @db.Uuid
+  reviewId       String   @map("review_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  choice         String
+  reason         String?
+  fromVersion    Int      @map("from_version")
+  toVersion      Int      @map("to_version")
+  reviewSnapshot Json     @map("review_snapshot")
+  createdAt      DateTime @default(now()) @map("created_at")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan           Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  review         MeasurementReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, fromVersion])
+  @@index([tenantId, createdAt])
+  @@map("plan_review_decisions")
+}
+
+model CommandCenterEvent {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  eventKey   String   @map("event_key")
+  name       String
+  entityId   String   @map("entity_id") @db.Uuid
+  metadata   Json     @default("{}")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, eventKey])
+  @@index([tenantId, name, occurredAt])
+  @@map("command_center_events")
 }
 
 model OperationalEvidence {

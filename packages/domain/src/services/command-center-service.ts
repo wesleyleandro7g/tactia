@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
 import type { CommandCenterRepository } from '@tactia/database';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
-import { assertOwnerOrAdmin, assertOperator, assertTenantContext } from '../authz';
+import { assertOwnerOrAdmin, assertOperator, assertTenantContext, assertTenantUser } from '../authz';
 import { decimalToNumber } from '../utils/serialize';
 
 const planStatusSchema = z.enum(['draft', 'active', 'paused', 'completed', 'closed']);
@@ -42,6 +42,17 @@ export const createPlanSchema = z.object({
 export const updatePlanStatusSchema = z.object({
   version: z.number().int().positive(),
   status: planStatusSchema,
+});
+
+export const decidePlanReviewSchema = z.object({
+  version: z.number().int().positive(),
+  reviewId: z.string().uuid(),
+  choice: z.enum(['adjust', 'continue', 'close']),
+  reason: z.string().trim().min(3).max(500).nullable().optional(),
+}).superRefine((value, ctx) => {
+  if (value.choice === 'adjust' && !value.reason) {
+    ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Explain what should change' });
+  }
 });
 
 export const createMeasurementReviewSchema = z.object({
@@ -153,6 +164,10 @@ function serializePlan(plan: PlanRecord) {
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
     nextReviewAt: plan.nextReviewAt?.toISOString() ?? null,
+    reviewDecisions: plan.reviewDecisions.map((decision) => ({
+      ...decision,
+      createdAt: decision.createdAt.toISOString(),
+    })),
     goal: serializeGoal({ ...plan.goal, plans: [] }),
     steps: plan.steps.map((step) => ({
       ...step,
@@ -263,6 +278,34 @@ export class CommandCenterService {
       throw new AppError(ErrorCode.CONFLICT, 'Plan changed since it was reviewed');
     }
     return serializePlan(plan);
+  }
+
+  async decidePlanReview(ctx: RequestContext, id: string, raw: unknown) {
+    assertOwnerOrAdmin(ctx);
+    assertTenantUser(ctx);
+    const input = decidePlanReviewSchema.parse(raw);
+    const result = await this.repository.decidePlanReview({
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      planId: id,
+      ...input,
+    });
+    if (result === 'not_found' || result === 'review_not_found') {
+      throw new AppError(ErrorCode.NOT_FOUND, 'Plan or review not found');
+    }
+    if (result === 'pending_approval') {
+      throw new AppError(ErrorCode.CONFLICT, 'Resolve the pending approval before reviewing this plan');
+    }
+    if (result === 'conflict') {
+      throw new AppError(ErrorCode.CONFLICT, 'Plan changed since it was reviewed');
+    }
+    return {
+      id: result.decision.id,
+      choice: result.decision.choice,
+      fromVersion: result.decision.fromVersion,
+      toVersion: result.decision.toVersion,
+      status: result.status,
+    };
   }
 
   async createReview(ctx: RequestContext, raw: unknown) {
@@ -463,6 +506,11 @@ export class CommandCenterService {
       decisionSnapshot: decision.decisionSnapshot,
       actionExecutionId: decision.actionExecutionId,
     };
+  }
+
+  async recordApprovalDecision(ctx: RequestContext, approvalId: string, choice: 'approved' | 'rejected') {
+    assertTenantContext(ctx);
+    await this.repository.recordApprovalDecision(ctx.tenantId, approvalId, choice);
   }
 
   async reconcileExecution(ctx: RequestContext, actionExecutionId: string) {

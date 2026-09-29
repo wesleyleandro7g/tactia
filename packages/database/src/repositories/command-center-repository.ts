@@ -1,5 +1,6 @@
 import { createId } from '@tactia/shared';
 import { Prisma, type PrismaClient } from '../client';
+import { recordCommandCenterEvent } from './command-center-events';
 
 const planInclude = {
   goal: true,
@@ -17,6 +18,7 @@ const planInclude = {
   },
   evidence: { orderBy: { eventAt: 'desc' as const } },
   gaps: { orderBy: { createdAt: 'desc' as const } },
+  reviewDecisions: { orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.PlanInclude;
 
 export type CreatePlanInput = {
@@ -93,7 +95,8 @@ export class CommandCenterRepository {
   }
 
   async createPlan(input: CreatePlanInput) {
-    return this.db.plan.create({
+    return this.db.$transaction(async (tx) => {
+      const plan = await tx.plan.create({
       data: {
         id: createId(),
         tenantId: input.tenantId,
@@ -136,6 +139,15 @@ export class CommandCenterRepository {
           : {}),
       },
       include: planInclude,
+      });
+      await recordCommandCenterEvent(tx, {
+        tenantId: input.tenantId,
+        eventKey: `plan-created:${plan.id}`,
+        name: 'plan_created',
+        entityId: plan.id,
+        metadata: { version: plan.version },
+      });
+      return plan;
     });
   }
 
@@ -158,6 +170,103 @@ export class CommandCenterRepository {
     });
     if (result.count !== 1) return null;
     return this.findPlan(tenantId, id);
+  }
+
+  async decidePlanReview(input: {
+    tenantId: string;
+    userId: string;
+    planId: string;
+    reviewId: string;
+    version: number;
+    choice: 'adjust' | 'continue' | 'close';
+    reason?: string | null;
+  }) {
+    return this.db.$transaction(async (tx) => {
+      const plan = await tx.plan.findFirst({
+        where: { tenantId: input.tenantId, id: input.planId },
+        include: {
+          measurementDefinitions: { include: { reviews: { orderBy: { createdAt: 'desc' } } } },
+          steps: { include: { executions: { include: { actionExecution: { include: { approvals: true } } } } } },
+        },
+      });
+      if (!plan) return 'not_found' as const;
+      if (plan.version !== input.version || plan.status === 'closed') return 'conflict' as const;
+      if (plan.steps.some((step) => step.executions.some((link) =>
+        link.actionExecution.approvals.some((approval) => approval.status === 'pending')))) {
+        return 'pending_approval' as const;
+      }
+      const definition = plan.measurementDefinitions.find((item) =>
+        item.reviews.some((review) => review.id === input.reviewId));
+      const review = definition?.reviews.find((item) => item.id === input.reviewId);
+      if (!definition || !review || definition.reviews[0]?.id !== review.id) return 'review_not_found' as const;
+      const status = input.choice === 'close' ? 'closed' : input.choice === 'adjust' ? 'paused' : 'active';
+      const updated = await tx.plan.updateMany({
+        where: { tenantId: input.tenantId, id: input.planId, version: input.version, status: { not: 'closed' } },
+        data: { status, version: { increment: 1 }, nextReviewAt: input.choice === 'continue' ? new Date(Date.now() + 7 * 86400000) : null },
+      });
+      if (updated.count !== 1) return 'conflict' as const;
+
+      const decision = await tx.planReviewDecision.create({
+        data: {
+          id: createId(),
+          tenantId: input.tenantId,
+          planId: input.planId,
+          reviewId: input.reviewId,
+          userId: input.userId,
+          choice: input.choice,
+          reason: input.reason ?? null,
+          fromVersion: input.version,
+          toVersion: input.version + 1,
+          reviewSnapshot: {
+            definitionId: definition.id,
+            definitionVersion: definition.version,
+            indicator: definition.indicator,
+            unit: definition.unit,
+            baseline: definition.baseline?.toString() ?? null,
+            observed: review.observed?.toString() ?? null,
+            status: review.status,
+            windowFrom: definition.windowFrom.toISOString(),
+            windowTo: definition.windowTo.toISOString(),
+            sources: definition.sources,
+            references: review.references,
+            attribution: definition.attribution,
+            limitation: review.limitation,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await recordCommandCenterEvent(tx, {
+        tenantId: input.tenantId,
+        eventKey: `review-decision:${decision.id}`,
+        name: 'decision_resolved',
+        entityId: decision.id,
+        metadata: { kind: 'plan_review', choice: input.choice, planVersion: decision.toVersion },
+      });
+      if (input.choice === 'adjust') {
+        await tx.evidenceGap.create({
+          data: {
+            id: createId(),
+            tenantId: input.tenantId,
+            planId: input.planId,
+            subject: `Ajustar plano: ${plan.title}`,
+            reason: input.reason ?? 'Revisão do resultado solicitou ajuste do plano.',
+            impact: 'medium',
+            dedupeKey: `plan-review-adjust:${input.planId}:v${input.version}`,
+            nextStep: 'Ops revisa o plano e prepara uma nova versão para decisão.',
+          },
+        });
+      }
+      return { decision, status };
+    });
+  }
+
+  async recordApprovalDecision(tenantId: string, approvalId: string, choice: 'approved' | 'rejected') {
+    await recordCommandCenterEvent(this.db, {
+      tenantId,
+      eventKey: `approval-decision:${approvalId}`,
+      name: 'decision_resolved',
+      entityId: approvalId,
+      metadata: { kind: 'approval', choice },
+    });
   }
 
   async createReview(input: {
@@ -394,6 +503,13 @@ export class CommandCenterRepository {
     await this.db.planStep.update({
       where: { id: link.planStepId },
       data: { status: stepStatus },
+    });
+    await recordCommandCenterEvent(this.db, {
+      tenantId,
+      eventKey: `execution-state:${execution.id}:${execution.status}:${execution.updatedAt.toISOString()}`,
+      name: 'execution_state_changed',
+      entityId: execution.id,
+      metadata: { status: execution.status, planId: plan.id },
     });
     if (
       plan.status === 'draft' &&

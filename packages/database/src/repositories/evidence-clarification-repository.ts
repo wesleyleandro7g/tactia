@@ -1,5 +1,6 @@
 import { createId } from '@tactia/shared';
 import { Prisma, type PrismaClient } from '../client';
+import { recordCommandCenterEvent } from './command-center-events';
 
 export type ClarificationPolicy = {
   enabled: boolean;
@@ -84,7 +85,8 @@ export class EvidenceClarificationRepository {
     numberId: string;
     question: string;
   }) {
-    return this.db.evidenceClarification.upsert({
+    return this.db.$transaction(async (tx) => {
+      const clarification = await tx.evidenceClarification.upsert({
       where: { gapId: input.gapId },
       create: {
         id: createId(),
@@ -103,6 +105,15 @@ export class EvidenceClarificationRepository {
         answeredAt: null,
         error: null,
       },
+      });
+      await recordCommandCenterEvent(tx, {
+        tenantId: input.tenantId,
+        eventKey: `clarification-requested:${clarification.id}:${clarification.attempts}`,
+        name: 'clarification_requested',
+        entityId: clarification.id,
+        metadata: { gapId: input.gapId },
+      });
+      return clarification;
     });
   }
 
@@ -233,6 +244,13 @@ export class EvidenceClarificationRepository {
               nextStep: 'Revisar resposta ambígua; não assumir confirmação.',
               resolution: Prisma.JsonNull,
             },
+      });
+      await recordCommandCenterEvent(tx, {
+        tenantId: input.tenantId,
+        eventKey: `clarification-received:${clarification.id}:${clarification.attempts}`,
+        name: 'clarification_received',
+        entityId: clarification.id,
+        metadata: { gapId: clarification.gapId, clear: input.clear },
       });
       return { clarification, evidence, clear: input.clear };
     });

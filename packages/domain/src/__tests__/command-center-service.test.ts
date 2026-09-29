@@ -57,6 +57,7 @@ function planRow() {
     measurementDefinitions: [],
     evidence: [],
     gaps: [],
+    reviewDecisions: [],
   };
 }
 
