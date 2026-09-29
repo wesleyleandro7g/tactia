@@ -10,6 +10,8 @@ Leia antes: `00-contexto-e-arquitetura.md` (premissas), `04-handoff-engenharia.m
 (contratos e critérios de aceite) e `docs/plano-experiencia-central-de-comando.md`
 (estratégia de produto).
 
+Dados sintéticos para inspeção: `07-seed-demo.md`.
+
 Para iniciar uma sessão nova de agente, use `06-prompt-continuacao.md`: ele já
 reúne contexto, tarefa, invariantes, comandos de verificação e falhas
 preexistentes que não devem consumir tempo.
@@ -167,6 +169,16 @@ versão obsoleta, revisão obsoleta, isolamento e snapshot), `command-center-cyc
 (4/4, eventos de decisão/execução), `clarification-flow.test.ts` (7/7, eventos
 sem texto e sem duplicação). Regressão web 34/34, Ops 20/20 e domínio 16/16;
 typecheck dos quatro pacotes e lint dos pacotes limpos/arquivos web alterados.
+
+### Dados sintéticos para demonstração
+
+`pnpm --filter @tactia/web seed` agora gera um cenário da Central na empresa
+demo, além dos dados de negócio existentes. A fonte é explicitamente sintética;
+o plano não executa ação, e a medição usa o cálculo canônico. A repetição do
+comando em `tactia_test` conservou os mesmos IDs. Contagem final: 2 objetivos
+(um legado), 1 plano, 1 medição/revisão, 1 recomendação, 1 lacuna e 1 fonte.
+`command-center-seed.test.ts` verifica idempotência e preservação da flag
+desligada explicitamente. Instruções: `07-seed-demo.md`.
 
 ### Acessibilidade — revisão estática parcial
 

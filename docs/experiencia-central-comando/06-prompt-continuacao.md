@@ -27,7 +27,9 @@ guiada e eventos estão nesta branch.
 3. `docs/experiencia-central-comando/00-contexto-e-arquitetura.md` — premissas de
    produto, sobretudo a de **esforço operacional zero do cliente**.
 4. `docs/esclarecimento-lacunas-whatsapp.md` — operação do Fluxo D.
-5. `apps/web/AGENTS.md` e `apps/admin/AGENTS.md` — esta versão do Next (16.3.3)
+5. `docs/experiencia-central-comando/07-seed-demo.md` — dados sintéticos para
+   inspeção da Central e comando seguro para `tactia_test`.
+6. `apps/web/AGENTS.md` e `apps/admin/AGENTS.md` — esta versão do Next (16.3.3)
    tem mudanças de API. **Leia os guias em `node_modules/next/dist/docs/`
    (resolvidos a partir de cada app) antes de escrever qualquer código Next.**
 
