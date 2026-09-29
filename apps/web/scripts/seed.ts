@@ -2,6 +2,7 @@ import { createId } from '@tactia/shared';
 import { prisma } from '@tactia/database';
 import { DEMO_PLAYBOOK_RECLAMACAO_ATRASO } from '@tactia/domain';
 import { auth } from '../src/lib/auth';
+import { seedCommandCenter } from './seed-command-center';
 
 const DEMO_EMAIL = 'owner@demo.tactia';
 const CUSTOMER_COUNT = 200;
@@ -632,7 +633,7 @@ async function seedPlaybooks(tenantId: string) {
 }
 
 async function main() {
-  const { tenant } = await ensureIdentity();
+  const { tenant, user } = await ensureIdentity();
   console.log(`Identity ready: ${DEMO_EMAIL} / password123 (${tenant.name})`);
   await seedBusiness(tenant.id);
   await seedCurrentMonthSales(tenant.id);
@@ -648,6 +649,7 @@ async function main() {
     tenant.id,
     customerRows.map((row) => row.id),
   );
+  await seedCommandCenter(tenant.id, user.id);
 }
 
 main()
