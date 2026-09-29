@@ -1,4 +1,4 @@
-export type CatalogFieldType = 'string' | 'number' | 'boolean' | 'url' | 'secret' | 'file' | 'select' | 'multiselect' | 'time';
+export type CatalogFieldType = 'string' | 'number' | 'boolean' | 'url' | 'secret' | 'file' | 'select' | 'multiselect' | 'time' | 'json';
 
 export type CatalogFieldOption = { value: string; label: string; disabled?: boolean };
 
@@ -12,7 +12,7 @@ export type CatalogField = {
   options?: CatalogFieldOption[];
 };
 
-export type SourceConnectorKind = 'csv' | 'sql' | 'mcp' | 'trello' | 'browser' | 'none';
+export type SourceConnectorKind = 'csv' | 'sql' | 'mcp' | 'trello' | 'browser' | 'html' | 'none';
 
 export const SQL_DIALECTS = [
   { value: 'postgres', label: 'PostgreSQL', defaultPort: 5432 },
@@ -218,6 +218,54 @@ export const SOURCE_KINDS: readonly SourceKind[] = [
     credentialFields: [
       { key: 'username', label: 'Usuário Torge', type: 'string', required: true },
       { key: 'password', label: 'Senha Torge', type: 'secret', required: true },
+    ],
+  },
+  {
+    id: 'web_portal',
+    label: 'Portal web',
+    description: 'Site ou portal autorizado, sem API, extraído para as tabelas canônicas.',
+    group: 'business_systems',
+    groupLabel: BUSINESS,
+    connector: 'html',
+    selectable: true,
+    configFields: [
+      {
+        key: 'allowedHosts',
+        label: 'Hosts autorizados',
+        type: 'string',
+        required: true,
+        placeholder: 'portal.cliente.com.br',
+        hint: 'Domínios separados por vírgula. Só essas origens são buscadas.',
+      },
+      {
+        key: 'resources',
+        label: 'Recursos (JSON)',
+        type: 'json',
+        required: true,
+        hint: 'Lista de recursos com startUrl, itemSelector, idField e fields (CSS/XPath).',
+        placeholder: '[{"key":"products","startUrl":"https://portal.cliente.com.br/produtos","itemSelector":"tr.produto","idField":"sku","fields":{"sku":"td.sku::text","name":"td.nome::text"}}]',
+      },
+      {
+        key: 'loginUrl',
+        label: 'URL de login',
+        type: 'url',
+        hint: 'Opcional. POST de formulário HTTP; não preenche SPA.',
+      },
+      { key: 'loginUsernameField', label: 'Campo usuário (name)', type: 'string' },
+      { key: 'loginPasswordField', label: 'Campo senha (name)', type: 'string' },
+      { key: 'adaptive', label: 'Seletores adaptativos', type: 'boolean' },
+      {
+        key: 'allowEmpty',
+        label: 'Permitir extração vazia',
+        type: 'boolean',
+        hint: 'Sem isso, login, layout ou seletor sem linhas falha em vez de sincronizar zero registros.',
+      },
+    ],
+    credentialFields: [
+      { key: 'username', label: 'Usuário', type: 'string' },
+      { key: 'password', label: 'Senha', type: 'secret' },
+      { key: 'cookie', label: 'Cookie', type: 'secret' },
+      { key: 'authorization', label: 'Authorization', type: 'secret' },
     ],
   },
   {

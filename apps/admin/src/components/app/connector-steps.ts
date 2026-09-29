@@ -31,6 +31,8 @@ function configStepLabel(kindId: string): string {
     case 'mcp':
     case 'rest':
       return 'Endpoint';
+    case 'web_portal':
+      return 'Portal';
     default:
       return 'Configuração';
   }
@@ -75,6 +77,12 @@ export function connectorScreenCopy(kind: SourceKind): { title: string; descript
       return {
         title: 'Torge',
         description: 'Configure a conta, a filial e a instância de navegador dedicada. A fonte começa como rascunho e não dispara carga automaticamente.',
+      };
+    case 'web_portal':
+      return {
+        title: 'Portal web',
+        description:
+          'Hosts autorizados e receita de extração (CSS/XPath). Use quando o sistema do cliente não tem API, CSV ou SQL.',
       };
     case 'erp':
       return {

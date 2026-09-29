@@ -90,6 +90,8 @@ services:
       FIGRANIUM_INSTANCES_JSON: ${FIGRANIUM_INSTANCES_JSON:-{}}
       BROWSER_RUNTIME_URL: http://browser-runtime:8765
       BROWSER_RUNTIME_TOKEN: ${BROWSER_RUNTIME_TOKEN:?defina BROWSER_RUNTIME_TOKEN}
+      HTML_INGEST_URL: ${HTML_INGEST_URL:-}
+      HTML_INGEST_TOKEN: ${HTML_INGEST_TOKEN:-}
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
       EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
@@ -171,6 +173,8 @@ services:
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
       JOBS_ENABLED: ${JOBS_ENABLED:-true}
       FIGRANIUM_INSTANCES_JSON: ${FIGRANIUM_INSTANCES_JSON:-{}}
+      HTML_INGEST_URL: ${HTML_INGEST_URL:-}
+      HTML_INGEST_TOKEN: ${HTML_INGEST_TOKEN:-}
       # Chat de teste do operador (/tenants/{id}/chat): mesmo LLM do web.
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_API_KEY: ${LLM_API_KEY:-}
@@ -180,6 +184,9 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
     volumes:
       - uploads_data:/data/uploads
+    networks:
+      - default
+      - browser_control
     depends_on:
       postgres:
         condition: service_healthy
@@ -197,6 +204,39 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+
+  html-ingest:
+    profiles: ['html-ingest']
+    build:
+      context: ..
+      dockerfile: services/html-ingest/Dockerfile
+    restart: unless-stopped
+    environment:
+      HTML_INGEST_TOKEN: ${HTML_INGEST_TOKEN:-}
+      HTML_INGEST_ADAPTIVE_DIR: /data/adaptive
+      HTML_INGEST_EGRESS_URL: http://browser-egress:8888
+      HTML_INGEST_EGRESS_TOKEN: ${BROWSER_RUNTIME_TOKEN:?defina BROWSER_RUNTIME_TOKEN}
+    volumes:
+      - html_ingest_adaptive:/data/adaptive
+    networks:
+      - browser_control
+    depends_on:
+      - browser-egress
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8770/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   figranium-torge:
     image: ghcr.io/figranium/figranium:0.18.4
@@ -260,6 +300,7 @@ volumes:
   uploads_data:
   figranium_torge_data:
   figranium_torge_captures:
+  html_ingest_adaptive:
 
 networks:
   browser_control:

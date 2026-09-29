@@ -25,10 +25,20 @@ function buildConfiguration(
   for (const field of kind.configFields) {
     if (field.type === 'file') continue;
     const raw = config[field.key]?.trim() ?? '';
+    if (field.type === 'boolean') {
+      configuration[field.key] = raw === 'true';
+      continue;
+    }
     if (!raw) continue;
     if (field.type === 'number') configuration[field.key] = Number(raw);
-    else if (field.type === 'boolean') configuration[field.key] = raw === 'true';
     else if (field.type === 'multiselect') configuration[field.key] = raw.split(',').filter(Boolean);
+    else if (field.type === 'json') {
+      try {
+        configuration[field.key] = JSON.parse(raw) as unknown;
+      } catch {
+        throw new Error(`JSON inválido em ${field.label}.`);
+      }
+    }
     else configuration[field.key] = raw;
   }
   if (extraJson.trim()) {
@@ -99,7 +109,9 @@ export function ConnectSourceWizard({
           recentWindowDays: '30',
           reconciliationWindowDays: '30',
         }
-      : {},
+      : kind.id === 'web_portal'
+        ? { adaptive: 'true' }
+        : {},
   );
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [extraJson, setExtraJson] = useState('');

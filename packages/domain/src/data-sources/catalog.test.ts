@@ -18,6 +18,7 @@ describe('data source catalog', () => {
     expect(ids).not.toContain('postgres');
     expect(ids).toContain('notion');
     expect(ids).toContain('trello');
+    expect(ids).toContain('web_portal');
     expect(ids).toContain('erp');
     expect(ids).toContain('crm');
     expect(ids).toContain('custom');
@@ -33,6 +34,7 @@ describe('data source catalog', () => {
     expect(sourceKindHasConnector('database')).toBe(true);
     expect(sourceKindHasConnector('postgres')).toBe(true);
     expect(sourceKindHasConnector('mcp')).toBe(true);
+    expect(sourceKindHasConnector('web_portal')).toBe(true);
     expect(sourceKindHasConnector('notion')).toBe(false);
     expect(getSourceKind('google_sheets')?.label).toBe('Google Sheets');
     expect(getSourceKind('postgres')?.label).toBe('PostgreSQL');
@@ -64,6 +66,12 @@ describe('data source catalog', () => {
       'rest',
       'mcp',
       'custom',
+    ]);
+    expect(groups.find((group) => group.group === 'business_systems')?.kinds.map((kind) => kind.id)).toEqual([
+      'torge',
+      'web_portal',
+      'erp',
+      'crm',
     ]);
   });
 });

@@ -47,6 +47,14 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Testes do html-ingest
+        run: |
+          pip install --require-hashes -r services/html-ingest/requirements.txt
+          pip install pytest
+          PYTHONPATH=services/html-ingest pytest services/html-ingest/tests
 
   # Mantém o artefato de deploy honesto: se a imagem parar de construir, a CI falha.
   docker:
@@ -83,3 +91,26 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Build da imagem html-ingest
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/html-ingest/Dockerfile
+          load: true
+          tags: tactia-html-ingest:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke da imagem html-ingest
+        run: |
+          docker run --rm tactia-html-ingest:ci python -c "from scrapling.parser import Selector; from app.http_client import HttpSession; import importlib.util; assert importlib.util.find_spec('playwright') is None"
+          cid=$(docker run -d --rm -p 127.0.0.1:8770:8770 -e HTML_INGEST_TOKEN=ci-token -e HTML_INGEST_TEST_LOCAL=true tactia-html-ingest:ci)
+          trap 'docker stop "$cid" >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8770/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "html-ingest health failed"
+          docker logs "$cid" || true
+          exit 1

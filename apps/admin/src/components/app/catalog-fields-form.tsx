@@ -2,7 +2,7 @@
 
 import type { CatalogField } from '@tactia/domain/data-sources/catalog';
 import { Field } from '@/components/ui/field';
-import { Input, Select } from '@/components/ui/input';
+import { Input, Select, Textarea } from '@/components/ui/input';
 
 export function CatalogFieldsForm({
   fields,
@@ -46,6 +46,19 @@ export function CatalogFieldsForm({
               />
               {field.label}
             </label>
+          );
+        }
+        if (field.type === 'json') {
+          return (
+            <Field key={field.key} htmlFor={id} label={field.label} hint={field.hint}>
+              <Textarea
+                id={id}
+                required={field.required}
+                placeholder={field.placeholder}
+                value={values[field.key] ?? ''}
+                onChange={(event) => onChange(field.key, event.target.value)}
+              />
+            </Field>
           );
         }
         if (field.type === 'select' || field.type === 'multiselect') {

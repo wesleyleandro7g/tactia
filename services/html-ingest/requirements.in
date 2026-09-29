@@ -1,0 +1,6 @@
+# Parser-only Scrapling (no fetchers extra: no Playwright, Patchright, curl_cffi).
+# Regenerate the hashed lock with Python 3.12:
+#   pip-compile --generate-hashes --strip-extras requirements.in
+scrapling==0.4.15
+fastapi==0.115.12
+uvicorn==0.34.2

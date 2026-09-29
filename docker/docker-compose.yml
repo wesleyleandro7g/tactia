@@ -70,6 +70,31 @@ services:
       timeout: 5s
       retries: 10
 
+  html-ingest:
+    profiles: ["html-ingest"]
+    build:
+      context: ..
+      dockerfile: services/html-ingest/Dockerfile
+    ports:
+      - "127.0.0.1:8770:8770"
+    environment:
+      HTML_INGEST_TOKEN: ${HTML_INGEST_TOKEN:-local-html-ingest-token}
+      HTML_INGEST_TEST_LOCAL: ${HTML_INGEST_TEST_LOCAL:-true}
+      HTML_INGEST_ADAPTIVE_DIR: /data/adaptive
+    volumes:
+      - html_ingest_adaptive:/data/adaptive
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8770/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   browser-runtime:
     profiles: ["browser-automation"]
     build:
@@ -125,6 +150,7 @@ volumes:
   minio_data:
   figranium_torge_data:
   figranium_torge_captures:
+  html_ingest_adaptive:
 
 networks:
   browser_control:

@@ -77,6 +77,10 @@ EVOLUTION_API_KEY=
 EVOLUTION_INSTANCE=tactia
 # EVOLUTION_WEBHOOK_SECRET=
 
+# Sidecar de extração HTML (fonte portal web). Opcional: o stack sobe sem ele.
+# HTML_INGEST_TOKEN=<segredo forte compartilhado com html-ingest>
+# HTML_INGEST_URL=http://html-ingest:8770
+
 WEB_PORT=3000
 ADMIN_PORT=3001
 LOG_LEVEL=info
@@ -99,6 +103,7 @@ openssl rand -hex 32
 | `DATABASE_URL` | `health` responde 503, aplicação inutilizável |
 | `LLM_API_KEY` | Apenas o chat fica indisponível |
 | `ADMIN_AUTH_SECRET` (≥32 chars) | Sessões do backoffice inválidas |
+| `HTML_INGEST_TOKEN` / `HTML_INGEST_URL` | Fonte portal web indisponível ao testar/sincronizar; web e admin sobem normalmente |
 | `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` | Cadastro de números funciona; o webhook ignora mensagens |
 
 > **Guarde `ENCRYPTION_KEY` em local seguro.** Trocá-la invalida todas as
@@ -114,12 +119,14 @@ arquivo `.env` entra na imagem Docker (`.dockerignore`).
 
 ```bash
 docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -d --build
+# Portal web (opcional): acrescente --profile html-ingest e defina HTML_INGEST_URL/TOKEN
 ```
 
 Ordem de subida:
 
 ```text
 postgres (healthy) → migrate (prisma migrate deploy) → web + admin
+html-ingest (profile html-ingest) → browser_control + egress; não bloqueia web/admin
 ```
 
 O serviço `migrate` aplica as migrations e sai. O `web` só sobe depois que ele

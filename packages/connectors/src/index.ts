@@ -60,6 +60,25 @@ export { TrelloConnector, TRELLO_RESOURCES } from './trello-connector';
 export type { TrelloConnectorConfig, TrelloResource } from './trello-connector';
 
 export {
+  WebPortalConnector,
+  defaultHtmlIngestClient,
+  parseWebPortalConfig,
+  parseWebPortalCredentials,
+} from './web-portal-connector';
+export type {
+  HtmlIngestClient,
+  HtmlIngestExtractRequest,
+  HtmlIngestExtractResult,
+  WebPortalConnectorConfig,
+} from './web-portal-connector';
+export type {
+  WebPortalConfig,
+  WebPortalCredentials,
+  WebPortalLogin,
+  WebPortalResource,
+} from './web-portal-config';
+
+export {
   computeTrelloWebhookSignature,
   sanitizeTrelloPayload,
   trelloCallbackUrl,

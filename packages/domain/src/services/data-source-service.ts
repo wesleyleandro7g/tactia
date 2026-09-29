@@ -14,6 +14,9 @@ import {
   TrelloConnector,
   trelloCallbackUrl,
   TorgeConnector,
+  WebPortalConnector,
+  parseWebPortalConfig,
+  parseWebPortalCredentials,
   assertTorgeModulesEnableable,
   createFigraniumExecutorFromEnv,
   createFigraniumExecutorFromResolved,
@@ -77,6 +80,7 @@ export class DataSourceService {
     assertCanManageConnections(ctx);
     const input = createDataSourceSchema.parse(raw);
     if (input.type === 'trello') trelloConfigurationSchema.parse(input.configuration);
+    if (input.type === 'web_portal') this.parseWebPortalConfiguration(input.configuration);
     if (input.credentialId) {
       const credential = await this.credentials.findById({ tenantId: ctx.tenantId!, id: input.credentialId });
       if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Credential not found');
@@ -167,6 +171,9 @@ export class DataSourceService {
     const current = await this.get(ctx, id);
     if (current.type === 'trello' && input.configuration != null) {
       trelloConfigurationSchema.parse(input.configuration);
+    }
+    if (current.type === 'web_portal' && input.configuration != null) {
+      this.parseWebPortalConfiguration(input.configuration);
     }
     if (current.type === 'torge') {
       const configuration = input.configuration === undefined ? current.configuration : input.configuration;
@@ -446,6 +453,28 @@ export class DataSourceService {
       });
     }
 
+    if (ds.type === 'web_portal') {
+      let recipe;
+      try {
+        recipe = parseWebPortalConfig(ds.configuration);
+      } catch (error) {
+        throw new AppError(
+          ErrorCode.VALIDATION_ERROR,
+          error instanceof Error ? error.message : 'Configuração do portal web inválida.',
+        );
+      }
+      let portalCreds: Record<string, unknown> = {};
+      if (ds.credentialId) {
+        portalCreds = await new CredentialService(this.credentials).getDecryptedData(ctx, ds.credentialId);
+      }
+      return new WebPortalConnector({
+        tenantId: ctx.tenantId!,
+        dataSourceId: ds.id,
+        recipe,
+        credentials: parseWebPortalCredentials(portalCreds),
+      });
+    }
+
     if (ds.type === 'torge') {
       if (!ds.credentialId) throw new AppError(ErrorCode.VALIDATION_ERROR, 'Credencial Torge obrigatória.');
       const decrypted = await new CredentialService(this.credentials).getDecryptedData(ctx, ds.credentialId);
@@ -507,6 +536,17 @@ export class DataSourceService {
       return createFigraniumExecutorFromResolved(resolved, resolver);
     }
     return createFigraniumExecutorFromEnv(instanceKey, resolver);
+  }
+
+  private parseWebPortalConfiguration(value: unknown) {
+    try {
+      return parseWebPortalConfig(value);
+    } catch (error) {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        error instanceof Error ? error.message : 'Configuração do portal web inválida.',
+      );
+    }
   }
 
   private parseTorgeConfiguration(value: unknown) {

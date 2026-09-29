@@ -90,6 +90,7 @@ atrás de um proxy com TLS. Guia completo: [docs/deploy-producao.md](docs/deploy
 | [docs/email-smtp-empresa.md](docs/email-smtp-empresa.md) | Envio de e-mails por empresa via SMTP (Gmail, Outlook, M365, custom) |
 | [docs/runbook.md](docs/runbook.md) | Diagnóstico de sync, chat, segredos, backup e deploy |
 | [docs/conector-trello.md](docs/conector-trello.md) | Configuração, webhooks, sync, LGPD e métricas do conector Trello |
+| [docs/conector-portal-web.md](docs/conector-portal-web.md) | Portal HTTP autorizado (Scrapling) para replicar dados sem API |
 | [docs/browser-agent-p0-operacao.md](docs/browser-agent-p0-operacao.md) | Skills Markdown, snapshots, recuperação, erros e gates do Browser Agent interativo |
 | [docs/skills-hierarquicas-empresa.md](docs/skills-hierarquicas-empresa.md) | Skill global, catálogo secundário, vínculos, segurança e migração por empresa |
 | [docs/agendamento-acoes.md](docs/agendamento-acoes.md) | Agendamento de ações por empresa: recorrência, resiliência/reset, targets e criação pelo chat |

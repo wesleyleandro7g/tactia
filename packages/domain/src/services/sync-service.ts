@@ -34,6 +34,9 @@ import {
   TrelloConnector,
   trelloCallbackUrl,
   TorgeConnector,
+  WebPortalConnector,
+  parseWebPortalConfig,
+  parseWebPortalCredentials,
   createFigraniumExecutorFromEnv,
   createFigraniumExecutorFromResolved,
   parseTorgeConnectionConfig,
@@ -1035,6 +1038,28 @@ export class SyncService {
           url: String(config['url'] ?? ''),
           authorization:
             typeof credData['authorization'] === 'string' ? credData['authorization'] : undefined,
+        },
+        this.deps.rawRecords,
+      );
+    }
+
+    if (ds.type === 'web_portal') {
+      let recipe;
+      try {
+        recipe = parseWebPortalConfig(ds.configuration);
+      } catch (error) {
+        throw new AppError(
+          ErrorCode.VALIDATION_ERROR,
+          error instanceof Error ? error.message : 'Configuração do portal web inválida.',
+        );
+      }
+      const credData = await this.decryptCredentials(tenantId, ds.credentialId);
+      return new WebPortalConnector(
+        {
+          tenantId,
+          dataSourceId: ds.id,
+          recipe,
+          credentials: parseWebPortalCredentials(credData),
         },
         this.deps.rawRecords,
       );

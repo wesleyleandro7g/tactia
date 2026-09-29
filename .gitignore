@@ -1,4 +1,15 @@
 node_modules
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+*.sqlite
+*.sqlite-journal
 .turbo
 .next
 dist
