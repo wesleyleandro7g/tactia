@@ -16,8 +16,18 @@ contra desenvolvimento ou produção sem conferir o `DATABASE_URL` e o propósit
 do ambiente. O seed existente cria `owner@demo.tactia` com a senha de
 demonstração definida em `apps/web/scripts/seed.ts`; ela não é uma credencial
 para ambientes reais. Para entrar no Ops, o bootstrap de operador continua
-separado e exige `TACTIA_BOOTSTRAP_OPERATOR_EMAIL` e
-`TACTIA_BOOTSTRAP_OPERATOR_PASSWORD`.
+separado:
+
+```bash
+pnpm --filter @tactia/admin seed
+```
+
+O script do Ops carrega `apps/admin/.env.local` com a mesma precedência do Next.
+Defina nele `DATABASE_URL`, `ADMIN_AUTH_SECRET`,
+`TACTIA_BOOTSTRAP_OPERATOR_EMAIL` e `TACTIA_BOOTSTRAP_OPERATOR_PASSWORD` antes
+de executar o comando. Variáveis exportadas no shell prevalecem sobre o arquivo;
+confira o banco de destino antes do bootstrap. A conta criada é um operador de
+alto privilégio, então use credenciais próprias de cada ambiente.
 
 O cenário contém:
 
