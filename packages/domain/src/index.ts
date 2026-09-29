@@ -268,3 +268,20 @@ export {
   trelloCallbackUrl,
   verifyTrelloWebhookSignature,
 } from '@tactia/connectors';
+
+export {
+  CommandCenterService,
+  EvidenceGapService,
+  createPlanSchema,
+  updatePlanStatusSchema,
+  createMeasurementReviewSchema,
+  preparePlanFromRecommendationSchema,
+  linkPlanExecutionSchema,
+} from './services/command-center-service';
+
+export {
+  EvidenceClarificationService,
+  prepareEvidenceClarificationSchema,
+  clarificationResponseIsClear,
+  evaluateClarificationPolicy,
+} from './services/evidence-clarification-service';

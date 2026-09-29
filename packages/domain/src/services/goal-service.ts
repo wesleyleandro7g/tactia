@@ -12,6 +12,10 @@ export const createGoalSchema = z
     periodType: z.enum(['month', 'quarter', 'year']),
     periodStart: z.coerce.date(),
     target: z.number().finite(),
+    title: z.string().trim().min(3).max(160).nullable().optional(),
+    status: z.enum(['preparing', 'active', 'achieved', 'paused']).default('active'),
+    baselineValue: z.number().finite().nullable().optional(),
+    baselineRef: z.record(z.string(), z.unknown()).nullable().optional(),
   })
   .refine((data) => data.scope === 'tenant' || Boolean(data.scopeId), {
     message: 'scopeId is required when scope is seller or product',
@@ -49,6 +53,12 @@ export class GoalService {
     periodType: string;
     periodStart: Date;
     target: unknown;
+    title: string | null;
+    status: string;
+    baselineValue: unknown;
+    baselineRef: unknown;
+    ownerUserId: string | null;
+    version: number;
   }) {
     return {
       id: goal.id,
@@ -58,6 +68,12 @@ export class GoalService {
       periodType: goal.periodType,
       periodStart: goal.periodStart,
       target: decimalToNumber(goal.target),
+      title: goal.title,
+      status: goal.status,
+      baselineValue: goal.baselineValue == null ? null : decimalToNumber(goal.baselineValue),
+      baselineRef: goal.baselineRef,
+      ownerUserId: goal.ownerUserId,
+      version: goal.version,
     };
   }
 }

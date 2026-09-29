@@ -33,11 +33,30 @@ export const whatsappAgentConfigSchema = z
     tone: z.string().trim().max(80).nullable().optional(),
     instructions: z.string().trim().max(2000).nullable().optional(),
     companyContext: z.string().trim().max(2000).nullable().optional(),
+    clarificationsEnabled: z.boolean().optional(),
+    clarificationStartHour: z.number().int().min(0).max(23).optional(),
+    clarificationEndHour: z.number().int().min(1).max(24).optional(),
+    clarificationMaxPerDay: z.number().int().min(1).max(10).optional(),
+    clarificationCooldownHours: z.number().int().min(1).max(168).optional(),
+    clarificationWeekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
   })
   .refine(
     (value) =>
       value.tone !== undefined ||
       value.instructions !== undefined ||
-      value.companyContext !== undefined,
+      value.companyContext !== undefined ||
+      value.clarificationsEnabled !== undefined ||
+      value.clarificationStartHour !== undefined ||
+      value.clarificationEndHour !== undefined ||
+      value.clarificationMaxPerDay !== undefined ||
+      value.clarificationCooldownHours !== undefined ||
+      value.clarificationWeekdays !== undefined,
     { message: 'At least one field is required' },
+  )
+  .refine(
+    (value) =>
+      value.clarificationStartHour === undefined ||
+      value.clarificationEndHour === undefined ||
+      value.clarificationStartHour < value.clarificationEndHour,
+    { message: 'Start hour must be before end hour', path: ['clarificationEndHour'] },
   );

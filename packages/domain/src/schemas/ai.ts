@@ -3,6 +3,12 @@ import { z } from 'zod';
 /** Conversation title is optional — derived from the first user message when absent. */
 export const createConversationSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
+  contextRef: z.object({
+    type: z.enum(['objective', 'plan', 'decision', 'review', 'evidence']),
+    resourceId: z.string().uuid(),
+    version: z.number().int().positive().optional(),
+    label: z.string().trim().min(1).max(160).optional(),
+  }).optional(),
 });
 
 export const listConversationsQuerySchema = z.object({

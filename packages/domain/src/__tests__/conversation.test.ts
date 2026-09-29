@@ -158,6 +158,28 @@ describe('ConversationService', () => {
     expect(metadata.sources[0]?.period?.from).toBe('2025-01-01T00:00:00.000Z');
   });
 
+  it('persists a structured context reference with the conversation', async () => {
+    const resourceId = createId();
+    const conversation = await conversationService.create(ownerCtx, {
+      title: 'Plano contextual',
+      contextRef: {
+        type: 'plan',
+        resourceId,
+        version: 3,
+        label: 'Recuperar clientes inativos',
+      },
+    });
+    const loaded = await conversationService.get(ownerCtx, conversation.id);
+    expect(loaded.contextRef).toEqual({
+      type: 'plan',
+      resourceId,
+      version: 3,
+      label: 'Recuperar clientes inativos',
+    });
+    await expect(conversationService.get(otherTenantCtx, conversation.id))
+      .rejects.toMatchObject({ code: ErrorCode.NOT_FOUND });
+  });
+
   it('lists only the conversations of the current user', async () => {
     const mine = await conversationService.create(memberCtx, { title: 'Minha conversa' });
     await conversationService.create(ownerCtx, { title: 'Conversa do owner' });

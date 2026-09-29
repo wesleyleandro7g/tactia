@@ -40,6 +40,7 @@ export class ConversationService {
       tenantId: ctx.tenantId,
       userId: ctx.userId,
       title: input.title ?? (firstMessage ? titleFromMessage(firstMessage) : DEFAULT_TITLE),
+      contextRef: input.contextRef,
     });
 
     await this.auditLogs.record(ctx, {

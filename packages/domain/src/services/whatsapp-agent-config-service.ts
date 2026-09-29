@@ -33,6 +33,12 @@ export class WhatsappAgentConfigService {
         ...(input.tone !== undefined ? { tone: input.tone } : {}),
         ...(input.instructions !== undefined ? { instructions: input.instructions } : {}),
         ...(input.companyContext !== undefined ? { companyContext: input.companyContext } : {}),
+        ...(input.clarificationsEnabled !== undefined ? { clarificationsEnabled: input.clarificationsEnabled } : {}),
+        ...(input.clarificationStartHour !== undefined ? { clarificationStartHour: input.clarificationStartHour } : {}),
+        ...(input.clarificationEndHour !== undefined ? { clarificationEndHour: input.clarificationEndHour } : {}),
+        ...(input.clarificationMaxPerDay !== undefined ? { clarificationMaxPerDay: input.clarificationMaxPerDay } : {}),
+        ...(input.clarificationCooldownHours !== undefined ? { clarificationCooldownHours: input.clarificationCooldownHours } : {}),
+        ...(input.clarificationWeekdays !== undefined ? { clarificationWeekdays: input.clarificationWeekdays } : {}),
       },
     });
     await this.auditLogs.record(ctx, {
@@ -43,6 +49,10 @@ export class WhatsappAgentConfigService {
         hasTone: Boolean(row.tone),
         hasInstructions: Boolean(row.instructions),
         hasCompanyContext: Boolean(row.companyContext),
+        clarificationsEnabled: row.clarificationsEnabled,
+        clarificationWindow: [row.clarificationStartHour, row.clarificationEndHour],
+        clarificationMaxPerDay: row.clarificationMaxPerDay,
+        clarificationCooldownHours: row.clarificationCooldownHours,
       },
     });
     return row;
