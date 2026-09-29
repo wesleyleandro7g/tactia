@@ -1,5 +1,5 @@
 import { createId } from '@tactia/shared';
-import { prisma } from '@tactia/database';
+import { prisma, Prisma } from '@tactia/database';
 import { DEMO_PLAYBOOK_RECLAMACAO_ATRASO } from '@tactia/domain';
 import { auth } from '../src/lib/auth';
 import { seedCommandCenter } from './seed-command-center';
@@ -27,73 +27,18 @@ function mulberry32(seed: number) {
   };
 }
 
-async function ensureIdentity() {
-  const existing = await prisma.authUser.findUnique({ where: { email: DEMO_EMAIL } });
-  if (existing) {
-    const user = await prisma.user.findFirst({ where: { externalAuthId: existing.id } });
-    const membership = user
-      ? await prisma.membership.findFirst({ where: { userId: user.id, role: 'owner' } })
-      : null;
-    const tenant = membership
-      ? await prisma.tenant.findUnique({ where: { id: membership.tenantId } })
-      : await prisma.tenant.findUnique({ where: { slug: 'empresa-demo' } });
-    if (!user || !tenant) {
-      throw new Error('Demo identity incomplete; clear DB and re-seed');
-    }
-    return { user, tenant };
-  }
-
-  const ctx = await auth.$context;
-  const authUserId = createId();
-  const hash = await ctx.password.hash('password123');
-  await prisma.authUser.create({
-    data: {
-      id: authUserId,
-      name: 'Owner Demo',
-      email: DEMO_EMAIL,
-      emailVerified: true,
-    },
+async function createDemoTenant(tx: Prisma.TransactionClient, userId: string) {
+  const tenant = await tx.tenant.create({
+    data: { id: createId(), name: 'Empresa Demo', slug: 'empresa-demo' },
   });
-  await prisma.authAccount.create({
-    data: {
-      id: createId(),
-      issuer: 'local:credential',
-      accountId: authUserId,
-      providerId: 'credential',
-      userId: authUserId,
-      password: hash,
-    },
+  await tx.membership.create({
+    data: { id: createId(), tenantId: tenant.id, userId, role: 'owner' },
   });
-
-  const user = await prisma.user.create({
-    data: {
-      id: createId(),
-      externalAuthId: authUserId,
-      name: 'Owner Demo',
-      email: DEMO_EMAIL,
-    },
-  });
-
-  const tenant = await prisma.tenant.create({
-    data: {
-      id: createId(),
-      name: 'Empresa Demo',
-      slug: 'empresa-demo',
-    },
-  });
-  await prisma.membership.create({
+  await tx.auditLog.create({
     data: {
       id: createId(),
       tenantId: tenant.id,
-      userId: user.id,
-      role: 'owner',
-    },
-  });
-  await prisma.auditLog.create({
-    data: {
-      id: createId(),
-      tenantId: tenant.id,
-      userId: user.id,
+      userId,
       actorType: 'system',
       action: 'TENANT_CREATED',
       entityType: 'tenant',
@@ -101,8 +46,57 @@ async function ensureIdentity() {
       metadata: { seed: true },
     },
   });
+  return tenant;
+}
 
-  return { user, tenant };
+async function ensureIdentity() {
+  const existing = await prisma.authUser.findUnique({ where: { email: DEMO_EMAIL } });
+  if (existing) {
+    const account = await prisma.authAccount.findFirst({
+      where: { userId: existing.id, providerId: 'credential' },
+    });
+    const user = await prisma.user.findFirst({ where: { externalAuthId: existing.id } });
+    const membership = user
+      ? await prisma.membership.findFirst({ where: { userId: user.id, role: 'owner' } })
+      : null;
+    const tenant = membership
+      ? await prisma.tenant.findUnique({ where: { id: membership.tenantId } })
+      : await prisma.tenant.findUnique({ where: { slug: 'empresa-demo' } });
+    if (account && user && membership && tenant) return { user, tenant };
+    if (!account || existing.name !== 'Owner Demo' || user?.name !== 'Owner Demo' || membership || tenant) {
+      throw new Error('Identidade demo incompleta ou incompatível; verifique os registros antes de executar o seed.');
+    }
+    return { user, tenant: await prisma.$transaction((tx) => createDemoTenant(tx, user.id)) };
+  }
+
+  const ctx = await auth.$context;
+  const authUserId = createId();
+  const hash = await ctx.password.hash('password123');
+  return prisma.$transaction(async (tx) => {
+    await tx.authUser.create({
+      data: { id: authUserId, name: 'Owner Demo', email: DEMO_EMAIL, emailVerified: true },
+    });
+    await tx.authAccount.create({
+      data: {
+        id: createId(),
+        issuer: 'local:credential',
+        accountId: authUserId,
+        providerId: 'credential',
+        userId: authUserId,
+        password: hash,
+      },
+    });
+    const user = await tx.user.create({
+      data: {
+        id: createId(),
+        externalAuthId: authUserId,
+        name: 'Owner Demo',
+        email: DEMO_EMAIL,
+      },
+    });
+    const tenant = await createDemoTenant(tx, user.id);
+    return { user, tenant };
+  });
 }
 
 async function seedBusiness(tenantId: string) {

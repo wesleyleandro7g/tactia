@@ -13,6 +13,22 @@ DATABASE_URL=postgresql://tactia:tactia@localhost:5433/tactia_test \
 
 O comando web carrega `apps/web/.env.local` antes de importar autenticação e
 banco. Variáveis exportadas no shell, como `DATABASE_URL` acima, prevalecem.
+Antes de gravar dados, ele verifica se `tenants.command_center_enabled` existe.
+Se faltar, o seed encerra com uma mensagem sobre o esquema desatualizado.
+
+No banco local `localhost:5433/tactia` inspecionado em 29/09/2026, já existem
+as tabelas anteriores à Central, mas não existe `_prisma_migrations`. Assim,
+`prisma migrate deploy` considera todas as 47 migrações pendentes e entra em
+conflito com as tabelas existentes. A correção desse banco exige conferir um
+backup, registrar como aplicadas as 40 migrações anteriores que correspondem
+ao esquema existente e então aplicar as 7 migrações da Central. Confira o
+destino e o esquema antes dessas operações; não execute `migrate deploy`
+diretamente nesse estado.
+
+A primeira tentativa de seed nesse banco criou parcialmente o usuário demo
+antes de falhar na criação da empresa. Depois de atualizar o esquema, execute
+o seed novamente: ele completa essa identidade parcial e passa a criar novas
+identidades em uma transação para não repetir a falha.
 
 Este comando foi executado somente em `tactia_test` em 29/09/2026. Não execute
 contra desenvolvimento ou produção sem conferir o `DATABASE_URL` e o propósito
