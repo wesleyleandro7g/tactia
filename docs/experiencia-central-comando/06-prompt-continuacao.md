@@ -13,9 +13,8 @@ Mantenha este arquivo atualizado ao final de cada etapa, junto com
 Você vai continuar a implementação da **Central de Comando** do Tactia
 (`/home/wesleyleandro/Projects/Desencoder/Tactia`), iniciada por outro agente.
 
-Branch: `feat/refact-experience`. Nada foi enviado ao remoto. Os commits de
-`f3ad280` até `3772833` já contêm modelagem, serviços, telas, fila do Ops e
-documentação da central.
+Branch: `feat/refact-experience`. Nada foi enviado ao remoto. A modelagem,
+serviços, telas, fila do Ops e flag por empresa administrável estão nesta branch.
 
 ## Leia nesta ordem antes de escrever código
 
@@ -33,22 +32,19 @@ documentação da central.
 
 ## Sua tarefa
 
-Implemente o **próximo passo 1** de `05-status-implementacao.md`: substituir a
-feature flag por variável de ambiente (`COMMAND_CENTER_TENANT_IDS`) por uma
-**flag por empresa administrável pelo Ops**, porque a estratégia de release do
-handoff depende disso.
+Implemente o **próximo passo 1** de `05-status-implementacao.md`: a **revisão de
+resultado guiada**, com ações para ajustar, continuar ou encerrar plano a partir
+de `/results`, versionando a decisão.
 
 Requisitos:
 
-- Persistência aditiva (migração sem `DROP` e sem renomear coluna existente).
-- Ops liga e desliga por empresa, com auditoria da mudança.
-- `apps/web` passa a decidir o shell por essa flag; sem ela, a navegação legada
-  continua e **nenhuma rota antiga deixa de funcionar**.
-- A variável de ambiente pode permanecer como fallback para desenvolvimento, mas
-  a fonte de verdade passa a ser o registro por empresa.
+- Preserve os eixos independentes de plano, execução e medição.
+- Exiba baseline, observado, janela, fontes e limitações antes da decisão.
+- Registre a decisão e a versão; não transforme uma revisão em sucesso causal.
+- Não imponha atualização manual de status como obrigação do cliente.
 
-Se você concluir e houver orçamento de contexto, siga para os passos 2 e 3 do
-mesmo documento (revisão de resultado guiada e instrumentação de eventos).
+Se você concluir e houver orçamento de contexto, siga para o próximo passo 2
+do mesmo documento (instrumentação de eventos sem mensagens nem PII).
 
 ## Invariantes que não podem ser quebradas
 
@@ -72,7 +68,7 @@ apresentar evidência de que estão erradas:
 
 ## Verificação
 
-O banco de teste já tem as 4 migrações aplicadas. **Nunca aponte migração para o
+O banco de teste já tem as 5 migrações aplicadas. **Nunca aponte migração para o
 banco de desenvolvimento ou produção sem pedir confirmação ao usuário.**
 
 ```bash

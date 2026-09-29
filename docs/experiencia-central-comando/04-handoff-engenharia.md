@@ -27,7 +27,7 @@ Em conflito, prevalecem segurança/tenant, capacidade real do backend, ausência
 
 | Rota proposta | Composição principal | Estado de migração |
 |---|---|---|
-| `/today` | ExecutiveSummary, ObjectiveProgress, PriorityCard × até 3, ExecutionTimeline resumida, resultados recentes | Feature flag por empresa; `/dashboard` continua |
+| `/today` | ExecutiveSummary, ObjectiveProgress, PriorityCard × até 3, ExecutionTimeline resumida, resultados recentes | Flag por empresa no Ops (`settings-routes.test.ts`, `command-center-flag.test.ts`); `/dashboard` continua |
 | `/objectives` | Lista de objetivos preparados + disponibilidade | Nova, sem wizard de cadastro obrigatório |
 | `/objectives/[id]` | ObjectiveProgress, planos, evidências e revisões | Link persistente/autorizado |
 | `/operations?tab=decisions|in-progress|routines|history` | DecisionCard, ExecutionTimeline e histórico | `/approvals` redireciona/preserva filtros quando maduro |
@@ -123,7 +123,9 @@ Protótipo com 5–8 empresários; resultado piloto, fontes, canais e capacidade
 Corrigir indisponível ≠ zero, regimes reais de autorização e preview/output legível. Não alterar silenciosamente a semântica de `recommendations/:id/accept`.
 
 ### Entrega 2 — shell/Hoje/Ops
-Feature flag por empresa; novo shell com quatro destinos; Hoje e objetivos preparados; EvidenceGapQueue; rotas antigas funcionais.
+Feature flag por empresa (`tenants.command_center_enabled`, Ops e testes de release);
+novo shell com quatro destinos; Hoje e objetivos preparados; EvidenceGapQueue;
+rotas antigas funcionais.
 
 ### Entrega 3 — ciclo completo
 Plano → versão/decisão → execução idempotente → observação automática/relato identificado → medição/revisão.

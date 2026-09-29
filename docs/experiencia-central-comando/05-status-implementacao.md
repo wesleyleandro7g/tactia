@@ -16,7 +16,7 @@ preexistentes que não devem consumir tempo.
 
 ## Como reproduzir a verificação
 
-Os testes de integração exigem o banco de teste, que já tem as 4 migrações novas
+Os testes de integração exigem o banco de teste, que já tem as 5 migrações novas
 aplicadas. Nunca aponte estes comandos para o banco de desenvolvimento.
 
 ```bash
@@ -51,7 +51,7 @@ Referência: a sequência definida em `04-handoff-engenharia.md`.
 |---|---|---|
 | 0 — validação com empresários | **Não iniciada** | Exige acesso a participantes; nada de código depende disso |
 | 1 — semântica de confiança | **Feito** | `MetricEnvelope`-like por bloco, indisponível ≠ zero, regime de autorização real |
-| 2 — shell/Hoje/Objetivos/Ops | **Feito** | 6 rotas novas + fila de lacunas; rotas antigas preservadas |
+| 2 — shell/Hoje/Objetivos/Ops | **Feito** | 6 rotas novas + fila de lacunas; flag por empresa no Ops; rotas antigas preservadas |
 | 3 — ciclo completo | **Feito** | Recomendação → plano versionado → decisão → execução → evidência → medição |
 | 4 — operação consolidada | **Parcial** | Conversa contextual e revisão automática prontas; revisão semanal e ajuste/encerramento guiado pendentes |
 | 5 — piloto ampliado | **Não iniciada** | Depende de deploy e de empresa real |
@@ -59,7 +59,7 @@ Referência: a sequência definida em `04-handoff-engenharia.md`.
 
 ## O que está implementado e verificado
 
-### Modelagem (4 migrações aditivas)
+### Modelagem (5 migrações aditivas)
 
 | Migração | Conteúdo |
 |---|---|
@@ -67,6 +67,7 @@ Referência: a sequência definida em `04-handoff-engenharia.md`.
 | `20260928235000_command_center_cycle` | `planVersion` + `decisionSnapshot` no vínculo; uniques de idempotência (execução, evidência por `externalRef`, plano por recomendação) |
 | `20260929002500_conversation_context` | `conversations.context_ref` para conversa contextual persistente |
 | `20260929102000_evidence_clarifications` | Política de contato em `whatsapp_agent_configs` + tabela `evidence_clarifications` |
+| `20260929150000_command_center_tenant_flag` | `tenants.command_center_enabled` opcional; decisão explícita prevalece sobre fallback por env |
 
 Todas são aditivas: nenhum `DROP`, nenhuma renomeação, nenhuma alteração de
 semântica de coluna existente.
@@ -107,6 +108,19 @@ Evidência (`clarification-flow.test.ts`, 7 casos):
 
 ### Superfícies
 
+O Ops liga ou desliga a Central de Comando no cadastro da empresa. A mudança é
+registrada na mesma transação em `audit_logs` com operador, valor anterior e
+novo valor. `apps/web` lê a decisão persistida no shell; `null` preserva o
+fallback `COMMAND_CENTER_TENANT_IDS` para desenvolvimento. `false` explícito
+prevalece inclusive sobre `*` no fallback. A navegação legada continua quando
+desligada, e suas rotas permanecem acessíveis quando ligada.
+
+Evidência: `settings-routes.test.ts` (20/20, incluindo ligar/desligar,
+auditoria, isolamento de empresas e validação) e `command-center-flag.test.ts`
+(2/2, precedência e tenant inexistente). Migração aplicada somente em
+`tactia_test`; regressão web 32/32 nos cinco arquivos da seção de verificação.
+Typecheck de database/domain/web/admin e lint dos arquivos alterados passaram.
+
 | Rota | Papel |
 |---|---|
 | `/today` | Síntese, objetivo, até 3 prioridades, trabalho delegado |
@@ -141,7 +155,7 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 | Item | Severidade | Situação |
 |---|---|---|
 | Migrações aplicadas **somente** em `tactia_test` | Alta | Desenvolvimento e produção exigem deploy controlado |
-| Feature flag por env (`COMMAND_CENTER_TENANT_IDS`) | Média | Handoff prevê flag por empresa administrável pelo Ops |
+| Fallback por env (`COMMAND_CENTER_TENANT_IDS`) | Baixa | Permanece apenas para empresas sem decisão registrada, para desenvolvimento; Ops grava decisão explícita |
 | Lint global de `apps/web` falha | Baixa | **Preexistente** em `components/landing/hero-prompt.tsx` e `web-threads.tsx`; comprovado com `git stash` no HEAD |
 | 6 testes `browser-integration`/Torge falham | Baixa | **Preexistentes**, validação de URL `app.torge.com.br`; comprovado no HEAD |
 | Eventos analíticos do handoff | Média | Não instrumentados |
@@ -151,22 +165,20 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Flag por empresa administrável** no Ops, substituindo a variável de ambiente,
-   já que a estratégia de release do handoff depende disso.
-2. **Revisão de resultado guiada**: ajustar, continuar ou encerrar plano a partir de
+1. **Revisão de resultado guiada**: ajustar, continuar ou encerrar plano a partir de
    `/results`, versionando a decisão (hoje a revisão é lida, não decidida).
-3. **Instrumentação de eventos** (`plan_created`, `decision_resolved`,
+2. **Instrumentação de eventos** (`plan_created`, `decision_resolved`,
    `execution_state_changed`, `clarification_requested`, `clarification_received`),
    sem payload de mensagem nem PII.
-4. **Editor de preparação no Ops**, para criar objetivo/plano/medição sem depender
+3. **Editor de preparação no Ops**, para criar objetivo/plano/medição sem depender
    de uma recomendação gerada pelo pipeline.
-5. **Validação visual e de acessibilidade** nos três breakpoints e nos dois temas,
+4. **Validação visual e de acessibilidade** nos três breakpoints e nos dois temas,
    com tabela equivalente nos gráficos.
-6. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
+5. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
 
 ## Definition of Done do primeiro recorte
 
 Ainda **não** atingida de ponta a ponta com dados reais. O ciclo está provado em
 teste de integração com Postgres real, mas falta: empresa real conectada, deploy
-das migrações e observação do resultado comercial em janela real. Os itens 1, 2 e
-6 acima são o caminho mais curto até lá.
+das migrações e observação do resultado comercial em janela real. Os itens 1 e
+5 acima são o caminho mais curto até lá.
