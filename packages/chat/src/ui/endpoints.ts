@@ -49,10 +49,15 @@ export function rewriteChatAssetUrl(url: string, basePath: string): string {
 }
 
 /** apps/web: persisted conversations of the signed-in user. */
-export function persistentChatEndpoints(): ChatEndpoints {
+export function persistentChatEndpoints(contextRef?: {
+  type: 'objective' | 'plan';
+  resourceId: string;
+}): ChatEndpoints {
   return {
     async createConversation() {
-      const response = await postJson('/api/v1/conversations', {});
+      const response = await postJson('/api/v1/conversations', {
+        ...(contextRef ? { contextRef } : {}),
+      });
       if (!response.ok) return null;
       const body = (await response.json()) as { data: { id: string } };
       return body.data.id;
