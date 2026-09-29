@@ -131,7 +131,7 @@ rotas antigas funcionais.
 Plano → versão/decisão → execução idempotente → observação automática/relato identificado → medição/revisão.
 
 ### Entregas 4–5
-Operação consolidada, revisão semanal, conversa contextual, piloto ampliado e liberação gradual. Rollback da UI preserva dados/auditoria/execuções e nunca tenta “reverter” efeito externo.
+Operação consolidada, revisão semanal, conversa contextual, piloto ampliado e liberação gradual. A decisão guiada de revisão está implementada (`plan-review-decision.test.ts`); a consolidação semanal permanece pendente. Rollback da UI preserva dados/auditoria/execuções e nunca tenta “reverter” efeito externo.
 
 ## Critérios de aceite funcionais
 
@@ -149,6 +149,8 @@ Estado em 29/09/2026. Evidência reproduzível em `05-status-implementacao.md`.
 - [x] Concluir execução não marca objetivo atingido; causalidade só aparece com método válido. — eixos separados e `attribution` explícita em `OutcomeReview`
 - [x] Pausar/cancelar/desfazer aparecem apenas quando suportados. — `ExecutionTimeline` usa `capabilities`
 - [x] Acompanhamento e revisão continuam sem login ou página aberta. — reconciliação no worker + medição no job diário
+- [x] Revisão de resultado permite continuar, solicitar ajuste ou encerrar com versão e histórico, sem declarar impacto causal. — `plan-review-decision.test.ts` (2 casos)
+- [x] Eventos de plano, decisão, execução e esclarecimento são deduplicados e não guardam mensagem/PII. — `command-center-cycle.test.ts`, `clarification-flow.test.ts`, `plan-review-decision.test.ts`
 
 ## Critérios de aceite de UX e acessibilidade
 

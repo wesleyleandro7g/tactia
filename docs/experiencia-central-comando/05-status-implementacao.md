@@ -16,7 +16,7 @@ preexistentes que não devem consumir tempo.
 
 ## Como reproduzir a verificação
 
-Os testes de integração exigem o banco de teste, que já tem as 5 migrações novas
+Os testes de integração exigem o banco de teste, que já tem as 7 migrações novas
 aplicadas. Nunca aponte estes comandos para o banco de desenvolvimento.
 
 ```bash
@@ -28,7 +28,9 @@ DATABASE_URL=$TEST_DB pnpm db:migrate:deploy
 # ciclo plano → decisão → execução → evidência → medição
 cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-cycle.test.ts \
-  src/__tests__/command-center-flow.test.ts
+  src/__tests__/command-center-flow.test.ts \
+  src/__tests__/plan-review-decision.test.ts \
+  src/lib/__tests__/command-center-flag.test.ts
 
 # esclarecimento pontual por WhatsApp
 cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
@@ -53,13 +55,13 @@ Referência: a sequência definida em `04-handoff-engenharia.md`.
 | 1 — semântica de confiança | **Feito** | `MetricEnvelope`-like por bloco, indisponível ≠ zero, regime de autorização real |
 | 2 — shell/Hoje/Objetivos/Ops | **Feito** | 6 rotas novas + fila de lacunas; flag por empresa no Ops; rotas antigas preservadas |
 | 3 — ciclo completo | **Feito** | Recomendação → plano versionado → decisão → execução → evidência → medição |
-| 4 — operação consolidada | **Parcial** | Conversa contextual e revisão automática prontas; revisão semanal e ajuste/encerramento guiado pendentes |
+| 4 — operação consolidada | **Parcial** | Conversa contextual, revisão automática e decisão guiada prontas; revisão semanal consolidada pendente |
 | 5 — piloto ampliado | **Não iniciada** | Depende de deploy e de empresa real |
 | Fluxo D — esclarecimento | **Feito** | Política opt-in, orçamento, correlação e registro automático |
 
 ## O que está implementado e verificado
 
-### Modelagem (5 migrações aditivas)
+### Modelagem (7 migrações aditivas)
 
 | Migração | Conteúdo |
 |---|---|
@@ -68,6 +70,8 @@ Referência: a sequência definida em `04-handoff-engenharia.md`.
 | `20260929002500_conversation_context` | `conversations.context_ref` para conversa contextual persistente |
 | `20260929102000_evidence_clarifications` | Política de contato em `whatsapp_agent_configs` + tabela `evidence_clarifications` |
 | `20260929150000_command_center_tenant_flag` | `tenants.command_center_enabled` opcional; decisão explícita prevalece sobre fallback por env |
+| `20260929160000_plan_review_decisions` | Histórico versionado de decisões de revisão com snapshot da medição |
+| `20260929170000_command_center_events` | Eventos deduplicados e escopados por empresa, sem texto de mensagens/contatos |
 
 Todas são aditivas: nenhum `DROP`, nenhuma renomeação, nenhuma alteração de
 semântica de coluna existente.
@@ -118,8 +122,29 @@ desligada, e suas rotas permanecem acessíveis quando ligada.
 Evidência: `settings-routes.test.ts` (20/20, incluindo ligar/desligar,
 auditoria, isolamento de empresas e validação) e `command-center-flag.test.ts`
 (2/2, precedência e tenant inexistente). Migração aplicada somente em
-`tactia_test`; regressão web 32/32 nos cinco arquivos da seção de verificação.
+`tactia_test`; regressão web 34/34 nos seis arquivos da seção de verificação.
 Typecheck de database/domain/web/admin e lint dos arquivos alterados passaram.
+
+### Revisão guiada e eventos
+
+`/results` apresenta baseline, observado, janela, fontes e limitações antes de
+oferecer continuar, solicitar ajuste ou encerrar. A decisão exige a versão atual
+e a revisão mais recente, grava snapshot imutável e incrementa a versão do plano.
+Continuar agenda nova revisão; ajuste pausa o plano e abre trabalho no Ops;
+encerrar fecha o plano. Resultado medido, objetivo e efeitos externos permanecem
+em seus eixos próprios. Aprovações pendentes bloqueiam a decisão.
+
+Cinco eventos são gravados em `command_center_events`: `plan_created`,
+`decision_resolved`, `execution_state_changed`, `clarification_requested` e
+`clarification_received`. A chave única por empresa deduplica reprocessamentos.
+Metadados contêm apenas IDs, estados, versão e clareza da resposta; pergunta,
+resposta, telefone e nomes não entram no evento.
+
+Evidência em `tactia_test`: `plan-review-decision.test.ts` (2/2, incluindo
+versão obsoleta, revisão obsoleta, isolamento e snapshot), `command-center-cycle.test.ts`
+(4/4, eventos de decisão/execução), `clarification-flow.test.ts` (7/7, eventos
+sem texto e sem duplicação). Regressão web 34/34, Ops 20/20 e domínio 16/16;
+typecheck dos quatro pacotes e lint dos pacotes limpos/arquivos web alterados.
 
 | Rota | Papel |
 |---|---|
@@ -158,27 +183,23 @@ Ops `/api/v1/evidence-gaps` e `/api/v1/evidence-gaps/[id]/clarification`.
 | Fallback por env (`COMMAND_CENTER_TENANT_IDS`) | Baixa | Permanece apenas para empresas sem decisão registrada, para desenvolvimento; Ops grava decisão explícita |
 | Lint global de `apps/web` falha | Baixa | **Preexistente** em `components/landing/hero-prompt.tsx` e `web-threads.tsx`; comprovado com `git stash` no HEAD |
 | 6 testes `browser-integration`/Torge falham | Baixa | **Preexistentes**, validação de URL `app.torge.com.br`; comprovado no HEAD |
-| Eventos analíticos do handoff | Média | Não instrumentados |
+| Consolidação/consulta dos eventos analíticos | Baixa | Eventos persistidos; painel de leitura e métricas agregadas ainda não existem |
 | Validação visual 360/768/1280, leitor de tela, Web Vitals | Média | Não executada; exige navegador real |
 | Editor de planos/medição no Ops | Média | Preparação ainda depende de recomendação existente |
 | Agrupar lacunas numa mensagem e reenvio após silêncio | Baixa | Fora do escopo atual por decisão |
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Revisão de resultado guiada**: ajustar, continuar ou encerrar plano a partir de
-   `/results`, versionando a decisão (hoje a revisão é lida, não decidida).
-2. **Instrumentação de eventos** (`plan_created`, `decision_resolved`,
-   `execution_state_changed`, `clarification_requested`, `clarification_received`),
-   sem payload de mensagem nem PII.
-3. **Editor de preparação no Ops**, para criar objetivo/plano/medição sem depender
+1. **Editor de preparação no Ops**, para criar objetivo/plano/medição sem depender
    de uma recomendação gerada pelo pipeline.
-4. **Validação visual e de acessibilidade** nos três breakpoints e nos dois temas,
+2. **Validação visual e de acessibilidade** nos três breakpoints e nos dois temas,
    com tabela equivalente nos gráficos.
-5. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
+3. **Consolidar métricas de eventos** para observar o piloto sem mensagem nem PII.
+4. **Deploy das migrações** fora de `tactia_test` e piloto com uma empresa real.
 
 ## Definition of Done do primeiro recorte
 
 Ainda **não** atingida de ponta a ponta com dados reais. O ciclo está provado em
 teste de integração com Postgres real, mas falta: empresa real conectada, deploy
 das migrações e observação do resultado comercial em janela real. Os itens 1 e
-5 acima são o caminho mais curto até lá.
+4 acima são o caminho mais curto até lá.

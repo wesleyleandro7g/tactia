@@ -14,7 +14,7 @@ Você vai continuar a implementação da **Central de Comando** do Tactia
 (`/home/wesleyleandro/Projects/Desencoder/Tactia`), iniciada por outro agente.
 
 Branch: `feat/refact-experience`. Nada foi enviado ao remoto. A modelagem,
-serviços, telas, fila do Ops e flag por empresa administrável estão nesta branch.
+serviços, telas, fila do Ops, flag por empresa, revisão guiada e eventos estão nesta branch.
 
 ## Leia nesta ordem antes de escrever código
 
@@ -32,19 +32,19 @@ serviços, telas, fila do Ops e flag por empresa administrável estão nesta bra
 
 ## Sua tarefa
 
-Implemente o **próximo passo 1** de `05-status-implementacao.md`: a **revisão de
-resultado guiada**, com ações para ajustar, continuar ou encerrar plano a partir
-de `/results`, versionando a decisão.
+Implemente o **próximo passo 1** de `05-status-implementacao.md`: um **editor de
+preparação no Ops** para criar objetivo, plano e medição sem depender de uma
+recomendação produzida pelo pipeline.
 
 Requisitos:
 
-- Preserve os eixos independentes de plano, execução e medição.
-- Exiba baseline, observado, janela, fontes e limitações antes da decisão.
-- Registre a decisão e a versão; não transforme uma revisão em sucesso causal.
-- Não imponha atualização manual de status como obrigação do cliente.
+- Reuse `CommandCenterService` e seus contratos de tenant; não crie executor no Ops.
+- O Ops prepara dados e medição; o cliente decide ações no `apps/web`.
+- Valide objetivo, escopo, fontes e janela antes de publicar a preparação.
+- Preserve versionamento e snapshots de planos e decisões já existentes.
 
-Se você concluir e houver orçamento de contexto, siga para o próximo passo 2
-do mesmo documento (instrumentação de eventos sem mensagens nem PII).
+Se você concluir e houver orçamento de contexto, siga para a validação visual e
+de acessibilidade do próximo passo 2 do mesmo documento.
 
 ## Invariantes que não podem ser quebradas
 
@@ -68,7 +68,7 @@ apresentar evidência de que estão erradas:
 
 ## Verificação
 
-O banco de teste já tem as 5 migrações aplicadas. **Nunca aponte migração para o
+O banco de teste já tem as 7 migrações aplicadas. **Nunca aponte migração para o
 banco de desenvolvimento ou produção sem pedir confirmação ao usuário.**
 
 ```bash
@@ -79,12 +79,17 @@ DATABASE_URL=$TEST_DB pnpm db:migrate:deploy
 cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-cycle.test.ts \
   src/__tests__/command-center-flow.test.ts \
+  src/__tests__/plan-review-decision.test.ts \
+  src/lib/__tests__/command-center-flag.test.ts \
   src/lib/__tests__/clarification-flow.test.ts \
-  src/__tests__/pilot-flow.test.ts        # esperado: 30/30
+  src/__tests__/pilot-flow.test.ts        # esperado: 34/34
 
 cd packages/domain && pnpm exec vitest run \
   src/__tests__/command-center-service.test.ts \
   src/__tests__/evidence-clarification-policy.test.ts
+
+cd apps/admin && DATABASE_URL=$TEST_DB pnpm exec vitest run \
+  src/lib/__tests__/settings-routes.test.ts  # esperado: 20/20
 
 # typecheck dos 4 pacotes afetados
 pnpm --filter @tactia/database typecheck && pnpm --filter @tactia/domain typecheck \
