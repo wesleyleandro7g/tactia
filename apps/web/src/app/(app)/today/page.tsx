@@ -2,6 +2,7 @@ import { ExecutiveSummary } from '@/components/app/command-center/executive-summ
 import { ObjectiveProgress } from '@/components/app/command-center/objective-progress';
 import { PriorityCard } from '@/components/app/command-center/priority-card';
 import { ExecutionTimeline } from '@/components/app/command-center/execution-timeline';
+import { WeeklyCycleExcerpt } from '@/components/app/command-center/weekly-cycle-review';
 import type { ObjectiveView, PlanView } from '@/components/app/command-center/types';
 import { PageHeader } from '@/components/app/page-header';
 import { EmptyState } from '@/components/ui/feedback';
@@ -28,12 +29,13 @@ function evidenceLines(value: unknown): string[] {
 
 export default async function TodayPage() {
   const ctx = await requireTenant('/today');
-  const [objectiveResult, planResult, recommendationResult, progressResult, freshnessResult] = await Promise.all([
+  const [objectiveResult, planResult, recommendationResult, progressResult, freshnessResult, cycleReview] = await Promise.all([
     safe(() => commandCenterService.listObjectives(ctx)),
     safe(() => commandCenterService.listPlans(ctx)),
     safe(() => recommendationService.list(ctx, { status: 'pending', page: '1', pageSize: '10' })),
     safe(() => analyticsService.getGoalsProgress(ctx)),
     safe(() => analyticsService.getDataFreshness(ctx)),
+    safe(() => commandCenterService.getWeeklyCycleReview(ctx)),
   ]);
 
   const objectives = (objectiveResult?.items ?? []) as ObjectiveView[];
@@ -120,6 +122,17 @@ export default async function TodayPage() {
         )}
       </section>
       <section aria-labelledby="delegated-work" className="flex flex-col gap-4"><div><h2 id="delegated-work" className="font-display text-2xl tracking-tight">Trabalho delegado</h2><p className="mt-1 text-sm text-muted-foreground">Andamento obtido das fontes e execuções existentes, sem check-in manual.</p></div>{activePlans.length ? <div className="grid gap-4 xl:grid-cols-2">{activePlans.map((plan) => <ExecutionTimeline key={plan.id} plan={plan} />)}</div> : <EmptyState title="Nenhum plano em andamento" description="Planos preparados e autorizados aparecerão aqui com o próximo evento esperado." />}</section>
+      {cycleReview ? (
+        <section aria-labelledby="today-recent-results" className="flex flex-col gap-4">
+          <div>
+            <h2 id="today-recent-results" className="font-display text-2xl tracking-tight">Resultados recentes</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Recorte da janela em curso. A revisão completa permanece em Resultados, sem substituir a medição por indicadores operacionais.
+            </p>
+          </div>
+          <WeeklyCycleExcerpt review={cycleReview} />
+        </section>
+      ) : null}
     </div>
   );
 }

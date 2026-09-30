@@ -71,6 +71,77 @@ export type MeasurementDefinitionView = {
   reviews: MeasurementReviewView[];
 };
 
+export type CycleReviewView = {
+  tenantId: string;
+  period: { from: string; to: string };
+  periodInclusive: { from: string; to: string };
+  inProgress: Array<{
+    planId: string;
+    title: string;
+    status: string;
+    version: number;
+    nextReviewAt: string | null;
+    goalId: string;
+    goalTitle: string | null;
+    goalStatus: string;
+  }>;
+  decisions: Array<{
+    id: string;
+    kind: 'plan_review' | 'approval';
+    choice: string;
+    planId: string;
+    planTitle: string;
+    fromVersion: number | null;
+    toVersion: number | null;
+    reason: string | null;
+    createdAt: string;
+  }>;
+  executions: Array<{
+    id: string;
+    planId: string;
+    planTitle: string;
+    planStatus: string;
+    stepId: string;
+    stepTitle: string;
+    actionName: string;
+    actionType: string;
+    status: string;
+    createdAt: string;
+    finishedAt: string | null;
+  }>;
+  gaps: Array<{
+    id: string;
+    subject: string;
+    reason: string;
+    impact: string;
+    status: string;
+    planId: string | null;
+    planTitle: string | null;
+  }>;
+  observations: Array<{
+    definitionId: string;
+    planId: string;
+    planTitle: string;
+    planStatus: string;
+    goalStatus: string;
+    metricKey: string;
+    indicator: string;
+    unit: string;
+    baseline: number | null;
+    target: number | null;
+    observed: number | null;
+    availability: 'ready' | 'empty' | 'partial';
+    status: string;
+    attribution: string;
+    limitation: string | null;
+    windowFrom: string;
+    windowTo: string;
+    version: number;
+    sources: unknown;
+    reviews: MeasurementReviewView[];
+  }>;
+};
+
 export type PlanView = {
   id: string;
   recommendationId: string | null;
