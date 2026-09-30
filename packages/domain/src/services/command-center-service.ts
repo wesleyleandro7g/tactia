@@ -4,6 +4,24 @@ import type { CommandCenterRepository } from '@tactia/database';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
 import { assertOwnerOrAdmin, assertOperator, assertTenantContext, assertTenantUser } from '../authz';
 import { decimalToNumber } from '../utils/serialize';
+import { parseCycleReviewQuery, serializeCycleReview } from './command-center-cycle-review';
+
+export {
+  CYCLE_REVIEW_DEFAULT_DAYS,
+  CYCLE_REVIEW_MAX_DAYS,
+  parseCycleReviewQuery,
+  resolveCycleReviewWindow,
+  serializeCycleReview,
+} from './command-center-cycle-review';
+export type {
+  CycleReview,
+  CycleReviewAvailability,
+  CycleReviewDecision,
+  CycleReviewExecution,
+  CycleReviewGap,
+  CycleReviewObservation,
+  CycleReviewPlan,
+} from './command-center-cycle-review';
 
 const planStatusSchema = z.enum(['draft', 'active', 'paused', 'completed', 'closed']);
 const measurementStatusSchema = z.enum(['measuring', 'measured', 'not_measurable', 'review_needed']);
@@ -237,6 +255,17 @@ export class CommandCenterService {
     const status = query.status ? planStatusSchema.parse(query.status) : undefined;
     const items = await this.repository.listPlans(ctx.tenantId, status);
     return { items: items.map(serializePlan) };
+  }
+
+  async getWeeklyCycleReview(
+    ctx: RequestContext,
+    query: Record<string, string | undefined> = {},
+    now = new Date(),
+  ) {
+    assertTenantContext(ctx);
+    const window = parseCycleReviewQuery(query, now);
+    const readings = await this.repository.listCycleReadings(ctx.tenantId, window.from, window.to);
+    return serializeCycleReview(ctx.tenantId, window, readings);
   }
 
   async getPlan(ctx: RequestContext, id: string) {
