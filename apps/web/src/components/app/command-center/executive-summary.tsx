@@ -4,15 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { Availability } from './types';
-
-const availabilityLabel: Record<Availability, string> = {
-  ready: 'Atualizado',
-  empty: 'Em preparação',
-  partial: 'Dados parciais',
-  stale: 'Dados desatualizados',
-  error: 'Atualização indisponível',
-};
+import { AVAILABILITY_LABEL, type Availability } from './types';
 
 export function ExecutiveSummary({
   objectiveTitle,
@@ -40,7 +32,7 @@ export function ExecutiveSummary({
     <Card aria-labelledby="executive-summary-title" className="lg:col-span-2">
       <CardHeader>
         <div>
-          <Badge tone={tone}>{availabilityLabel[availability]}</Badge>
+          <Badge tone={tone}>{AVAILABILITY_LABEL[availability]}</Badge>
           <CardTitle id="executive-summary-title" className="mt-3 font-display text-2xl">
             {objectiveTitle ? `Seu foco: ${objectiveTitle}` : 'Seu foco está sendo preparado'}
           </CardTitle>

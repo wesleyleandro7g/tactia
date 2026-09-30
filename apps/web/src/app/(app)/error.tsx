@@ -24,8 +24,8 @@ export default function AppError({
       </Alert>
       <div className="flex flex-wrap gap-2">
         <Button size="md" onClick={reset}>Tentar novamente</Button>
-        <Link href="/today" className={cn(buttonVariants({ variant: 'outline', size: 'md' }))}>
-          Voltar para Hoje
+        <Link href="/objectives" className={cn(buttonVariants({ variant: 'outline', size: 'md' }))}>
+          Ir para Objetivos
         </Link>
       </div>
     </div>

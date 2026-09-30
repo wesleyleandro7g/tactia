@@ -24,9 +24,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Sidebar as SidebarIcon } from "lucide-react"
+import { SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_COOKIE_NAME } from "@/lib/sidebar-cookie"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
@@ -256,7 +255,8 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, open, openMobile, isMobile } = useSidebar()
+  const expanded = isMobile ? openMobile : open
 
   return (
     <Button
@@ -264,7 +264,9 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon-sm"
-      className={cn(className)}
+      aria-expanded={expanded}
+      aria-label={expanded ? "Recolher navegação" : "Mostrar navegação"}
+      className={cn("min-h-11 min-w-11", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -272,7 +274,7 @@ function SidebarTrigger({
       {...props}
     >
       <SidebarIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">{expanded ? "Recolher navegação" : "Mostrar navegação"}</span>
     </Button>
   )
 }

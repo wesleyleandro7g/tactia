@@ -56,6 +56,32 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/settings/whatsapp': MessageCircle,
 };
 
+const SECTION_TITLES: Array<[string, string]> = [
+  ['/settings/api-keys', 'API Keys'],
+  ['/settings/whatsapp', 'WhatsApp'],
+  ['/settings/connections', 'Conexões'],
+  ['/settings/documents', 'Documentos'],
+  ['/settings/playbooks', 'Playbooks'],
+  ['/settings/memory', 'Memória'],
+  ['/settings/facts', 'Fatos'],
+  ['/settings/goals', 'Metas'],
+  ['/operations', 'Operação'],
+  ['/objectives', 'Objetivos'],
+  ['/results', 'Resultados'],
+  ['/dashboard', 'Dashboard'],
+  ['/briefings', 'Briefings'],
+  ['/approvals', 'Aprovações'],
+  ['/chat', 'Agente IA'],
+  ['/onboarding', 'Boas-vindas'],
+];
+
+export function sectionTitleFromPath(pathname: string): string {
+  const match = SECTION_TITLES.find(
+    ([href]) => pathname === href || pathname.startsWith(`${href}/`),
+  );
+  return match?.[1] ?? 'Central de comando';
+}
+
 /** Marca o item ativo com aria-current e destaca visualmente. */
 export function NavLinks({
   items,

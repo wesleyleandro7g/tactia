@@ -1,4 +1,29 @@
 export type Availability = 'ready' | 'empty' | 'partial' | 'stale' | 'error';
+
+export const AVAILABILITY_LABEL: Record<Availability, string> = {
+  ready: 'Atualizado',
+  empty: 'Em preparação',
+  partial: 'Dados parciais',
+  stale: 'Dados desatualizados',
+  error: 'Atualização indisponível',
+};
+
+export type TodaySnapshot = {
+  availability: Availability;
+  periodLabel: string;
+  attention: string | null;
+  updatedAt: string | null;
+  chatHref: string;
+  objectiveTitle: string | null;
+};
+
+export type TodayPriorityView = {
+  id: string;
+  title: string;
+  description: string;
+  insight: { severity: string; evidence: unknown };
+};
+
 export type EvidenceKind = 'observed' | 'reported' | 'inferred';
 
 export type EvidenceView = {
