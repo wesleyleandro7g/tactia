@@ -6,13 +6,15 @@ import { hasMinRole } from '@tactia/domain';
 import { hasCommandCenter } from '@/lib/command-center-flag';
 
 const COMMAND_CENTER_NAV: NavItem[] = [
-  { href: '/today', label: 'Hoje' },
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/chat', label: 'Agente IA' },
   { href: '/objectives', label: 'Objetivos' },
   { href: '/operations', label: 'Operação' },
   { href: '/results', label: 'Resultados' },
-  { href: '/chat', label: 'Conversar com a Tactia' },
-  { href: '/dashboard', label: 'Análises' },
 ];
+
+const COMMAND_CENTER_TODAY: NavItem = { href: '/today', label: 'Hoje' };
+const API_KEYS_NAV: NavItem = { href: '/settings/api-keys', label: 'API Keys' };
 
 const LEGACY_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -36,15 +38,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const tenants = await listUserTenants(ctx);
   const commandCenterEnabled = await hasCommandCenter(ctx.tenantId);
-  const nav: NavItem[] = [
-    ...(commandCenterEnabled ? COMMAND_CENTER_NAV : LEGACY_NAV),
-  ];
-  if (ctx.role && hasMinRole(ctx.role, 'admin')) {
-    nav.push(
-      { href: '/settings/api-keys', label: 'API keys' },
-      { href: '/settings/whatsapp', label: 'WhatsApp' },
-    );
-  }
+  const isAdmin = Boolean(ctx.role && hasMinRole(ctx.role, 'admin'));
+  const nav: NavItem[] = commandCenterEnabled
+    ? [
+        ...COMMAND_CENTER_NAV,
+        ...(isAdmin ? [API_KEYS_NAV] : []),
+        COMMAND_CENTER_TODAY,
+      ]
+    : [
+        ...LEGACY_NAV,
+        ...(isAdmin
+          ? [API_KEYS_NAV, { href: '/settings/whatsapp', label: 'WhatsApp' }]
+          : []),
+      ];
   return (
     <AppShell
       nav={nav}
