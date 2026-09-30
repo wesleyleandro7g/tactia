@@ -12,7 +12,8 @@ Você vai continuar a implementação da **Central de Comando** do Tactia
 
 Branch: `feat/refact-experience`. Nada foi enviado ao remoto. A modelagem,
 serviços, telas, fila do Ops, editor de preparação, flag por empresa, revisão
-guiada, eventos e indicadores operacionais do piloto estão nesta branch.
+guiada, eventos, indicadores operacionais do piloto e revisão semanal
+consolidada estão nesta branch.
 
 ## Leia nesta ordem antes de escrever código
 
@@ -32,36 +33,34 @@ guiada, eventos e indicadores operacionais do piloto estão nesta branch.
 
 ## Sua tarefa
 
-Implemente a **próxima entrega de código** da Central de Comando: a **revisão
-semanal consolidada** da entrega 4. Não gaste esta etapa com uma nova rodada de
-revisão visual, pesquisa ou deploy. O próximo desenvolvimento de produto, depois
-deste, é concluir a validação visual e de acessibilidade nos três breakpoints.
+Conclua a **validação visual e de acessibilidade** da Central de Comando nos
+três breakpoints (360, 768 e 1280px) e nos dois temas. Não gaste esta etapa com
+pesquisa de empresários, deploy ou uma nova entrega de produto. O próximo
+desenvolvimento, depois deste, é inspecionar produção e planejar o piloto com
+uma empresa real.
 
 Requisitos:
 
-- Parta das leituras já existentes de planos, decisões de revisão, execuções,
-  lacunas e revisões de medição em `CommandCenterService` / `CommandCenterRepository`.
-  A consolidação observa o ciclo; não cria executor paralelo, não altera
-  `recommendations/:id/accept` e não reexecuta o seed em produção.
-- Em `/results` (e, se couber um recorte em `/today`), apresente a janela:
-  o que estava em andamento, o que foi decidido, o que a execução fez, o que
-  permanece como lacuna e o que foi observado na medição. Mantenha os eixos
-  independentes; executar não marca objetivo atingido nem impacto causal.
-- Toda consolidação é por empresa, com autorização no servidor. Links
-  persistentes e relações opcionais revalidam o tenant. Ausência de cobertura
-  continua `null`, nunca zero comercial. Use `nullableDecimalToNumber`.
-- Reutilize `OutcomeReview` e os padrões de `apps/web`. Não exponha texto de
-  esclarecimento, telefone ou nomes. Os indicadores operacionais do piloto já
-  existem no Ops (`/tenants/[id]/metrics`); não os recrie no app do cliente
-  como substituto da revisão de resultado.
-- Cubra, com testes relevantes, isolamento entre empresas, janela, estado vazio
-  e a distinção entre eixos. Verifique typecheck e lint dos arquivos/pacotes
-  alterados. Se precisar de migração, aplique-a apenas em `tactia_test`.
+- Parta da revisão estática já registrada em `05-status-implementacao.md`:
+  tabelas equivalentes dos gráficos, quebra dos cards abaixo de 480px, contraste
+  de tokens de texto/ação e anúncios do editor Ops. A revisão semanal
+  consolidada já está em `/results` e no recorte de `/today`.
+- Inspecione de fato as rotas novas (`/today`, `/objectives`, `/operations`,
+  `/results`) e o recorte da janela consolidada, nos temas claro e escuro.
+  Verifique zoom, teclado, foco visível e leitor de tela. Não declare WCAG
+  2.2 AA concluída sem essa evidência renderizada.
+- Corrija apenas o que a inspeção provar: truncamento de decisão/autorização,
+  contraste, alvo de toque das ações primárias, anúncio de estados assíncronos
+  e consistência dos eixos (execução ≠ objetivo atingido; `null` ≠ zero).
+- Não altere a semântica de confiança, o executor, `recommendations/:id/accept`
+  nem os indicadores do piloto no Ops. Não reexecute o seed em produção.
+- Se mudar código, cubra o comportamento corrigido e rode as suítes da Central
+  como regressão. Typecheck e lint só dos arquivos/pacotes alterados.
 
-Critério de saída: o empresário encontra, numa janela definida, o acompanhamento
-consolidado do ciclo sem montar a história a partir de várias telas, e entende
-o que foi observado versus o que ainda não pode ser atribuído. A consulta não
-expõe dados de outra empresa.
+Critério de saída: há evidência renderizada nos três breakpoints e nos dois
+temas de que o empresário lê a janela consolidada, decide e acompanha sem
+perder ação ou número, e de que a interface não depende só de cor para
+estado, severidade ou tendência.
 
 ## Invariantes que não podem ser quebradas
 
@@ -100,15 +99,17 @@ cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-cycle.test.ts \
   src/__tests__/command-center-flow.test.ts \
   src/__tests__/plan-review-decision.test.ts \
+  src/__tests__/command-center-cycle-review.test.ts \
   src/lib/__tests__/command-center-flag.test.ts \
   src/lib/__tests__/clarification-flow.test.ts \
-  src/__tests__/pilot-flow.test.ts        # esperado: 34/34
+  src/__tests__/pilot-flow.test.ts        # esperado: 37/37
 
 cd packages/database && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-events.test.ts
 
 cd packages/domain && pnpm exec vitest run \
   src/__tests__/command-center-service.test.ts \
+  src/__tests__/command-center-cycle-review.test.ts \
   src/__tests__/evidence-clarification-policy.test.ts \
   src/__tests__/command-center-metrics-service.test.ts
 

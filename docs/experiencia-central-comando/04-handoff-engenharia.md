@@ -1,8 +1,8 @@
 # Central de comando — handoff para engenharia
 
-> **Estado atual da implementação: `05-status-implementacao.md`.** Entregas 1, 2, 3
-> e o Fluxo D já estão implementados e verificados; os critérios abaixo refletem
-> isso. Leia o status antes de planejar trabalho novo.
+> **Estado atual da implementação: `05-status-implementacao.md`.** Entregas 1, 2, 3,
+> 4 e o Fluxo D já estão implementados e verificados; os critérios abaixo
+> refletem isso. Leia o status antes de planejar trabalho novo.
 
 Este documento fecha o pacote de design-spec. Não autoriza implementação nesta etapa e não contém código de UI.
 
@@ -32,7 +32,7 @@ Em conflito, prevalecem segurança/tenant, capacidade real do backend, ausência
 | `/objectives/[id]` | ObjectiveProgress, planos, evidências e revisões | Link persistente/autorizado |
 | `/operations?tab=decisions|in-progress|routines|history` | DecisionCard, ExecutionTimeline e histórico | `/approvals` redireciona/preserva filtros quando maduro |
 | `/operations/plans/[id]` | composição de plano, não formulário de tarefas | URL persistente |
-| `/results` | OutcomeReview, análises e briefings históricos | Preservar filtros/links de dashboard e briefings |
+| `/results` | Revisão semanal consolidada, OutcomeReview, análises e briefings históricos | Preservar filtros/links de dashboard e briefings; janela em `?from=&to=` |
 | `/chat/[id]` | ChatPanel + referência contextual persistida | Nunca invalidar links atuais |
 | Admin: `/gaps`, `/tenants/[id]/preparation` e `/tenants/[id]/metrics` | EvidenceGapQueue, editor de objetivo/plano/medição e indicadores do piloto | Preparação e métricas escopadas por empresa, sem executor no Ops |
 
@@ -132,7 +132,7 @@ recomendação do pipeline (`settings-routes.test.ts`).
 Plano → versão/decisão → execução idempotente → observação automática/relato identificado → medição/revisão.
 
 ### Entregas 4–5
-Operação consolidada, revisão semanal, conversa contextual, piloto ampliado e liberação gradual. A decisão guiada de revisão está implementada (`plan-review-decision.test.ts`); os indicadores operacionais do piloto estão no Ops (`command-center-metrics-routes.test.ts`); a consolidação semanal permanece pendente. Rollback da UI preserva dados/auditoria/execuções e nunca tenta “reverter” efeito externo.
+Operação consolidada, revisão semanal, conversa contextual, piloto ampliado e liberação gradual. A decisão guiada de revisão está implementada (`plan-review-decision.test.ts`); os indicadores operacionais do piloto estão no Ops (`command-center-metrics-routes.test.ts`); a consolidação semanal observa o ciclo em `/results` e no recorte de `/today` (`command-center-cycle-review.test.ts`). Rollback da UI preserva dados/auditoria/execuções e nunca tenta “reverter” efeito externo.
 
 ## Critérios de aceite funcionais
 
@@ -154,6 +154,7 @@ Estado em 29/09/2026. Evidência reproduzível em `05-status-implementacao.md`.
 - [x] Revisão de resultado permite continuar, solicitar ajuste ou encerrar com versão e histórico, sem declarar impacto causal. — `plan-review-decision.test.ts` (2 casos)
 - [x] Eventos de plano, decisão, execução e esclarecimento são deduplicados e não guardam mensagem/PII. — `command-center-cycle.test.ts`, `clarification-flow.test.ts`, `plan-review-decision.test.ts`
 - [x] Operador consulta, por empresa e janela, os indicadores que os eventos da Central sustentam, com definição, denominador e ausência explícita; a consulta não vaza outra empresa nem conteúdo pessoal. — `command-center-metrics-routes.test.ts`, `command-center-events.test.ts`, `command-center-metrics-service.test.ts`
+- [x] Empresário acompanha, numa janela definida, andamento, decisões, execução, lacunas e observado sem montar a história a partir de várias telas; executar não marca objetivo atingido nem impacto causal; ausência de cobertura permanece `null`; a consulta não expõe outra empresa. — `command-center-cycle-review.test.ts` (web 3, domínio 6)
 
 ## Critérios de aceite de UX e acessibilidade
 

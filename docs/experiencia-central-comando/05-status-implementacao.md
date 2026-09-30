@@ -32,6 +32,7 @@ cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-cycle.test.ts \
   src/__tests__/command-center-flow.test.ts \
   src/__tests__/plan-review-decision.test.ts \
+  src/__tests__/command-center-cycle-review.test.ts \
   src/lib/__tests__/command-center-flag.test.ts
 
 # esclarecimento pontual por WhatsApp
@@ -41,6 +42,7 @@ cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
 # unitários de domínio
 cd packages/domain && pnpm exec vitest run \
   src/__tests__/command-center-service.test.ts \
+  src/__tests__/command-center-cycle-review.test.ts \
   src/__tests__/evidence-clarification-policy.test.ts
 
 # regressão do fluxo anterior (não deve quebrar)
@@ -72,7 +74,7 @@ Referência: a sequência definida em `04-handoff-engenharia.md`.
 | 1 — semântica de confiança | **Feito** | `MetricEnvelope`-like por bloco, indisponível ≠ zero, regime de autorização real |
 | 2 — shell/Hoje/Objetivos/Ops | **Feito** | 6 rotas novas + fila de lacunas; flag por empresa no Ops; rotas antigas preservadas |
 | 3 — ciclo completo | **Feito** | Recomendação → plano versionado → decisão → execução → evidência → medição |
-| 4 — operação consolidada | **Parcial** | Conversa contextual, revisão automática e decisão guiada prontas; revisão semanal consolidada pendente |
+| 4 — operação consolidada | **Feito** | Conversa contextual, revisão automática, decisão guiada e revisão semanal consolidada prontas |
 | 5 — piloto ampliado | **Não iniciada** | Depende de deploy e de empresa real |
 | Fluxo D — esclarecimento | **Feito** | Política opt-in, orçamento, correlação e registro automático |
 
@@ -197,6 +199,36 @@ estados, versão, clareza); pergunta, resposta, telefone e nomes são descartado
 Nenhuma migração nova: a consulta usa `command_center_events`. A chave única
 por empresa continua impedindo reprocessamento de contar duas vezes.
 
+### Revisão semanal consolidada
+
+`CommandCenterService.getWeeklyCycleReview` observa o ciclo já persistido —
+planos, decisões de revisão/aprovação, execuções vinculadas, lacunas abertas e
+revisões de medição — numa janela definida (padrão 7 dias UTC, máximo 90). Não
+há executor paralelo, persistência nova nem alteração de `recommendations/:id/accept`.
+
+A leitura é por empresa e autorizada no servidor. `tenantId` na query é
+ignorado. Relações opcionais (plano da lacuna, definição da medição, vínculo da
+execução) só entram se o tenant coincidir; o link persistente aponta para o
+recurso revalidado. Texto de esclarecimento, telefone e nomes não são lidos.
+
+`/results?from=&to=` apresenta os cinco eixos na mesma tela: em andamento,
+decidido, execução, lacunas e observado. `/today` mostra um recorte com o
+mesmo vínculo persistente. O observado reutiliza `OutcomeReview` e
+`nullableDecimalToNumber`; sem cobertura o valor continua `null` com
+`availability: empty`, nunca zero comercial. Execução concluída não altera o
+estado do objetivo nem declara causalidade. Os indicadores do piloto
+permanecem no Ops (`/tenants/[id]/metrics`).
+
+Nenhuma migração foi necessária.
+
+Evidência em `tactia_test`: `command-center-cycle-review.test.ts` (3/3, isolamento,
+janela, estado vazio, relação opcional revalidada e eixos independentes) e
+domínio `command-center-cycle-review.test.ts` (6/6, janela, tenant da query,
+vazio, eixos, plano estrangeiro e zero verdadeiro). Regressão web 37/37 nos
+sete arquivos da verificação (34 anteriores + 3 novos), Ops 30/30 e domínio
+28/28 nos arquivos da Central; typecheck de database/domain/web/admin e lint
+de database/domain/arquivos web alterados passaram.
+
 Evidência em `tactia_test`: `command-center-events.test.ts` (5/5, deduplicação,
 janela, isolamento, paginação, vazio e sanitização),
 `command-center-metrics-service.test.ts` (6/6, operador, intervalo, tenant da
@@ -242,17 +274,18 @@ zoom, leitor de tela, nem validação visual dos dois temas. Não declarar WCAG
 
 | Rota | Papel |
 |---|---|
-| `/today` | Síntese, objetivo, até 3 prioridades, trabalho delegado |
+| `/today` | Síntese, objetivo, até 3 prioridades, trabalho delegado, recorte da janela |
 | `/objectives`, `/objectives/[id]` | Objetivos preparados, planos e evidências |
 | `/operations`, `/operations/plans/[id]` | Decisões versionadas, execução, evidência e resultado |
-| `/results` | Revisões com baseline, janela, atribuição e limitação |
+| `/results` | Revisão semanal consolidada da janela + revisões por plano |
 | Ops `/gaps` | Fila de lacunas com estado do esclarecimento e ação de consulta |
 | Ops `/tenants/[id]/metrics` | Indicadores do piloto a partir dos eventos da Central |
 
 APIs novas: `/api/v1/objectives`, `/api/v1/plans`, `/api/v1/plans/[id]`,
 `/api/v1/plans/[id]/steps/[stepId]/execute`, `/api/v1/measurement-reviews`,
 `/api/v1/recommendations/[id]/prepare-plan`, `/api/v1/clarifications/dispatch`,
-Ops `/api/v1/evidence-gaps`, `/api/v1/evidence-gaps/[id]/clarification` e
+`/api/v1/cycle-review`, Ops `/api/v1/evidence-gaps`,
+`/api/v1/evidence-gaps/[id]/clarification` e
 `/api/v1/tenants/[id]/command-center/metrics`.
 
 ## Decisões que devem ser preservadas
@@ -284,13 +317,10 @@ Ops `/api/v1/evidence-gaps`, `/api/v1/evidence-gaps/[id]/clarification` e
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Implementar a revisão semanal consolidada** da entrega 4, sobre planos,
-   decisões, execução, lacunas e resultado observado; detalhada em
-   `06-prompt-continuacao.md`.
-2. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
+1. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
    dois temas, inclusive zoom/leitor de tela; as tabelas equivalentes já estão
-   disponíveis nos gráficos.
-3. **Inspecionar produção e planejar o piloto** com uma empresa real; não
+   disponíveis nos gráficos. Detalhada em `06-prompt-continuacao.md`.
+2. **Inspecionar produção e planejar o piloto** com uma empresa real; não
    reproduzir o baseline especial do banco local sem verificar o esquema.
 
 ## Definition of Done do primeiro recorte
