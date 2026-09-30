@@ -3,8 +3,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { PageBlock } from '@tactia/domain';
-import { REPORTS_PORTAL_COMPONENT_KEY } from '@tactia/domain';
+import { REPORTS_PORTAL_COMPONENT_KEY, type PageBlock } from '@tactia/domain/automations/model';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { statusLabel } from './status-label';
