@@ -34,7 +34,7 @@ function SidebarBrand({ homeHref }: { homeHref: string }) {
       href={homeHref}
       className={cn('inline-flex items-center', collapsed && 'size-8 justify-center')}
     >
-      {collapsed ? <BrandMark /> : <BrandLogo className="h-7" priority />}
+      {collapsed ? <BrandMark priority /> : <BrandLogo className="h-7" priority />}
     </Link>
   );
 }
@@ -78,7 +78,7 @@ export function AppShell({
       </a>
 
       <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">
+        <SidebarHeader className="h-14 justify-center border-b border-sidebar-border px-4 py-0 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
           <SidebarBrand homeHref={homeHref} />
         </SidebarHeader>
 

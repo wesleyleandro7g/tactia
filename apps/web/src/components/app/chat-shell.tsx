@@ -77,7 +77,7 @@ export function ChatShell({
       </Sheet>
 
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 lg:px-6">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 lg:px-6">
           <Button
             type="button"
             variant="ghost"
