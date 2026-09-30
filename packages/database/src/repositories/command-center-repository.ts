@@ -653,4 +653,167 @@ export class CommandCenterRepository {
     });
   }
 
+  async listCycleReadings(tenantId: string, from: Date, to: Date) {
+    const inWindow = { gte: from, lt: to };
+    const planSelect = {
+      id: true,
+      title: true,
+      status: true,
+      version: true,
+      nextReviewAt: true,
+      tenantId: true,
+      goal: { select: { id: true, title: true, status: true, tenantId: true } },
+    } satisfies Prisma.PlanSelect;
+
+    const [plans, decisions, approvals, executions, gaps, reviews] = await Promise.all([
+      this.db.plan.findMany({
+        where: { tenantId, status: { in: ['draft', 'active', 'paused'] } },
+        select: planSelect,
+        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+      }),
+      this.db.planReviewDecision.findMany({
+        where: { tenantId, createdAt: inWindow, plan: { tenantId } },
+        select: {
+          id: true,
+          choice: true,
+          reason: true,
+          fromVersion: true,
+          toVersion: true,
+          createdAt: true,
+          tenantId: true,
+          plan: { select: planSelect },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.approval.findMany({
+        where: {
+          tenantId,
+          status: { in: ['approved', 'rejected'] },
+          resolvedAt: inWindow,
+          actionExecution: {
+            tenantId,
+            planStepLinks: { some: { tenantId, planStep: { tenantId, plan: { tenantId } } } },
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          resolvedAt: true,
+          createdAt: true,
+          tenantId: true,
+          actionExecution: {
+            select: {
+              id: true,
+              status: true,
+              tenantId: true,
+              planStepLinks: {
+                where: { tenantId },
+                select: {
+                  tenantId: true,
+                  planStep: { select: { tenantId: true, plan: { select: planSelect } } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { resolvedAt: 'desc' },
+      }),
+      this.db.planStepExecution.findMany({
+        where: {
+          tenantId,
+          planStep: { tenantId, plan: { tenantId } },
+          actionExecution: {
+            tenantId,
+            OR: [
+              { createdAt: inWindow },
+              { startedAt: inWindow },
+              { finishedAt: inWindow },
+            ],
+          },
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          createdAt: true,
+          planStep: {
+            select: {
+              id: true,
+              title: true,
+              tenantId: true,
+              plan: { select: planSelect },
+            },
+          },
+          actionExecution: {
+            select: {
+              id: true,
+              status: true,
+              tenantId: true,
+              createdAt: true,
+              startedAt: true,
+              finishedAt: true,
+              action: { select: { name: true, type: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.evidenceGap.findMany({
+        where: {
+          tenantId,
+          status: { notIn: ['resolved', 'unresolved'] },
+        },
+        select: {
+          id: true,
+          subject: true,
+          reason: true,
+          impact: true,
+          status: true,
+          planId: true,
+          tenantId: true,
+          createdAt: true,
+          plan: { select: planSelect },
+        },
+        orderBy: [{ impact: 'asc' }, { createdAt: 'asc' }],
+      }),
+      this.db.measurementReview.findMany({
+        where: {
+          tenantId,
+          measurementDefinition: { tenantId, plan: { tenantId } },
+          OR: [{ reviewedAt: inWindow }, { createdAt: inWindow }],
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          status: true,
+          observed: true,
+          operationalResults: true,
+          references: true,
+          limitation: true,
+          reviewedAt: true,
+          createdAt: true,
+          measurementDefinition: {
+            select: {
+              id: true,
+              tenantId: true,
+              metricKey: true,
+              indicator: true,
+              unit: true,
+              baseline: true,
+              target: true,
+              windowFrom: true,
+              windowTo: true,
+              attribution: true,
+              sources: true,
+              version: true,
+              plan: { select: planSelect },
+            },
+          },
+        },
+        orderBy: [{ reviewedAt: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    return { plans, decisions, approvals, executions, gaps, reviews };
+  }
+
 }
