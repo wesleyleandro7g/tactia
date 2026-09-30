@@ -111,6 +111,13 @@ export type SyncServiceDeps = {
     userId: string | null;
   }) => Promise<void>;
   /**
+   * Persiste o evento `sync.completed` só no sucesso completo. Falha aqui não
+   * falha o sync; resultado parcial não chama este porto.
+   */
+  domainEvents?: {
+    recordSyncCompleted(event: { tenantId: string; dataSourceId: string; syncJobId: string }): Promise<void>;
+  };
+  /**
    * When set, `startSync` enqueues the job instead of running it inline
    * (pg-boss in production). The worker calls `executeSync`.
    */
@@ -674,6 +681,23 @@ export class SyncService {
       });
       if (finalStatus === 'completed') {
         await this.deps.dataSources.updateLastSyncAt({ id: ds.id, lastSyncAt: new Date() });
+        if (this.deps.domainEvents) {
+          try {
+            await this.deps.domainEvents.recordSyncCompleted({
+              tenantId,
+              dataSourceId: ds.id,
+              syncJobId,
+            });
+          } catch (error) {
+            logger.error({
+              ...(requestId ? { request_id: requestId } : {}),
+              tenant_id: tenantId,
+              operation: 'sync_completion_event',
+              sync_job_id: syncJobId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
       }
       if (this.deps.moduleRuns && (finalStatus === 'completed' || finalStatus === 'partial')) {
         for (const module of succeededModules) {

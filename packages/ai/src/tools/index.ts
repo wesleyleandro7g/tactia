@@ -39,6 +39,7 @@ import { createProposeActionTool, type ActionProposalPort } from './propose-acti
 import { createSendEmailTool, type DirectEmailPort } from './send-email';
 import { createGenerateInfographicTool, type InfographicStore } from './generate-infographic';
 import { createScheduleTools, type SchedulePort } from './schedule';
+import { createAutomationTools, type AutomationPort } from './automations';
 import {
   createGetAcquisitionTool,
   createGetCashFlowTool,
@@ -121,6 +122,7 @@ export {
   createTriggerScheduleTool,
   type SchedulePort,
 } from './schedule';
+export { createAutomationTools, type AutomationPort } from './automations';
 export {
   currentMonthPeriod,
   periodInputSchema,
@@ -154,6 +156,7 @@ export type CreateToolsOptions = {
    * Chat-only — do not pass it for the MCP registry.
    */
   schedulePort?: SchedulePort;
+  automationPort?: AutomationPort;
 };
 
 /** Read tools + analytics tools + optional propose_action (Etapa 7). */
@@ -218,6 +221,9 @@ export function createDefaultTools(deps: ToolDeps, options: CreateToolsOptions =
   }
   if (options.schedulePort) {
     tools.push(...createScheduleTools(options.schedulePort));
+  }
+  if (options.automationPort) {
+    tools.push(...createAutomationTools(options.automationPort));
   }
 
   return tools;

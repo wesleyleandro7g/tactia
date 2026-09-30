@@ -30,6 +30,18 @@ export interface ScheduleAgentRunner {
   }): Promise<Record<string, unknown>>;
 }
 
+/** Starts an automation and returns immediately. Success is reported later. */
+export interface ScheduleAutomationRunner {
+  start(input: {
+    ctx: RequestContext;
+    scheduleId: string;
+    occurrenceId: string;
+    automationId: string;
+    params: Record<string, unknown>;
+    effectMode: 'propose' | 'auto_execute';
+  }): Promise<{ id: string; status: string }>;
+}
+
 export type ScheduleRunnerDeps = {
   schedules: ScheduleRepository;
   occurrences: ScheduleOccurrenceRepository;
@@ -37,6 +49,8 @@ export type ScheduleRunnerDeps = {
   auditLogs: AuditLogService;
   /** Absent = ai_agent schedules fail with a clear "agent runner not wired". */
   agentRunner?: ScheduleAgentRunner;
+  /** Absent = automation schedules fail until the automation service is wired. */
+  automationRunner?: ScheduleAutomationRunner;
 };
 
 /** Synthetic principal for background schedule runs (no HTTP session). */
@@ -56,7 +70,7 @@ function systemContext(tenantId: string, requestId: string): RequestContext {
  * Executes one schedule occurrence (Task 4/5). Resolves the schedule target:
  * - `action`    → ExecutionEngine.propose (effectMode controls approval)
  * - `ai_agent`  → ScheduleAgentRunner (Orchestrator headless)
- * - `automation`→ not implemented yet (placeholder, spec §3.2)
+ * - `automation`→ enfileira a automação. Sucesso só quando ela termina.
  *
  * Idempotency: the occurrence already exists (created exclusively per period).
  * A failed run records the error and does NOT count towards the success cap;
@@ -96,6 +110,7 @@ export class ScheduleRunner {
     try {
       let output: Record<string, unknown>;
       let actionExecutionId: string | null = null;
+      let waitForAutomation = false;
 
       switch (schedule.target) {
         case 'action': {
@@ -108,12 +123,27 @@ export class ScheduleRunner {
           output = await this.runAgentTarget(ctx, schedule, occurrenceId);
           break;
         }
-        case 'automation':
+        case 'automation': {
+          const startedRun = await this.runAutomationTarget(ctx, schedule, occurrenceId);
+          output = { runId: startedRun.id, status: startedRun.status };
+          waitForAutomation = true;
+          break;
+        }
         default:
-          throw new AppError(
-            ErrorCode.VALIDATION_ERROR,
-            'Automações ainda não são suportadas (placeholder mapeado).',
-          );
+          throw new AppError(ErrorCode.VALIDATION_ERROR, 'Alvo de agendamento desconhecido.');
+      }
+
+      if (waitForAutomation) {
+        logger.info({
+          tenant_id: tenantId,
+          operation: 'schedule_run',
+          schedule_id: schedule.id,
+          occurrence_id: occurrenceId,
+          target: schedule.target,
+          duration_ms: Date.now() - started,
+          status: 202,
+        });
+        return this.deps.occurrences.findById({ tenantId, id: occurrenceId });
       }
 
       await this.deps.occurrences.update(
@@ -186,6 +216,45 @@ export class ScheduleRunner {
     }
 
     return this.deps.occurrences.findById({ tenantId, id: occurrenceId });
+  }
+
+  private async runAutomationTarget(
+    ctx: RequestContext,
+    schedule: {
+      id: string;
+      effectMode: string;
+      automationId: string | null;
+      automationParams: unknown;
+    },
+    occurrenceId: string,
+  ): Promise<{ id: string; status: string }> {
+    if (!this.deps.automationRunner) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'Executor de automações não está configurado.');
+    }
+    if (!schedule.automationId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'Agendamento de automação exige automationId.');
+    }
+    const params =
+      schedule.automationParams && typeof schedule.automationParams === 'object' && !Array.isArray(schedule.automationParams)
+        ? (schedule.automationParams as Record<string, unknown>)
+        : {};
+    const startedRun = await this.deps.automationRunner.start({
+      ctx,
+      scheduleId: schedule.id,
+      occurrenceId,
+      automationId: schedule.automationId,
+      params,
+      effectMode: schedule.effectMode === 'auto_execute' ? 'auto_execute' : 'propose',
+    });
+    await this.deps.occurrences.update(
+      { tenantId: ctx.tenantId as string, id: occurrenceId },
+      {
+        status: 'running',
+        automationRunId: startedRun.id,
+        output: { runId: startedRun.id, status: startedRun.status },
+      },
+    );
+    return startedRun;
   }
 
   private async runActionTarget(

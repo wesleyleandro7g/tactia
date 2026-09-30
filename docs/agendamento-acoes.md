@@ -15,7 +15,7 @@ Cada empresa pode ter múltiplos agendamentos.
 |---|---|---|
 | `ai_agent` | Roda o agente de IA headless com as instruções do agendamento. | `aiConfig`: `{ instruction, systemPrompt?, tools?, skillIds? }` |
 | `action` | Propõe/executa uma ação do catálogo (ex.: `send_email`). | `actionType` + `actionInput` |
-| `automation` | Placeholder mapeado — ainda **não** suportado (falha com mensagem clara). | — |
+| `automation` | Inicia uma automação publicada. O sucesso da ocorrência só conta quando a execução termina com sucesso. | `automationId` + `automationParams` |
 
 ## Modo de efeito (`effectMode`)
 

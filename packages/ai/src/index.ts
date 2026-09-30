@@ -115,6 +115,7 @@ export {
   createUpdateScheduleTool,
   createDisableScheduleTool,
   createTriggerScheduleTool,
+  createAutomationTools,
   currentMonthPeriod,
   periodInputSchema,
   periodLabel,
@@ -127,6 +128,7 @@ export {
   type CreateToolsOptions,
   type InfographicStore,
   type SchedulePort,
+  type AutomationPort,
   type ToolDeps,
 } from './tools/index';
 export {

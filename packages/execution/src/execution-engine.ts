@@ -49,9 +49,22 @@ const CANCELLABLE = new Set(['pending', 'awaiting_approval', 'approved']);
  */
 export class ExecutionEngine {
   private readonly queue: JobQueue;
+  private settlementListener: ((event: {
+    tenantId: string;
+    executionId: string;
+    status: string;
+    error: string | null;
+  }) => Promise<void>) | null = null;
 
   constructor(private readonly deps: ExecutionEngineDeps) {
     this.queue = deps.queue ?? new InlineJobQueue();
+  }
+
+  /** Notifica automações quando um efeito aprovado ou rejeitado termina. */
+  setSettlementListener(
+    listener: (event: { tenantId: string; executionId: string; status: string; error: string | null }) => Promise<void>,
+  ): void {
+    this.settlementListener = listener;
   }
 
   /**
@@ -373,6 +386,7 @@ export class ExecutionEngine {
       reason: approval.reason,
     });
 
+    await this.notifySettled(ctx.tenantId, approval.actionExecutionId);
     return this.requireExecution(ctx, approval.actionExecutionId);
   }
 
@@ -538,7 +552,29 @@ export class ExecutionEngine {
       });
     }
 
+    await this.notifySettled(tenantId, executionId);
     return this.deps.executions.findById({ tenantId, id: executionId });
+  }
+
+  private async notifySettled(tenantId: string, executionId: string): Promise<void> {
+    if (!this.settlementListener) return;
+    const execution = await this.deps.executions.findById({ tenantId, id: executionId });
+    if (!execution) return;
+    try {
+      await this.settlementListener({
+        tenantId,
+        executionId,
+        status: execution.status,
+        error: execution.error,
+      });
+    } catch (error) {
+      logger.error({
+        operation: 'execution_settlement_listener',
+        tenant_id: tenantId,
+        execution_id: executionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**

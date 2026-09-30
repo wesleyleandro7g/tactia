@@ -86,6 +86,12 @@ export const chatServices = createChatServices({
         });
       }
     : undefined,
+  emailArtifactResolver: {
+    async load(tenantId, artifactIds) {
+      const { loadAutomationAttachmentsForTenant } = await import('./automations');
+      return loadAutomationAttachmentsForTenant(tenantId, artifactIds);
+    },
+  },
 });
 
 const { repositories: chatRepositories, objectStorage, snapshotEngine } = chatServices;
@@ -424,6 +430,12 @@ export const syncService = new SyncService({
   customData: customDataValidationService,
   enrichInteractions: async ({ tenantId, dataSourceId }) => {
     await interactionEnrichmentService.enrichPending({ tenantId, dataSourceId });
+  },
+  domainEvents: {
+    async recordSyncCompleted(event) {
+      const { automationService } = await import('./automations');
+      await automationService.recordSyncCompleted({ ...event, status: 'completed' });
+    },
   },
   // An import is only useful once it produced insights (spec §2): the pipeline
   // runs right after a successful sync, and a failure here never fails the sync.

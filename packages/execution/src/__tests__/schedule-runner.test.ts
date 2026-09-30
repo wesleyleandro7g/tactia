@@ -6,7 +6,7 @@
  * - repeatMode=count → schedule disables after maxOccurrences successes
  * - a failed occurrence records the error and does NOT count towards the cap
  * - target=ai_agent delegates to the ScheduleAgentRunner
- * - target=automation fails with a clear "not implemented"
+ * - target=automation fails clearly when the runner is not wired
  *
  * Env: DATABASE_URL=postgresql://tactia:tactia@localhost:5433/tactia_test
  */
@@ -219,7 +219,7 @@ describe('ScheduleRunner', () => {
 
     const result = await runner.run(tenant.id, occurrence.id);
     expect(result?.status).toBe('failed');
-    expect(result?.error).toContain('Automações ainda não são suportadas');
+    expect(result?.error).toContain('Executor de automações não está configurado');
   });
 
   it('does not re-run a completed occurrence (idempotent)', async () => {

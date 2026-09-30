@@ -19,6 +19,8 @@ export const JOBS = {
   embedFacts: 'memory.embed_facts',
   ingestDocument: 'knowledge.ingest',
   ingestMedia: 'knowledge.ingest_media',
+  /** One automation run (catálogo de automações). */
+  automationRun: 'automation.run',
   /** One firing of a Schedule occurrence (agendamento de ações). */
   scheduleRun: 'schedule.run',
   /** One async WhatsApp agent operation (direct execution + status reply). */
@@ -379,6 +381,11 @@ export async function startJobWorkers(): Promise<void> {
     await scheduleRunner.run(data.tenantId, data.occurrenceId, data.requestId);
   });
 
+  await jobQueue.register<{ tenantId: string; runId: string }>(JOBS.automationRun, async (data) => {
+    const { automationService } = await import('./automations');
+    await automationService.execute(data.tenantId, data.runId);
+  });
+
   await jobQueue.register<{ now?: string }>(JOBS.tick, async (data) => {
     const now = data.now ? new Date(data.now) : new Date();
     const daily = await enqueueDailyForDueTenants(now);
@@ -387,6 +394,9 @@ export async function startJobWorkers(): Promise<void> {
     const { browserAutomationService } = await import('./browser-automation');
     const browser = await syncService.enqueueDueBrowserSyncs(now);
     const scheduled = await scheduleService.enqueueDueSchedules(now);
+    const { sweepAutomationApprovals, automationService } = await import('./automations');
+    const automations = await sweepAutomationApprovals();
+    const automationEvents = await automationService.dispatchDomainEvents();
     const expiredBrowserSessions = await browserAutomationService.cleanupExpiredSessions();
     const trelloReconcile = await enqueueTrelloReconciliations(now);
     const trelloPrivacy = await enqueueTrelloPrivacy(now);
@@ -397,6 +407,8 @@ export async function startJobWorkers(): Promise<void> {
       browser_enqueued: browser.enqueued,
       schedules_enqueued: scheduled.enqueued,
       schedules_evaluated: scheduled.evaluated,
+      automations_recovered: automations.recovered,
+      automation_events_started: automationEvents.started,
       expired_browser_sessions: expiredBrowserSessions,
       trello_reconcile_enqueued: trelloReconcile.enqueued,
       trello_privacy_enqueued: trelloPrivacy.enqueued,

@@ -65,6 +65,7 @@ import {
   TenantAwareEmailSender,
   createDefaultActionRegistry,
   defineAction,
+  type EmailArtifactResolver,
   type EmailSender,
   type JobQueue,
 } from '@tactia/execution';
@@ -116,6 +117,7 @@ export type CreateChatServicesInput = {
   /** Async document ingestion (web job queue); inline when absent. */
   enqueueDocumentIngest?: (job: { tenantId: string; documentId: string }) => Promise<void>;
   emailSender?: EmailSender;
+  emailArtifactResolver?: EmailArtifactResolver;
 };
 
 /**
@@ -318,6 +320,7 @@ export function createChatServices(input: CreateChatServicesInput) {
     leads: repositories.leads,
     sellers: repositories.sellers,
     emailSender,
+    ...(input.emailArtifactResolver ? { artifactResolver: input.emailArtifactResolver } : {}),
   });
 
   const executionEngine = new ExecutionEngine({

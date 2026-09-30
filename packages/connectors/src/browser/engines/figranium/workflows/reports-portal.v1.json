@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "workflowKey": "tactia.reports-portal",
+  "workflowVersion": "1",
+  "publishable": true,
+  "task": {
+    "name": "Tactia Reports Portal v1",
+    "description": "Entra no portal isolado e exporta os CSVs de vendas, estoque e financeiro do período pedido.",
+    "url": "http://127.0.0.1:3000/demo/reports-portal",
+    "mode": "agent",
+    "wait": 0,
+    "actions": [],
+    "variables": {
+      "periodStart": "",
+      "periodEnd": "",
+      "reports": "sales,inventory,financial"
+    },
+    "schedule": { "enabled": false, "frequency": "daily", "hour": 3, "minute": 0 },
+    "disableRecording": true,
+    "translation": { "enabled": false, "targetLanguage": "portuguese" },
+    "extractionFormat": "json",
+    "extractionScript": "return { portal: document.title };"
+  }
+}

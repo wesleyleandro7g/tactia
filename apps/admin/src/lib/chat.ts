@@ -11,7 +11,7 @@ import { operatorTenantContext } from './operator-tenant';
  */
 let queue: PgBossJobQueue | null | undefined;
 
-function adminChatQueue(): PgBossJobQueue | null {
+export function adminChatQueue(): PgBossJobQueue | null {
   if (queue !== undefined) return queue;
   const connectionString = process.env['DATABASE_URL'];
   queue =
@@ -26,6 +26,18 @@ function adminChatQueue(): PgBossJobQueue | null {
 export const chatServices = createChatServices({
   prisma,
   browserQueue: adminChatQueue,
+  emailArtifactResolver: {
+    async load(tenantId, artifactIds) {
+      const { loadAutomationAttachments } = await import('@tactia/execution');
+      const { createObjectStorageFromEnv } = await import('@tactia/shared/storage');
+      return loadAutomationAttachments({
+        db: prisma,
+        storage: createObjectStorageFromEnv(),
+        tenantId,
+        artifactIds,
+      });
+    },
+  },
 });
 
 export const chatRuntime = createChatRuntime(chatServices);

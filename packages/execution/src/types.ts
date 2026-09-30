@@ -41,11 +41,18 @@ export type ActionDefinition = {
 // Ports
 // ---------------------------------------------------------------------------
 
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+};
+
 export type EmailMessage = {
   to: string;
   subject: string;
   body: string;
   cc?: string[];
+  attachments?: EmailAttachment[];
 };
 
 export type EmailSendResult = {

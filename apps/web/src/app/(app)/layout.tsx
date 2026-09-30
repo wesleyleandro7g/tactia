@@ -4,6 +4,7 @@ import { AppShell } from '@/components/app/app-shell';
 import { TodayBriefing } from '@/components/app/command-center/today-briefing';
 import { type NavItem } from '@/components/app/nav';
 import { hasCommandCenter } from '@/lib/command-center-flag';
+import { hasAutomations } from '@/lib/automations-flag';
 import { emptyTodayBriefing, loadTodayBriefing, toTodaySnapshot } from '@/lib/command-center-today';
 import { DEGRADED_TODAY_SNAPSHOT } from '@/lib/command-center-today-view';
 import { getServerContext, listUserTenants, type TenantContext } from '@/lib/server-context';
@@ -42,14 +43,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const tenants = await listUserTenants(ctx);
   const commandCenterEnabled = await hasCommandCenter(ctx.tenantId);
+  const automationsEnabled = await hasAutomations(ctx.tenantId);
+  const automationsNav: NavItem[] = automationsEnabled ? [{ href: '/automations', label: 'Automações' }] : [];
   const isAdmin = Boolean(ctx.role && hasMinRole(ctx.role, 'admin'));
   const nav: NavItem[] = commandCenterEnabled
     ? [
         ...COMMAND_CENTER_NAV,
+        ...automationsNav,
         ...(isAdmin ? [API_KEYS_NAV] : []),
       ]
     : [
         ...LEGACY_NAV,
+        ...automationsNav,
         ...(isAdmin
           ? [API_KEYS_NAV, { href: '/settings/whatsapp', label: 'WhatsApp' }]
           : []),

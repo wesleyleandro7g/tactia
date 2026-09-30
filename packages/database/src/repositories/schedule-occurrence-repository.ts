@@ -13,6 +13,7 @@ export type CreateScheduleOccurrenceInput = {
 export type UpdateScheduleOccurrenceInput = {
   status?: ScheduleOccurrenceStatus;
   actionExecutionId?: string | null;
+  automationRunId?: string | null;
   output?: Record<string, unknown> | null;
   error?: string | null;
   startedAt?: Date | null;
@@ -76,6 +77,7 @@ export class ScheduleOccurrenceRepository {
       data: {
         ...(input.status === undefined ? {} : { status: input.status }),
         ...(input.actionExecutionId === undefined ? {} : { actionExecutionId: input.actionExecutionId }),
+        ...(input.automationRunId === undefined ? {} : { automationRunId: input.automationRunId }),
         ...(input.output === undefined ? {} : { output: asNullableJson(input.output) }),
         ...(input.error === undefined ? {} : { error: input.error }),
         ...(input.startedAt === undefined ? {} : { startedAt: input.startedAt }),

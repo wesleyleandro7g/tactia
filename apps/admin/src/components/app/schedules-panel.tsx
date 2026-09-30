@@ -111,6 +111,11 @@ export function SchedulesPanel({
         if (actionType) payload.actionType = actionType;
         payload.actionInput = parseJson(String(form.get('actionInput') ?? ''), {});
       }
+      if (target === 'automation') {
+        const automationId = String(form.get('automationId') ?? '').trim();
+        if (automationId) payload.automationId = automationId;
+        payload.automationParams = parseJson(String(form.get('automationParams') ?? ''), {});
+      }
     } catch (jsonError) {
       setError(jsonError instanceof Error ? jsonError.message : 'Entrada inválida');
       return false;
@@ -150,7 +155,7 @@ export function SchedulesPanel({
               >
                 <option value="ai_agent">Agente de IA</option>
                 <option value="action">Ação</option>
-                <option value="automation">Automação (em breve)</option>
+                <option value="automation">Automação</option>
               </select>
             </Field>
             <Field htmlFor="sch-effect" label="Modo de efeito">
@@ -250,6 +255,17 @@ export function SchedulesPanel({
                 hint='Ex.: {"to":"dono@empresa.com","subject":"Olá","body":"..."}'
               >
                 <Textarea id="sch-action-input" name="actionInput" rows={3} defaultValue={'{}'} />
+              </Field>
+            </>
+          ) : null}
+
+          {target === 'automation' ? (
+            <>
+              <Field htmlFor="sch-automation-id" label="automationId">
+                <Input id="sch-automation-id" name="automationId" placeholder="uuid da automação publicada" />
+              </Field>
+              <Field htmlFor="sch-automation-params" label="automationParams (JSON)">
+                <Textarea id="sch-automation-params" name="automationParams" rows={3} defaultValue={'{}'} />
               </Field>
             </>
           ) : null}

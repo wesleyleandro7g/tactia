@@ -44,7 +44,7 @@ const createInputSchema = z
     description: z.string().trim().max(500).optional(),
     target: z
       .enum(['ai_agent', 'action', 'automation'])
-      .describe('ai_agent (roda o agente), action (ação do catálogo) ou automation (ainda não suportado).'),
+      .describe('ai_agent (roda o agente), action (ação do catálogo) ou automation (automação publicada).'),
     effectMode: z
       .enum(['propose', 'auto_execute'])
       .optional()
@@ -65,6 +65,8 @@ const createInputSchema = z
       .optional()
       .describe('Obrigatório para target=action.'),
     actionInput: z.record(z.unknown()).optional().describe('Payload da ação quando target=action.'),
+    automationId: z.string().uuid().optional().describe('Obrigatório para target=automation.'),
+    automationParams: z.record(z.unknown()).optional().describe('Parâmetros da automação quando target=automation.'),
   })
   .strict();
 

@@ -25,6 +25,8 @@ export type CreateScheduleInput = {
   aiConfig?: Record<string, unknown> | null;
   actionType?: ActionType | null;
   actionInput?: Record<string, unknown> | null;
+  automationId?: string | null;
+  automationParams?: Record<string, unknown> | null;
   createdBy?: string | null;
 };
 
@@ -43,6 +45,8 @@ export type UpdateScheduleInput = {
   aiConfig?: Record<string, unknown> | null;
   actionType?: ActionType | null;
   actionInput?: Record<string, unknown> | null;
+  automationId?: string | null;
+  automationParams?: Record<string, unknown> | null;
   successCount?: number;
   lastRunAt?: Date | null;
 };
@@ -69,6 +73,8 @@ export class ScheduleRepository {
         aiConfig: asNullableJson(input.aiConfig),
         actionType: input.actionType ?? null,
         actionInput: asNullableJson(input.actionInput),
+        automationId: input.automationId ?? null,
+        automationParams: asNullableJson(input.automationParams),
         createdBy: input.createdBy ?? null,
       },
     });
@@ -136,6 +142,8 @@ export class ScheduleRepository {
         ...(input.aiConfig === undefined ? {} : { aiConfig: asNullableJson(input.aiConfig) }),
         ...(input.actionType === undefined ? {} : { actionType: input.actionType }),
         ...(input.actionInput === undefined ? {} : { actionInput: asNullableJson(input.actionInput) }),
+        ...(input.automationId === undefined ? {} : { automationId: input.automationId }),
+        ...(input.automationParams === undefined ? {} : { automationParams: asNullableJson(input.automationParams) }),
         ...(input.successCount === undefined ? {} : { successCount: input.successCount }),
         ...(input.lastRunAt === undefined ? {} : { lastRunAt: input.lastRunAt }),
       },

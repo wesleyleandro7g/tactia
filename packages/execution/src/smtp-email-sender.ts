@@ -1,5 +1,6 @@
 import nodemailer, { type Transporter } from 'nodemailer';
-import { createId, logger } from '@tactia/shared';
+import { logger } from '@tactia/shared';
+import { EmailDeliveryUncertainError } from './automations/email-uncertainty';
 import type { EmailMessage, EmailSender, EmailSendResult } from './types';
 import { resolveSmtpConnection, type SmtpProviderId } from './email-providers';
 
@@ -26,6 +27,7 @@ export interface SmtpTransport {
     cc?: string;
     subject: string;
     text: string;
+    attachments?: Array<{ filename: string; content: Buffer; contentType: string }>;
   }): Promise<{ messageId?: string }>;
   verify(): Promise<true>;
 }
@@ -115,8 +117,20 @@ export class SmtpEmailSender implements EmailSender {
       ...(message.cc && message.cc.length > 0 ? { cc: message.cc.join(', ') } : {}),
       subject: message.subject,
       text: message.body,
+      ...(message.attachments && message.attachments.length > 0
+        ? {
+            attachments: message.attachments.map((attachment) => ({
+              filename: attachment.filename,
+              content: attachment.content,
+              contentType: attachment.contentType,
+            })),
+          }
+        : {}),
     });
-    const id = info.messageId ?? createId();
+    const id = info.messageId?.trim();
+    if (!id) {
+      throw new EmailDeliveryUncertainError('O servidor SMTP não devolveu um identificador de aceitação.');
+    }
     logger.info({
       operation: 'email_send',
       driver: this.driver,

@@ -312,3 +312,37 @@ export {
   clarificationResponseIsClear,
   evaluateClarificationPolicy,
 } from './services/evidence-clarification-service';
+
+export {
+  REPORT_KEYS,
+  REPORTS_PORTAL_COMPONENT_KEY,
+  REPORTS_PORTAL_TEMPLATE_KEY,
+  REPORTS_PORTAL_WORKFLOW_KEY,
+  REPORTS_PORTAL_WORKFLOW_VERSION,
+  SYNC_COMPLETED_EVENT,
+} from './automations/model';
+export type {
+  AuthorizationPolicy,
+  AutomationInputSchema,
+  AutomationOriginName,
+  AutomationStepDefinition,
+  AutomationVersionBody,
+  PageBlock,
+  PageConfig,
+  ReportKey,
+} from './automations/model';
+export {
+  assertConnectionAllowed,
+  assertVersionBody,
+  decideEmailEffect,
+  pickReleasedDefaults,
+  resolveAutomationParams,
+} from './automations/policy';
+export { checksumBuffer, isReportKey, renderReportCsv, validateReportBundle } from './automations/reports';
+export { REPORTS_PORTAL_META, reportsPortalVersionBody, NOTIFY_EMAIL_META, notifyEmailVersionBody, AUTOMATION_TEMPLATES } from './automations/template';
+export type { AutomationTemplateKey } from './automations/template';
+export { executePublishedFigraniumWorkflow } from './automations/figranium-workflow';
+export type { PublishedWorkflowRun, WorkflowArtifact } from './automations/figranium-workflow';
+export { assertWebhookSignature, signWebhook } from './automations/webhook';
+export { syncCompletedEvent } from './automations/sync-completion';
+export { fingerprint } from './automations/fingerprint';

@@ -5,7 +5,7 @@ export {
   type DefaultActionDeps,
 } from './actions/index';
 export { createTaskAction, createTaskInputSchema, type CreateTaskDeps } from './actions/create-task';
-export { sendEmailAction, sendEmailInputSchema, type SendEmailDeps } from './actions/send-email';
+export { sendEmailAction, sendEmailInputSchema, type SendEmailDeps, type EmailArtifactResolver } from './actions/send-email';
 export { ConsoleEmailSender, MemoryEmailSender } from './email-sender';
 export {
   SmtpEmailSender,
@@ -48,6 +48,15 @@ export {
 } from './schedule-runner';
 export { ActionService } from './action-service';
 export { ApprovalService } from './approval-service';
+export { AutomationService, type AutomationServiceDeps, type StartAutomationInput } from './automations/service';
+export { PrismaAutomationStore } from './automations/prisma-store';
+export { loadAutomationAttachments } from './automations/attachments';
+export { createReportsPortalBrowser } from './automations/reports-browser';
+export { createPublishedWorkflowRunner } from './automations/figranium-runner';
+export { EmailDeliveryUncertainError, isUncertainEmailError } from './automations/email-uncertainty';
+export type { AutomationBrowserPort, BrowserExportResult, EffectProposal } from './automations/ports';
+export { effectProposalFromAction } from './automations/ports';
+export type { ScheduleAutomationRunner } from './schedule-runner';
 export {
   ACTION_TYPES,
   approvalDecisionSchema,

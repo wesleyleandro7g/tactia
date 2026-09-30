@@ -1,14 +1,60 @@
 import { answerMetadata, createChatRuntime, toToolContext } from '@tactia/chat/server';
 import { createLLMAdapterFromEnv, type LLMAdapter } from '@tactia/ai';
+import { createId } from '@tactia/shared';
 import { chatServices } from './services';
 import { schedulePort } from './schedules';
+import { automationService } from './automations';
 
-/**
- * AI wiring for the web app. Registry, context builder and orchestrator are
- * built by `@tactia/chat` on top of the shared chat services, so the admin
- * test chat runs exactly the same stack.
- */
-const chatRuntime = createChatRuntime(chatServices, { schedulePort });
+const automationPort = {
+  async list(ctx: Parameters<typeof automationService.list>[0]) {
+    const page = await automationService.list(ctx);
+    return {
+      items: page.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        purpose: item.purpose,
+        status: item.status,
+      })),
+    };
+  },
+  async get(ctx: Parameters<typeof automationService.get>[0], id: string) {
+    const detail = await automationService.get(ctx, id);
+    return {
+      id: detail.automation.id,
+      name: detail.automation.name,
+      purpose: detail.automation.purpose,
+      status: detail.automation.status,
+      fields: (detail.version?.inputSchema.fields ?? []).map((field) => ({
+        key: field.key,
+        label: field.label,
+        type: field.type,
+        required: field.required,
+        ...(field.enum ? { enum: field.enum } : {}),
+      })),
+    };
+  },
+  async run(
+    ctx: Parameters<typeof automationService.start>[0],
+    input: { automationId: string; params: Record<string, unknown>; idempotencyKey?: string },
+  ) {
+    const run = await automationService.start(ctx, {
+      automationId: input.automationId,
+      params: input.params,
+      origin: 'agent',
+      idempotencyKey: input.idempotencyKey ?? `agent:${createId()}`,
+    });
+    return { id: run.id, status: run.status, url: run.url, summary: run.summary };
+  },
+  async getRun(
+    ctx: Parameters<typeof automationService.getRun>[0],
+    input: { automationId: string; runId: string },
+  ) {
+    const run = await automationService.getRun(ctx, input.automationId, input.runId);
+    return { id: run.id, status: run.status, url: run.url, summary: run.summary, error: run.error };
+  },
+};
+
+const chatRuntime = createChatRuntime(chatServices, { schedulePort, automationPort });
 
 /** MCP registry (no Browser Agent tools). */
 export const toolRegistry = chatRuntime.toolRegistry;

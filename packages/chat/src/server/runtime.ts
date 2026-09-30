@@ -5,9 +5,11 @@ import {
   createDefaultTools,
   createSendEmailTool,
   createScheduleTools,
+  createAutomationTools,
   defineTool,
   requireLLMAdapter,
   type ActionProposalPort,
+  type AutomationPort,
   type ChatAnswer,
   type DirectEmailPort,
   type InfographicStore,
@@ -64,6 +66,8 @@ export type ChatRuntimeOptions = {
    * the ScheduleService (job queue + tenant timezone) is wired.
    */
   schedulePort?: SchedulePort;
+  /** Ferramentas de automação no chat interno. Não entram no registro MCP. */
+  automationPort?: AutomationPort;
 };
 
 /**
@@ -191,6 +195,7 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
     }),
     // Schedule management (chat-only). Added when apps/web wires a SchedulePort.
     ...(options.schedulePort ? createScheduleTools(options.schedulePort) : []),
+    ...(options.automationPort ? createAutomationTools(options.automationPort) : []),
   ]);
 
   const contextBuilder = new ContextBuilder({

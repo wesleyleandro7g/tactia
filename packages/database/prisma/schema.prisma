@@ -212,6 +212,52 @@ enum ScheduleOccurrenceStatus {
   cancelled
 }
 
+enum AutomationStatus {
+  draft
+  published
+  paused
+}
+
+enum AutomationRunStatus {
+  queued
+  running
+  awaiting_approval
+  completed
+  failed
+  cancelled
+  needs_attention
+}
+
+enum AutomationStepStatus {
+  pending
+  running
+  completed
+  failed
+  skipped
+  awaiting_approval
+  cancelled
+  needs_attention
+}
+
+enum AutomationOrigin {
+  page
+  agent
+  schedule
+  webhook
+  internal_event
+}
+
+enum AutomationTriggerKind {
+  webhook
+  internal_event
+}
+
+enum AutomationOutboxStatus {
+  pending
+  dispatching
+  dispatched
+}
+
 enum EpisodeKind {
   decision
   action_outcome
@@ -664,6 +710,7 @@ model Tenant {
   timezone     String       @default("America/Sao_Paulo")
   currency     String       @default("BRL")
   commandCenterEnabled Boolean? @map("command_center_enabled")
+  automationsEnabled Boolean @default(false) @map("automations_enabled")
   browserAgentSkillMarkdown String @default("") @map("browser_agent_skills") @db.Text
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
@@ -735,6 +782,15 @@ model Tenant {
   agentSkills AgentSkill[]
   schedules            Schedule[]
   scheduleOccurrences  ScheduleOccurrence[]
+  automations          Automation[]
+  automationVersions   AutomationVersion[]
+  automationRuns       AutomationRun[]
+  automationStepRuns   AutomationStepRun[]
+  automationTriggers   AutomationTrigger[]
+  automationArtifacts  AutomationArtifact[]
+  automationOutbox     AutomationOutbox[]
+  automationConnectionLocks AutomationConnectionLock[]
+  domainEvents         DomainEvent[]
 
   @@unique([slug])
   @@index([status])
@@ -2373,6 +2429,9 @@ model Schedule {
   /// Payload for target = action.
   actionType       ActionType?        @map("action_type")
   actionInput      Json?              @map("action_input")
+  /// Payload for target = automation. The published definition is resolved at run time.
+  automationId     String?            @map("automation_id") @db.Uuid
+  automationParams Json?              @map("automation_params")
   lastRunAt        DateTime?          @map("last_run_at")
   createdBy        String?            @map("created_by") @db.Uuid
   createdAt        DateTime           @default(now()) @map("created_at")
@@ -2399,6 +2458,7 @@ model ScheduleOccurrence {
   /// user | ai | system — who originated the occurrence.
   origin            String                   @default("system")
   actionExecutionId String?                  @map("action_execution_id") @db.Uuid
+  automationRunId   String?                  @map("automation_run_id") @db.Uuid
   output            Json?
   error             String?
   startedAt         DateTime?                @map("started_at")
@@ -2576,4 +2636,200 @@ model EvidenceClarification {
   @@index([tenantId, status])
   @@index([numberId, status, sentAt])
   @@map("evidence_clarifications")
+}
+
+// ---------------------------------------------------------------------------
+// Automações personalizadas por cliente
+// ---------------------------------------------------------------------------
+
+model Automation {
+  id                   String           @id @db.Uuid
+  tenantId             String           @map("tenant_id") @db.Uuid
+  key                  String
+  name                 String
+  purpose              String
+  status               AutomationStatus @default(draft)
+  publishedVersionId   String?          @unique @map("published_version_id") @db.Uuid
+  componentKey         String?          @map("component_key")
+  parameterDefaults    Json             @default("{}") @map("parameter_defaults")
+  createdBy            String?          @map("created_by") @db.Uuid
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  publishedVersion     AutomationVersion? @relation("PublishedAutomationVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
+  versions             AutomationVersion[] @relation("AutomationVersions")
+  runs                 AutomationRun[]
+  triggers             AutomationTrigger[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, status])
+  @@map("automations")
+}
+
+model AutomationVersion {
+  id                  String    @id @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  automationId        String    @map("automation_id") @db.Uuid
+  version             Int
+  inputSchema         Json      @map("input_schema")
+  outputSchema        Json      @default("{}") @map("output_schema")
+  steps               Json
+  pageConfig          Json      @map("page_config")
+  authorizationPolicy Json      @map("authorization_policy")
+  publishedAt         DateTime? @map("published_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  automation          Automation @relation("AutomationVersions", fields: [automationId], references: [id], onDelete: Cascade)
+  publishedFor        Automation? @relation("PublishedAutomationVersion")
+  runs                AutomationRun[]
+
+  @@unique([automationId, version])
+  @@index([tenantId])
+  @@map("automation_versions")
+}
+
+model AutomationRun {
+  id               String              @id @db.Uuid
+  tenantId         String              @map("tenant_id") @db.Uuid
+  automationId     String              @map("automation_id") @db.Uuid
+  versionId        String              @map("version_id") @db.Uuid
+  status           AutomationRunStatus @default(queued)
+  origin           AutomationOrigin
+  originRef        String?             @map("origin_ref")
+  idempotencyKey   String              @map("idempotency_key")
+  contentHash      String              @map("content_hash")
+  params           Json
+  summary          String?
+  error            String?
+  requestedBy      String?             @map("requested_by") @db.Uuid
+  scheduleOccurrenceId String?         @map("schedule_occurrence_id") @db.Uuid
+  cancelRequested  Boolean             @default(false) @map("cancel_requested")
+  forceApproval    Boolean             @default(false) @map("force_approval")
+  leaseOwner       String?             @map("lease_owner")
+  leaseUntil       DateTime?           @map("lease_until")
+  startedAt        DateTime?           @map("started_at")
+  finishedAt       DateTime?           @map("finished_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  automation       Automation          @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  version          AutomationVersion   @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  steps            AutomationStepRun[]
+  artifacts        AutomationArtifact[]
+  outbox           AutomationOutbox[]
+
+  @@unique([tenantId, automationId, idempotencyKey])
+  @@index([tenantId, status])
+  @@index([tenantId, automationId, createdAt])
+  @@map("automation_runs")
+}
+
+model AutomationStepRun {
+  id                String                @id @db.Uuid
+  tenantId          String                @map("tenant_id") @db.Uuid
+  runId             String                @map("run_id") @db.Uuid
+  stepKey           String                @map("step_key")
+  ordinal           Int
+  status            AutomationStepStatus  @default(pending)
+  attempt           Int                   @default(0)
+  input             Json                  @default("{}")
+  output            Json?
+  error             String?
+  retryable         Boolean               @default(false)
+  reconciled        Boolean               @default(false)
+  actionExecutionId String?               @map("action_execution_id") @db.Uuid
+  approvalId        String?               @map("approval_id") @db.Uuid
+  externalExecutionId String?             @map("external_execution_id")
+  startedAt         DateTime?             @map("started_at")
+  finishedAt        DateTime?             @map("finished_at")
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run               AutomationRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, stepKey])
+  @@index([tenantId, status])
+  @@index([actionExecutionId])
+  @@map("automation_step_runs")
+}
+
+model AutomationTrigger {
+  id            String                @id @db.Uuid
+  tenantId      String                @map("tenant_id") @db.Uuid
+  automationId  String                @map("automation_id") @db.Uuid
+  kind          AutomationTriggerKind
+  enabled       Boolean               @default(true)
+  secretCipher  String?               @map("secret_cipher")
+  eventType     String?               @map("event_type")
+  connectionId  String?               @map("connection_id")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  automation    Automation            @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, automationId])
+  @@index([kind, eventType, enabled])
+  @@map("automation_triggers")
+}
+
+model AutomationArtifact {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  runId      String   @map("run_id") @db.Uuid
+  stepRunId  String?  @map("step_run_id") @db.Uuid
+  name       String
+  mime       String
+  storageKey String   @map("storage_key")
+  byteSize   Int      @map("byte_size")
+  checksum   String
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run        AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, runId])
+  @@map("automation_artifacts")
+}
+
+model AutomationOutbox {
+  id          String                 @id @db.Uuid
+  tenantId    String                 @map("tenant_id") @db.Uuid
+  runId       String                 @map("run_id") @db.Uuid
+  status      AutomationOutboxStatus @default(pending)
+  availableAt DateTime               @default(now()) @map("available_at")
+  publishedAt DateTime?              @map("published_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run         AutomationRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([runId])
+  @@map("automation_outbox")
+}
+
+model AutomationConnectionLock {
+  connectionId String   @id @map("connection_id")
+  tenantId     String   @map("tenant_id") @db.Uuid
+  runId        String   @map("run_id") @db.Uuid
+  acquiredAt   DateTime @map("acquired_at")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("automation_connection_locks")
+}
+
+/// Fato interno persistido na conclusão do trabalho de origem. O gatilho de
+/// automação lê esta linha — não o callback em memória, que também recebe
+/// resultados parciais.
+model DomainEvent {
+  id           String    @id @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  type         String
+  sourceId     String    @map("source_id")
+  connectionId String    @map("connection_id")
+  dispatchedAt DateTime? @map("dispatched_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type, sourceId])
+  @@index([dispatchedAt, createdAt])
+  @@map("domain_events")
 }

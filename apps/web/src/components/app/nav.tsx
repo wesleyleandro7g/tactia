@@ -20,6 +20,7 @@ import {
   PlugZap,
   Target,
   TrendingUp,
+  Zap,
 } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/briefings': FileText,
   '/chat': MessageSquare,
   '/approvals': ClipboardCheck,
+  '/automations': Zap,
   '/settings/goals': Target,
   '/settings/facts': BookOpen,
   '/settings/memory': History,
@@ -71,6 +73,7 @@ const SECTION_TITLES: Array<[string, string]> = [
   ['/dashboard', 'Dashboard'],
   ['/briefings', 'Briefings'],
   ['/approvals', 'Aprovações'],
+  ['/automations', 'Automações'],
   ['/chat', 'Agente IA'],
   ['/onboarding', 'Boas-vindas'],
 ];

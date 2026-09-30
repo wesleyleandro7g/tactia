@@ -45,6 +45,8 @@ const baseScheduleShape = {
   aiConfig: aiConfigSchema.nullish(),
   actionType: z.enum(ACTION_TYPES).nullish(),
   actionInput: z.record(z.unknown()).nullish(),
+  automationId: z.string().uuid().nullish(),
+  automationParams: z.record(z.unknown()).nullish(),
 };
 
 /** Cross-field rules shared by create/update once the object is assembled. */
@@ -57,12 +59,16 @@ function assertCoherent(value: {
   maxOccurrences?: number | null;
   aiConfig?: z.infer<typeof aiConfigSchema> | null;
   actionType?: ActionType | null;
+  automationId?: string | null;
 }) {
   if (value.target === 'ai_agent' && !value.aiConfig) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Agendamentos do agente exigem aiConfig com instruction.');
   }
   if (value.target === 'action' && !value.actionType) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Agendamentos de ação exigem actionType.');
+  }
+  if (value.target === 'automation' && !value.automationId) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, 'Agendamentos de automação exigem automationId.');
   }
   if (value.frequency === 'custom' && !value.cronExpression) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Frequência custom exige cronExpression.');
@@ -178,6 +184,8 @@ export class ScheduleService {
       aiConfig: input.aiConfig ?? null,
       actionType: (input.actionType ?? null) as ActionType | null,
       actionInput: input.actionInput ?? null,
+      automationId: input.automationId ?? null,
+      automationParams: input.automationParams ?? null,
       createdBy: ctx.userId ?? null,
     });
 
@@ -207,6 +215,7 @@ export class ScheduleService {
       maxOccurrences: patch.maxOccurrences ?? existing.maxOccurrences,
       aiConfig: (patch.aiConfig ?? existing.aiConfig) as z.infer<typeof aiConfigSchema> | null,
       actionType: (patch.actionType ?? existing.actionType) as ActionType | null,
+      automationId: patch.automationId ?? existing.automationId,
     };
     assertCoherent(merged);
 
@@ -227,6 +236,8 @@ export class ScheduleService {
         ...(patch.aiConfig === undefined ? {} : { aiConfig: patch.aiConfig }),
         ...(patch.actionType === undefined ? {} : { actionType: (patch.actionType ?? null) as ActionType | null }),
         ...(patch.actionInput === undefined ? {} : { actionInput: patch.actionInput }),
+        ...(patch.automationId === undefined ? {} : { automationId: patch.automationId }),
+        ...(patch.automationParams === undefined ? {} : { automationParams: patch.automationParams }),
       },
     );
 

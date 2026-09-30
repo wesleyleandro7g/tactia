@@ -15,6 +15,7 @@ export type TenantTabKey =
   | 'documents'
   | 'playbooks'
   | 'schedules'
+  | 'automations'
   | 'preparation';
 
 export type TenantTabSegment =
@@ -32,6 +33,7 @@ export type TenantTabSegment =
   | 'documents'
   | 'playbooks'
   | 'schedules'
+  | 'automations'
   | 'preparation';
 
 export type TenantTab = {
@@ -57,6 +59,7 @@ export const TENANT_TABS: readonly TenantTab[] = [
   { key: 'documents', label: 'Documentos', segment: 'documents' },
   { key: 'playbooks', label: 'Playbooks', segment: 'playbooks' },
   { key: 'schedules', label: 'Agendamentos', segment: 'schedules' },
+  { key: 'automations', label: 'Automações', segment: 'automations' },
 ];
 
 export type TenantTabIndicators = {

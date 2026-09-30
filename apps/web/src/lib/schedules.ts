@@ -122,6 +122,21 @@ export const scheduleRunner = new ScheduleRunner({
   engine: executionEngine,
   auditLogs: auditLogService,
   agentRunner: scheduleAgentRunner,
+  automationRunner: {
+    async start(input) {
+      const { automationService } = await import('./automations');
+      const run = await automationService.start(input.ctx, {
+        automationId: input.automationId,
+        params: input.params,
+        origin: 'schedule',
+        originRef: input.scheduleId,
+        idempotencyKey: `schedule:${input.occurrenceId}`,
+        scheduleOccurrenceId: input.occurrenceId,
+        forceApproval: input.effectMode === 'propose',
+      });
+      return { id: run.id, status: run.status };
+    },
+  },
 });
 
 /**
