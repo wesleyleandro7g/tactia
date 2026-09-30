@@ -49,8 +49,7 @@ alto privilégio, então use credenciais próprias de cada ambiente.
 
 O cenário contém:
 
-- empresa com Central habilitada, salvo quando um operador já registrou
-  `false` explicitamente;
+- empresa demo com o cenário da Central (a flag de release não é mais gravada);
 - fonte ativa `Vendas sintéticas (seed)` e vendas canônicas sintéticas;
 - objetivo mensal ativo, com baseline do mês anterior quando há cobertura;
 - plano ativo com ação `create_task` preparada, duas etapas e medição de
@@ -67,5 +66,4 @@ executa ações externas nem aprova decisões.
 Resultado da execução e repetição em `tactia_test`: 200 clientes, 941 vendas,
 2 objetivos (um do seed legado), 1 plano, 1 definição e 1 revisão de medição,
 1 recomendação, 1 lacuna e 1 fonte. O teste
-`command-center-seed.test.ts` verifica idempotência, resultado observado e
-respeito à flag `false` explícita.
+`command-center-seed.test.ts` verifica idempotência e o resultado observado.

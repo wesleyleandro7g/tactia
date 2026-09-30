@@ -27,8 +27,6 @@ describe('command center demo seed', () => {
     const first = await seedCommandCenter(tenantId, userId, now);
     const second = await seedCommandCenter(tenantId, userId, now);
     expect(second).toEqual(first);
-    expect(await prisma.tenant.findUnique({ where: { id: tenantId }, select: { commandCenterEnabled: true } }))
-      .toEqual({ commandCenterEnabled: true });
     expect(await prisma.goal.count({ where: { tenantId } })).toBe(1);
     expect(await prisma.plan.count({ where: { tenantId } })).toBe(1);
     expect(await prisma.dataSource.count({ where: { tenantId } })).toBe(1);
@@ -45,10 +43,5 @@ describe('command center demo seed', () => {
     expect(plan.measurementDefinitions).toHaveLength(1);
     expect(plan.measurementDefinitions[0]?.reviews).toHaveLength(1);
     expect(Number(plan.measurementDefinitions[0]?.reviews[0]?.observed)).toBe(1200);
-
-    await prisma.tenant.update({ where: { id: tenantId }, data: { commandCenterEnabled: false } });
-    await seedCommandCenter(tenantId, userId, now);
-    expect(await prisma.tenant.findUnique({ where: { id: tenantId }, select: { commandCenterEnabled: true } }))
-      .toEqual({ commandCenterEnabled: false });
   });
 });

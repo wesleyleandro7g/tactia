@@ -1,6 +1,6 @@
 # Central de comando — status de implementação
 
-Última atualização: 29/09/2026. Branch: `feat/refact-experience`.
+Última atualização: 30/09/2026. A Central de Comando é o shell padrão do app cliente.
 
 Este documento existe para que outro agente continue o trabalho **sem precisar
 do histórico de conversa**. Ele registra o que está pronto, com qual evidência,
@@ -32,8 +32,7 @@ cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-cycle.test.ts \
   src/__tests__/command-center-flow.test.ts \
   src/__tests__/plan-review-decision.test.ts \
-  src/__tests__/command-center-cycle-review.test.ts \
-  src/lib/__tests__/command-center-flag.test.ts
+  src/__tests__/command-center-cycle-review.test.ts
 
 # esclarecimento pontual por WhatsApp
 cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
@@ -72,7 +71,7 @@ Referência: a sequência definida em `04-handoff-engenharia.md`.
 |---|---|---|
 | 0 — validação com empresários | **Não iniciada** | Exige acesso a participantes; nada de código depende disso |
 | 1 — semântica de confiança | **Feito** | `MetricEnvelope`-like por bloco, indisponível ≠ zero, regime de autorização real |
-| 2 — shell/Hoje/Objetivos/Ops | **Feito** | 6 rotas novas + fila de lacunas; flag por empresa no Ops; rotas antigas preservadas |
+| 2 — shell/Hoje/Objetivos/Ops | **Feito** | Shell único da Central; entrada em `/objectives`; rotas antigas seguem acessíveis por URL |
 | 3 — ciclo completo | **Feito** | Recomendação → plano versionado → decisão → execução → evidência → medição |
 | 4 — operação consolidada | **Feito** | Conversa contextual, revisão automática, decisão guiada e revisão semanal consolidada prontas |
 | 5 — piloto ampliado | **Não iniciada** | Depende de deploy e de empresa real |
@@ -131,21 +130,29 @@ Evidência (`clarification-flow.test.ts`, 7 casos):
 
 ### Superfícies
 
-O Ops liga ou desliga a Central de Comando no cadastro da empresa. A mudança é
-registrada na mesma transação em `audit_logs` com operador, valor anterior e
-novo valor. `apps/web` lê a decisão persistida no shell; `null` preserva o
-fallback `COMMAND_CENTER_TENANT_IDS` para desenvolvimento. `false` explícito
-prevalece inclusive sobre `*` no fallback. A navegação legada continua quando
-desligada, e suas rotas permanecem acessíveis quando ligada.
+A Central de Comando é o **padrão do app cliente**. O shell único aponta para
+Dashboard, Agente IA, Objetivos, Operação e Resultados (`/objectives` é a
+entrada em `/app` e o `homeHref` do shell). Automações e API Keys permanecem no
+nav quando o papel ou a flag correspondente autoriza. O briefing de Hoje
+carrega no cabeçalho em todas as rotas autenticadas com empresa e abre overlay;
+`/today` continua existindo só como alias que redireciona para `/objectives`.
 
-Evidência: `settings-routes.test.ts` (20/20, incluindo ligar/desligar,
-auditoria, isolamento de empresas e validação) e `command-center-flag.test.ts`
-(2/2, precedência e tenant inexistente). Migração aplicada em `tactia_test` e,
-posteriormente, no banco local `tactia`; regressão web 34/34 nos seis arquivos
-da seção de verificação.
-Typecheck de database/domain/web/admin e lint dos arquivos alterados passaram.
+A flag por empresa (`tenants.command_center_enabled`), o fallback
+`COMMAND_CENTER_TENANT_IDS` e o toggle no cadastro do Ops foram removidos do
+produto. A coluna Prisma permanece no esquema até a inspeção de produção; ninguém
+lê nem grava. `/approvals`, `/briefings` e `/settings/*` continuam acessíveis
+por URL e saíram da navegação; `/dashboard` permanece no shell da Central.
 
-O Ops agora tem a aba `/tenants/[id]/preparation` para preparar objetivo,
+Evidência em 30/09/2026: typecheck de `@tactia/web` e `@tactia/admin`; lint dos
+arquivos alterados; web 40/40 e Ops 28/28 em `tactia_test` (settings-routes 19
+após a remoção do bloco de release, tenant-tabs 6, metrics 3), depois de
+`migrate deploy` da automations só nesse banco. `/app` responde 307 para
+`/objectives`. A navegação da Central permanece Dashboard, Agente IA, Objetivos,
+Operação e Resultados; `/approvals` e `/briefings` continuam fora do nav e
+acessíveis por URL. Playwright MCP estava ocupado nesta sessão; o Ops local não
+estava no ar.
+
+O Ops continua com a aba `/tenants/[id]/preparation` para preparar objetivo,
 plano e medição sem recomendação do pipeline. A API valida operador, empresa,
 objetivo, fonte ativa, escopo e janela. A publicação ativa objetivo e plano na
 mesma transação, mantém a versão inicial e congela a ação `create_task` no
@@ -309,7 +316,7 @@ APIs novas: `/api/v1/objectives`, `/api/v1/plans`, `/api/v1/plans/[id]`,
 | Item | Severidade | Situação |
 |---|---|---|
 | Migrações ainda não verificadas em produção | Alta | `tactia_test` e o banco local `tactia` estão atualizados; o estado de produção é desconhecido e exige inspeção antes do deploy |
-| Fallback por env (`COMMAND_CENTER_TENANT_IDS`) | Baixa | Permanece apenas para empresas sem decisão registrada, para desenvolvimento; Ops grava decisão explícita |
+| Coluna `tenants.command_center_enabled` | Baixa | Flag saiu do produto; a coluna permanece no Prisma até inspeção de produção, sem leitura nem gravação |
 | Lint global de `apps/web` falha | Baixa | **Preexistente** em `components/landing/hero-prompt.tsx` e `web-threads.tsx`; comprovado com `git stash` no HEAD |
 | 6 testes `browser-integration`/Torge falham | Baixa | **Preexistentes**, validação de URL `app.torge.com.br`; comprovado no HEAD |
 | Validação visual 360/768/1280, leitor de tela, Web Vitals | Média | Revisão estática e contraste de tokens feitos; navegador indisponível nesta sessão |
@@ -317,11 +324,12 @@ APIs novas: `/api/v1/objectives`, `/api/v1/plans`, `/api/v1/plans/[id]`,
 
 ## Próximos passos sugeridos, em ordem
 
-1. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
+1. **Inspecionar produção e planejar o piloto** com uma empresa real; não
+   reproduzir o baseline especial do banco local sem verificar o esquema. A
+   coluna `command_center_enabled` só deve ser dropada depois dessa inspeção.
+2. **Concluir validação visual e de acessibilidade** nos três breakpoints e nos
    dois temas, inclusive zoom/leitor de tela; as tabelas equivalentes já estão
-   disponíveis nos gráficos. Detalhada em `06-prompt-continuacao.md`.
-2. **Inspecionar produção e planejar o piloto** com uma empresa real; não
-   reproduzir o baseline especial do banco local sem verificar o esquema.
+   disponíveis nos gráficos.
 
 ## Definition of Done do primeiro recorte
 

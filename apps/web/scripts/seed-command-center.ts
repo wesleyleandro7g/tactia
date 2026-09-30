@@ -21,11 +21,6 @@ export async function seedCommandCenter(tenantId: string, userId: string, now = 
   const ctx: RequestContext = { requestId: 'demo-command-center-seed', tenantId, userId, role: 'owner' };
   const { from, to, previousFrom } = monthWindow(now);
 
-  await prisma.tenant.updateMany({
-    where: { id: tenantId, commandCenterEnabled: null },
-    data: { commandCenterEnabled: true },
-  });
-
   let source = await prisma.dataSource.findFirst({ where: { tenantId, name: SOURCE_NAME } });
   if (!source) {
     source = await prisma.dataSource.create({

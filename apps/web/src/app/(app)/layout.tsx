@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/app/app-shell';
 import { TodayBriefing } from '@/components/app/command-center/today-briefing';
 import { type NavItem } from '@/components/app/nav';
-import { hasCommandCenter } from '@/lib/command-center-flag';
 import { hasAutomations } from '@/lib/automations-flag';
 import { emptyTodayBriefing, loadTodayBriefing, toTodaySnapshot } from '@/lib/command-center-today';
 import { DEGRADED_TODAY_SNAPSHOT } from '@/lib/command-center-today-view';
@@ -21,19 +20,6 @@ const COMMAND_CENTER_NAV: NavItem[] = [
 
 const API_KEYS_NAV: NavItem = { href: '/settings/api-keys', label: 'API Keys' };
 
-const LEGACY_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/briefings', label: 'Briefings' },
-  { href: '/chat', label: 'Chat' },
-  { href: '/approvals', label: 'Aprovações' },
-  { href: '/settings/goals', label: 'Metas' },
-  { href: '/settings/facts', label: 'Fatos' },
-  { href: '/settings/memory', label: 'Memória' },
-  { href: '/settings/playbooks', label: 'Playbooks' },
-  { href: '/settings/documents', label: 'Documentos' },
-  { href: '/settings/connections', label: 'Conexões' },
-];
-
 /**
  * Shell do app: exige sessão, monta a navegação e o seletor de empresa.
  */
@@ -42,34 +28,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!ctx.userId) redirect('/login');
 
   const tenants = await listUserTenants(ctx);
-  const commandCenterEnabled = await hasCommandCenter(ctx.tenantId);
   const automationsEnabled = await hasAutomations(ctx.tenantId);
   const automationsNav: NavItem[] = automationsEnabled ? [{ href: '/automations', label: 'Automações' }] : [];
   const isAdmin = Boolean(ctx.role && hasMinRole(ctx.role, 'admin'));
-  const nav: NavItem[] = commandCenterEnabled
-    ? [
-        ...COMMAND_CENTER_NAV,
-        ...automationsNav,
-        ...(isAdmin ? [API_KEYS_NAV] : []),
-      ]
-    : [
-        ...LEGACY_NAV,
-        ...automationsNav,
-        ...(isAdmin
-          ? [API_KEYS_NAV, { href: '/settings/whatsapp', label: 'WhatsApp' }]
-          : []),
-      ];
+  const nav: NavItem[] = [
+    ...COMMAND_CENTER_NAV,
+    ...automationsNav,
+    ...(isAdmin ? [API_KEYS_NAV] : []),
+  ];
 
   const sidebarDefaultOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
   let todaySnapshot = null;
   let todayBriefing = null;
-  if (commandCenterEnabled && ctx.tenantId && ctx.role) {
+  if (ctx.tenantId && ctx.role) {
+    let briefing = null;
     try {
-      const briefing = await loadTodayBriefing(ctx as TenantContext);
+      briefing = await loadTodayBriefing(ctx as TenantContext);
+    } catch {
+      briefing = null;
+    }
+    if (briefing) {
       todaySnapshot = toTodaySnapshot(briefing);
       todayBriefing = <TodayBriefing briefing={briefing} />;
-    } catch {
+    } else {
       todaySnapshot = DEGRADED_TODAY_SNAPSHOT;
       todayBriefing = <TodayBriefing briefing={emptyTodayBriefing()} />;
     }
@@ -80,7 +62,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       nav={nav}
       tenants={tenants}
       tenantId={ctx.tenantId}
-      homeHref={commandCenterEnabled ? '/objectives' : '/dashboard'}
+      homeHref="/objectives"
       sidebarDefaultOpen={sidebarDefaultOpen}
       todaySnapshot={todaySnapshot}
       todayBriefing={todayBriefing}

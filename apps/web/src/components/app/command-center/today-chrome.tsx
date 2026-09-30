@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { MessageSquare } from 'lucide-react';
@@ -36,6 +36,31 @@ function overlayDescription(snapshot: TodaySnapshot) {
   return `${snapshot.periodLabel} · ${freshness}. ${attention}`;
 }
 
+function TodaySummary({
+  snapshot,
+  attention,
+}: {
+  snapshot: TodaySnapshot;
+  attention: string;
+}) {
+  return (
+    <>
+      <span className="shrink-0 font-display text-sm italic text-foreground">Hoje</span>
+      <Badge tone={availabilityTone(snapshot.availability)}>
+        {AVAILABILITY_LABEL[snapshot.availability]}
+      </Badge>
+      <span className="min-w-0 flex-1 truncate font-display text-sm italic text-foreground">
+        {attention}
+      </span>
+      {snapshot.updatedAt ? (
+        <span className="hidden shrink-0 tabular text-xs text-muted-foreground lg:inline">
+          {snapshot.updatedAt}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 export function TodayChrome({
   snapshot,
   children,
@@ -46,12 +71,9 @@ export function TodayChrome({
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
+  const [openPath, setOpenPath] = useState<string | null>(null);
   const attention = snapshot.attention ?? 'Nada a decidir';
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  const open = openPath === pathname;
 
   const briefing = (
     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -66,24 +88,13 @@ export function TodayChrome({
         type="button"
         aria-expanded={open}
         aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpenPath(pathname)}
         className={cn(
           'flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition-[border-color,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:bg-card-hover',
           open && 'border-primary/40',
         )}
       >
-        <span className="shrink-0 font-display text-sm italic text-foreground">Hoje</span>
-        <Badge tone={availabilityTone(snapshot.availability)}>
-          {AVAILABILITY_LABEL[snapshot.availability]}
-        </Badge>
-        <span className="min-w-0 flex-1 truncate font-display text-sm italic text-foreground">
-          {attention}
-        </span>
-        {snapshot.updatedAt ? (
-          <span className="hidden shrink-0 tabular text-xs text-muted-foreground lg:inline">
-            {snapshot.updatedAt}
-          </span>
-        ) : null}
+        <TodaySummary snapshot={snapshot} attention={attention} />
       </button>
       <Link
         href={snapshot.chatHref}
@@ -94,7 +105,7 @@ export function TodayChrome({
       </Link>
 
       {isMobile ? (
-        <Sheet open={open} onOpenChange={setOpen}>
+        <Sheet open={open} onOpenChange={(next) => setOpenPath(next ? pathname : null)}>
           <SheetContent
             side="bottom"
             className="h-[90dvh] max-h-[90dvh] gap-0 rounded-t-2xl border-border bg-card p-0"
@@ -110,7 +121,7 @@ export function TodayChrome({
           </SheetContent>
         </Sheet>
       ) : (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(next) => setOpenPath(next ? pathname : null)}>
           <DialogContent
             className="p-0"
             finalFocus={triggerRef}

@@ -27,7 +27,7 @@ Em conflito, prevalecem segurança/tenant, capacidade real do backend, ausência
 
 | Rota proposta | Composição principal | Estado de migração |
 |---|---|---|
-| `/today` | ExecutiveSummary, ObjectiveProgress, PriorityCard × até 3, ExecutionTimeline resumida, resultados recentes | Flag por empresa no Ops (`settings-routes.test.ts`, `command-center-flag.test.ts`); `/dashboard` continua |
+| `/today` | ExecutiveSummary, ObjectiveProgress, PriorityCard × até 3, ExecutionTimeline resumida, resultados recentes | Alias que redireciona para `/objectives`; o briefing de Hoje vive no cabeçalho. `/dashboard` permanece no nav da Central |
 | `/objectives` | Lista de objetivos preparados + disponibilidade | Nova, sem wizard de cadastro obrigatório |
 | `/objectives/[id]` | ObjectiveProgress, planos, evidências e revisões | Link persistente/autorizado |
 | `/operations?tab=decisions|in-progress|routines|history` | DecisionCard, ExecutionTimeline e histórico | `/approvals` redireciona/preserva filtros quando maduro |
@@ -123,10 +123,12 @@ Protótipo com 5–8 empresários; resultado piloto, fontes, canais e capacidade
 Corrigir indisponível ≠ zero, regimes reais de autorização e preview/output legível. Não alterar silenciosamente a semântica de `recommendations/:id/accept`.
 
 ### Entrega 2 — shell/Hoje/Ops
-Feature flag por empresa (`tenants.command_center_enabled`, Ops e testes de release);
-novo shell com quatro destinos; Hoje e objetivos preparados; EvidenceGapQueue;
-rotas antigas funcionais. O Ops também prepara objetivo, plano e medição sem
-recomendação do pipeline (`settings-routes.test.ts`).
+Shell único da Central (Dashboard, Agente IA, Objetivos, Operação, Resultados);
+`/objectives` é a entrada. EvidenceGapQueue no Ops. Rotas antigas permanecem
+acessíveis por URL. A flag por empresa e o fallback de env foram retirados do
+produto; a coluna Prisma permanece até inspeção de produção.
+O Ops prepara objetivo, plano e medição sem recomendação do pipeline
+(`settings-routes.test.ts`).
 
 ### Entrega 3 — ciclo completo
 Plano → versão/decisão → execução idempotente → observação automática/relato identificado → medição/revisão.
@@ -136,7 +138,7 @@ Operação consolidada, revisão semanal, conversa contextual, piloto ampliado e
 
 ## Critérios de aceite funcionais
 
-Estado em 29/09/2026. Evidência reproduzível em `05-status-implementacao.md`.
+Estado em 30/09/2026. Evidência reproduzível em `05-status-implementacao.md`.
 
 - [x] Usuário encontra objetivo, até três prioridades, decisão e acompanhamento sem sintetizar várias telas. — `/today` implementada
 - [x] Nenhuma tela crítica apresenta falha/null como zero válido. — `command-center-cycle.test.ts`: `distinguishes a true zero from unavailable data once coverage exists`
@@ -204,9 +206,10 @@ A consulta operacional no Ops (`/tenants/[id]/metrics`) já cobre contagens e te
 
 ## Estratégia de release
 
-- Feature flags independentes para shell/Hoje e ciclo de planos.
+- A Central de Comando é o shell padrão; não reintroduzir flag de navegação.
 - Não exibir controles para etapas ainda indisponíveis.
-- Migrações aditivas; APIs e links externos preservados.
+- Migrações aditivas; APIs e links externos preservados. URLs antigas do app
+  cliente continuam válidas como caminho profundo.
 - Comparar composição nova com services atuais usando dados reais em piloto controlado.
 - Rollback de interface não remove planos, decisões, auditoria ou execuções.
 - Refatoração visual nunca amplia permissões ou autonomia.

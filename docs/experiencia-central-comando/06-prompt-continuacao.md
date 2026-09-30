@@ -10,10 +10,13 @@ Mantenha este arquivo atualizado ao final de cada etapa, junto com
 Você vai continuar a implementação da **Central de Comando** do Tactia
 (`/home/wesleyleandro/Projects/Desencoder/Tactia`), iniciada por outro agente.
 
-Branch: `feat/refact-experience`. Nada foi enviado ao remoto. A modelagem,
-serviços, telas, fila do Ops, editor de preparação, flag por empresa, revisão
-guiada, eventos, indicadores operacionais do piloto e revisão semanal
-consolidada estão nesta branch.
+A Central é o **shell padrão** do app cliente: home em `/objectives`, navegação
+Dashboard / Agente IA / Objetivos / Operação / Resultados. O briefing de Hoje
+fica no cabeçalho. Modelagem, serviços, telas, fila do Ops, editor de preparação,
+revisão guiada, eventos, indicadores do piloto e revisão semanal consolidada já
+estão no repositório. A flag por empresa e o fallback `COMMAND_CENTER_TENANT_IDS`
+saíram do produto; a coluna Prisma `command_center_enabled` permanece sem uso até
+inspeção de produção.
 
 ## Leia nesta ordem antes de escrever código
 
@@ -33,34 +36,26 @@ consolidada estão nesta branch.
 
 ## Sua tarefa
 
-Conclua a **validação visual e de acessibilidade** da Central de Comando nos
-três breakpoints (360, 768 e 1280px) e nos dois temas. Não gaste esta etapa com
-pesquisa de empresários, deploy ou uma nova entrega de produto. O próximo
-desenvolvimento, depois deste, é inspecionar produção e planejar o piloto com
-uma empresa real.
+**Inspecione produção e planeje o piloto** com uma empresa real. Não gaste esta
+etapa com pesquisa de empresários nem com uma nova entrega de produto. A
+validação visual 360/768/1280 e leitor de tela permanece pendente e registrada
+em `05-status-implementacao.md`; não a declare concluída sem evidência
+renderizada, e não a transforme no foco desta etapa.
 
 Requisitos:
 
-- Parta da revisão estática já registrada em `05-status-implementacao.md`:
-  tabelas equivalentes dos gráficos, quebra dos cards abaixo de 480px, contraste
-  de tokens de texto/ação e anúncios do editor Ops. A revisão semanal
-  consolidada já está em `/results` e no recorte de `/today`.
-- Inspecione de fato as rotas novas (`/today`, `/objectives`, `/operations`,
-  `/results`) e o recorte da janela consolidada, nos temas claro e escuro.
-  Verifique zoom, teclado, foco visível e leitor de tela. Não declare WCAG
-  2.2 AA concluída sem essa evidência renderizada.
-- Corrija apenas o que a inspeção provar: truncamento de decisão/autorização,
-  contraste, alvo de toque das ações primárias, anúncio de estados assíncronos
-  e consistência dos eixos (execução ≠ objetivo atingido; `null` ≠ zero).
-- Não altere a semântica de confiança, o executor, `recommendations/:id/accept`
-  nem os indicadores do piloto no Ops. Não reexecute o seed em produção.
+- Confirme o esquema de produção (incluindo se `command_center_enabled` existe)
+  antes de qualquer migrate deploy. Não reproduza o baseline especial do banco
+  local. Não drop a coluna nesta etapa.
+- Não reexecute o seed em produção. Não altere a semântica de confiança, o
+  executor, `recommendations/:id/accept` nem os indicadores do piloto no Ops.
+- Não reintroduza a flag de navegação nem o shell legado.
 - Se mudar código, cubra o comportamento corrigido e rode as suítes da Central
   como regressão. Typecheck e lint só dos arquivos/pacotes alterados.
 
-Critério de saída: há evidência renderizada nos três breakpoints e nos dois
-temas de que o empresário lê a janela consolidada, decide e acompanha sem
-perder ação ou número, e de que a interface não depende só de cor para
-estado, severidade ou tendência.
+Critério de saída: há um plano de piloto com empresa real e o estado do esquema
+de produção documentado em `05-status-implementacao.md`, sem aplicar migração
+sem confirmação.
 
 ## Invariantes que não podem ser quebradas
 
@@ -81,6 +76,8 @@ apresentar evidência de que estão erradas:
 6. Silêncio ou resposta ambígua **nunca** confirmam nem resolvem uma lacuna.
 7. Todo acesso é escopado por tenant, inclusive relações opcionais e links
    diretos.
+8. A Central é o shell padrão. Não reintroduzir `hasCommandCenter`,
+   `COMMAND_CENTER_TENANT_IDS` nem toggle de release no Ops.
 
 ## Verificação
 
@@ -100,9 +97,8 @@ cd apps/web && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-flow.test.ts \
   src/__tests__/plan-review-decision.test.ts \
   src/__tests__/command-center-cycle-review.test.ts \
-  src/lib/__tests__/command-center-flag.test.ts \
   src/lib/__tests__/clarification-flow.test.ts \
-  src/__tests__/pilot-flow.test.ts        # esperado: 37/37
+  src/__tests__/pilot-flow.test.ts
 
 cd packages/database && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/__tests__/command-center-events.test.ts
@@ -116,7 +112,7 @@ cd packages/domain && pnpm exec vitest run \
 cd apps/admin && DATABASE_URL=$TEST_DB pnpm exec vitest run \
   src/lib/__tests__/settings-routes.test.ts \
   src/lib/__tests__/tenant-tabs.test.ts \
-  src/lib/__tests__/command-center-metrics-routes.test.ts   # esperado: 30/30
+  src/lib/__tests__/command-center-metrics-routes.test.ts
 
 # typecheck dos 4 pacotes afetados
 pnpm --filter @tactia/database typecheck && pnpm --filter @tactia/domain typecheck \
@@ -134,7 +130,7 @@ Já foram comprovadas no `HEAD` sem as mudanças da central, via `git stash`:
 - 6 testes de `browser-integration`/Torge em `packages/domain` falham por
   validação de URL `app.torge.com.br`.
 - `pnpm --filter @tactia/web lint` falha em dois componentes da landing:
-  `components/landing/hero-prompt.tsx` e `components/landing/web-threads.tsx`.
+  `components/landing/hero-prompt.tsx` e `web-threads.tsx`.
 
 Rode lint apenas nos arquivos que você alterar, ou nos pacotes cujo lint está
 limpo (`@tactia/database`, `@tactia/domain`, `@tactia/admin`).
