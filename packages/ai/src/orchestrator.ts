@@ -265,6 +265,7 @@ function scrubClaimNoise(content: string, attachments: ChatAttachment[]): string
     if (attachment.url) text = text.split(attachment.url).join(' ');
   }
   return text
+    .replace(/https?:\/\/[^\s)\]]+/gi, ' ')
     .replace(/\/api\/v1\/infographics\/[A-Za-z0-9_-]+/gi, ' ')
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ')
     .replace(/\b01[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ');
@@ -277,10 +278,24 @@ function claimOffenders(
   attachments: ChatAttachment[],
 ): string[] {
   const allowlist = allowContextCalendarYears(
-    allowContextGoals(buildClaimAllowlist([...context.metrics, ...context.trailing30], sources), context),
+    allowContextGoals(buildClaimAllowlist(
+      [...context.metrics, ...context.trailing30],
+      sources.filter((source) => source.tool !== 'search_public_web'),
+    ), context),
     context,
     sources,
   );
+  for (const source of sources) {
+    if (source.tool !== 'search_public_web' || !source.url || !content.includes(source.url)) continue;
+    for (const token of extractNumberTokens(source.excerpt ?? '')) {
+      const number = canonicalizeNumber(token);
+      if (number) allowlist.add(number);
+    }
+    for (const token of extractNumberTokens(source.publishedAt ?? '')) {
+      const number = canonicalizeNumber(token);
+      if (number) allowlist.add(number);
+    }
+  }
   const claimText = scrubClaimNoise(content, attachments);
   return [...new Set([
     ...unsourcedNumbers(claimText, allowlist),
@@ -318,7 +333,7 @@ export function extractFollowUps(text: string): { content: string; followUps: st
 function dedupeSources(sources: MessageSource[]): MessageSource[] {
   const seen = new Map<string, MessageSource>();
   for (const source of sources) {
-    const key = `${source.metric}|${source.period?.from ?? ''}|${source.period?.to ?? ''}|${source.refId ?? ''}`;
+    const key = `${source.metric}|${source.period?.from ?? ''}|${source.period?.to ?? ''}|${source.refId ?? ''}|${source.url ?? ''}`;
     const existing = seen.get(key);
     if (!existing) {
       seen.set(key, source);

@@ -14,6 +14,7 @@ export {
   type ChatRuntime,
   type ChatRuntimeOptions,
 } from './runtime';
+export { CompanyKnowledgeService } from './company-knowledge';
 export {
   publicAnswer,
   runChatTurnSync,

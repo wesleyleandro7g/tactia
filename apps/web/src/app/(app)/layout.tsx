@@ -10,6 +10,8 @@ import { SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 const COMMAND_CENTER_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/chat', label: 'Agente IA' },
+  { href: '/settings/company-profile', label: 'Perfil da empresa' },
+  { href: '/settings/memory', label: 'Memória' },
   { href: '/objectives', label: 'Objetivos' },
   { href: '/operations', label: 'Operação' },
   { href: '/results', label: 'Resultados' },

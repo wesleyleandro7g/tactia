@@ -57,6 +57,7 @@ export const TOOL_LABELS: Record<string, string> = {
   list_browser_profiles: 'verificando os sistemas disponíveis',
   browser_delegate: 'iniciando o Browser Agent',
   browser_agent: 'concluindo a navegação',
+  search_public_web: 'pesquisando o mercado',
 };
 
 /** Nome curto da tool para o rodapé "Consultou: …". */
@@ -92,6 +93,7 @@ export const TOOL_SHORT_LABELS: Record<string, string> = {
   get_funnel: 'funil',
   remember_fact: 'memória',
   list_business_facts: 'fatos do negócio',
+  search_public_web: 'fontes públicas',
   get_cohorts: 'coortes',
   get_rfm: 'RFM',
   simulate: 'simulação',
@@ -244,6 +246,7 @@ export function hasNonSystemWork(tools: string[]): boolean {
 export type SourceLine = {
   key: string;
   label: string;
+  url?: string;
 };
 
 function joinNames(names: string[]): string {
@@ -256,6 +259,16 @@ function joinNames(names: string[]): string {
 export function sourceLines(sources: ChatSource[]): SourceLine[] {
   const lines = new Map<string, SourceLine>();
   for (const source of sources) {
+    if (source.url) {
+      if (!lines.has(source.url)) {
+        lines.set(source.url, {
+          key: source.url,
+          label: `${source.label ?? source.url}${source.publishedAt ? ` · ${source.publishedAt.slice(0, 10)}` : ''}`,
+          url: source.url,
+        });
+      }
+      continue;
+    }
     const name = metricLabel(source.metric);
     const period = source.period ? formatPeriod(source.period) : '';
     const key = `${source.metric}|${period}`;
@@ -273,7 +286,7 @@ export function sourceSummary(sources: ChatSource[]): string | null {
   const names: string[] = [];
   const periods: string[] = [];
   for (const source of sources) {
-    const name = metricLabel(source.metric);
+    const name = source.url ? 'fontes públicas' : metricLabel(source.metric);
     if (!names.includes(name)) names.push(name);
     if (source.period) {
       const period = formatPeriod(source.period);

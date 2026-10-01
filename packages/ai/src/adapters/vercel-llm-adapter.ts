@@ -114,7 +114,7 @@ export class VercelLLMAdapter implements LLMAdapter {
     this.provider = config.provider ?? 'openai';
     this.model = config.model;
     this.temperature = config.temperature ?? 0.2;
-    this.maxOutputTokens = config.maxOutputTokens ?? 1200;
+    this.maxOutputTokens = config.maxOutputTokens ?? 2000;
 
     const openai = createOpenAI({
       apiKey: config.apiKey,

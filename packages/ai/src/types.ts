@@ -38,6 +38,10 @@ export type MessageSource = {
   /** Canonical record cited as qualitative evidence */
   refId?: string;
   excerpt?: string;
+  /** Public source URL, shown as a citation in the chat. */
+  url?: string;
+  publishedAt?: string | null;
+  accessedAt?: string;
   /** Numeric claims extracted from trusted structured results, not from document prose. */
   numericEvidence?: Array<{
     value: number;

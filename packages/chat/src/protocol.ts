@@ -18,6 +18,9 @@ export type ChatSource = {
   value?: number;
   tool?: string;
   label?: string;
+  url?: string;
+  publishedAt?: string | null;
+  accessedAt?: string;
 };
 
 export type ChatProposal = {

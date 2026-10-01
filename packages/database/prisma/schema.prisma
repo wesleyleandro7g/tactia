@@ -780,6 +780,8 @@ model Tenant {
   browserAutomationArtifacts BrowserAutomationArtifact[]
   browserAutomationActionLogs BrowserAutomationActionLog[]
   agentSkills AgentSkill[]
+  agentProfile CompanyAgentProfile?
+  conversationSummaries ConversationSummary[]
   schedules            Schedule[]
   scheduleOccurrences  ScheduleOccurrence[]
   automations          Automation[]
@@ -2300,11 +2302,53 @@ model Conversation {
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]
+  summary   ConversationSummary?
   whatsappNumbers WhatsappAuthorizedNumber[]
 
   @@index([tenantId, createdAt])
   @@index([tenantId, userId, updatedAt])
   @@map("conversations")
+}
+
+/// Official company context, edited by owner/admin only.
+model CompanyAgentProfile {
+  tenantId    String   @id @map("tenant_id") @db.Uuid
+  industry    String   @default("") @db.Text
+  offering    String   @default("") @db.Text
+  customers   String   @default("") @db.Text
+  geography   String   @default("") @db.Text
+  positioning String   @default("") @db.Text
+  priorities  String   @default("") @db.Text
+  updatedBy   String?  @map("updated_by") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("company_agent_profiles")
+}
+
+/// Shared business summary of a conversation. Raw messages stay in their original conversation.
+model ConversationSummary {
+  id             String   @id @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  conversationId String   @unique @map("conversation_id") @db.Uuid
+  authorUserId   String   @map("author_user_id") @db.Uuid
+  text           String   @db.Text
+  curatedText    String?  @map("curated_text") @db.Text
+  lastMessageId  String?  @map("last_message_id") @db.Uuid
+  editedBy       String?  @map("edited_by") @db.Uuid
+  reviewedAt     DateTime? @map("reviewed_at")
+  deletedAt      DateTime? @map("deleted_at")
+  /// Written by raw SQL (pgvector), never selected through Prisma.
+  embedding      Unsupported("vector")?
+  embeddedAt     DateTime? @map("embedded_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, authorUserId, updatedAt])
+  @@map("conversation_summaries")
 }
 
 model Message {

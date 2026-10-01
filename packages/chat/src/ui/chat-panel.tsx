@@ -1028,7 +1028,9 @@ function SourceFooter({ sources }: { sources: ChatSource[] }) {
       <CollapsibleContent>
         <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
           {lines.map((line) => (
-            <li key={line.key}>{line.label}</li>
+            <li key={line.key}>
+              {line.url ? <a href={line.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">{line.label}</a> : line.label}
+            </li>
           ))}
         </ul>
       </CollapsibleContent>

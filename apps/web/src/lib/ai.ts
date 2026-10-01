@@ -54,7 +54,11 @@ const automationPort = {
   },
 };
 
-const chatRuntime = createChatRuntime(chatServices, { schedulePort, automationPort });
+const chatRuntime = createChatRuntime(chatServices, {
+  schedulePort,
+  automationPort,
+  publicSearchApiKey: process.env.TAVILY_API_KEY,
+});
 
 /** MCP registry (no Browser Agent tools). */
 export const toolRegistry = chatRuntime.toolRegistry;

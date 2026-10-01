@@ -109,6 +109,7 @@ export const {
   sellerService,
   saleService,
   businessFactService,
+  companyKnowledgeService,
   episodeService,
   playbookService,
   interactionService,

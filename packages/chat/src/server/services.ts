@@ -79,6 +79,7 @@ import { logger, type RequestContext } from '@tactia/shared';
 import { createObjectStorageFromEnv, type ObjectStorage } from '@tactia/shared/storage';
 import { z } from 'zod';
 import { BrowserAutomationService, type BrowserTaskQueue } from './browser/automation';
+import { CompanyKnowledgeService } from './company-knowledge';
 
 /** LLM/embedding env read by the chat stack (never sent to the client). */
 export type ChatEnv = {
@@ -188,6 +189,7 @@ export function createChatServices(input: CreateChatServicesInput) {
     },
     'chat',
   );
+  const companyKnowledgeService = new CompanyKnowledgeService(prisma, classifierAdapter ?? narratorAdapter, embeddingAdapter);
 
   // Domain services ------------------------------------------------------------
   const auditLogService = new AuditLogService(repositories.auditLogs);
@@ -458,6 +460,7 @@ export function createChatServices(input: CreateChatServicesInput) {
     actionRegistry,
     auditLogService,
     agentSkillService,
+    companyKnowledgeService,
     tenantService,
     catalogEmbeddingService,
     customDataValidationService,

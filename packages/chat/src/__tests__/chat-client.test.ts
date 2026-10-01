@@ -183,6 +183,18 @@ describe('sourceSummary', () => {
     expect(sourceLines(sources).some((line) => line.label.includes('get_'))).toBe(false);
   });
 
+  it('keeps each external citation as a dated link', () => {
+    const sources = [
+      { metric: 'external_web', label: 'Relatório A', url: 'https://example.org/a', publishedAt: '2026-09-01' },
+      { metric: 'external_web', label: 'Relatório B', url: 'https://example.org/b' },
+    ];
+    expect(sourceLines(sources)).toEqual([
+      { key: 'https://example.org/a', label: 'Relatório A · 2026-09-01', url: 'https://example.org/a' },
+      { key: 'https://example.org/b', label: 'Relatório B', url: 'https://example.org/b' },
+    ]);
+    expect(sourceSummary(sources)).toBe('Baseado em fontes públicas');
+  });
+
   it('drops the period from the summary when the sources disagree', () => {
     const summary = sourceSummary([
       { metric: 'revenue', period },

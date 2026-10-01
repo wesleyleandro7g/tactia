@@ -94,6 +94,27 @@ function registry() {
 }
 
 describe('Orchestrator', () => {
+  it('accepts a cited external figure and rejects the same figure without its source link', async () => {
+    const external = defineTool({
+      name: 'search_public_web', description: 'Busca pública', inputSchema: z.object({}),
+      async execute() {
+        return {
+          data: { pages: [{ url: 'https://example.org/market', content: 'O setor cresceu 42%.' }] },
+          sources: [{ metric: 'external_web', tool: 'search_public_web', url: 'https://example.org/market', excerpt: 'O setor cresceu 42%.' }],
+        };
+      },
+    });
+    const run = (text: string) => new Orchestrator({
+      llm: new MockLLMAdapter({ script: [{ toolCalls: [{ name: 'search_public_web' }] }, { text }] }),
+      tools: new ToolRegistry([external]),
+      contextBuilder: contextSource({ metrics: [], insights: [], sources: [] }),
+    }).run({ ctx: toolContext(), question: 'Como está o mercado?' });
+    const cited = await run('O setor cresceu 42% segundo o [relatório](https://example.org/market).');
+    expect(cited.content).toContain('42%');
+    expect(cited.guardrail).toBeUndefined();
+    const uncited = await run('O setor cresceu 42%.');
+    expect(uncited.content).not.toContain('42%');
+  });
   it('answers from tool results and carries the evidence', async () => {
     const llm = new MockLLMAdapter({
       script: [

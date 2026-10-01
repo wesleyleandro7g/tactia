@@ -1,10 +1,11 @@
 import type { ChatTurn } from '@tactia/ai';
+import { after } from 'next/server';
 import { runChatTurnSync, streamChatTurn } from '@tactia/chat/server';
 import { sendMessageSchema } from '@tactia/domain';
 import { answerMetadata, chatRuntime, toToolContext } from '@/lib/ai';
 import { createApiHandler, readJson } from '@/lib/api';
 import { RATE_LIMITS } from '@/lib/rate-limit';
-import { commandCenterService, conversationService } from '@/lib/services';
+import { commandCenterService, companyKnowledgeService, conversationService } from '@/lib/services';
 
 const HISTORY_TURNS = 12;
 
@@ -80,12 +81,15 @@ export const POST = createApiHandler(
       persistence: {
         conversationId,
         userMessageId: userMessage.id,
-        saveAnswer: (answer: Parameters<typeof answerMetadata>[0]) =>
-          conversationService.appendMessage(ctx, conversationId, {
+        saveAnswer: async (answer: Parameters<typeof answerMetadata>[0]) => {
+          const message = await conversationService.appendMessage(ctx, conversationId, {
             role: 'assistant',
             content: answer.content,
             metadata: answerMetadata(answer),
-          }),
+          });
+          after(() => companyKnowledgeService.summarizeConversation(ctx, conversationId));
+          return message;
+        },
       },
     };
 

@@ -21,6 +21,8 @@ import { AppError, ErrorCode, redactSensitiveDeep, type RequestContext } from '@
 import { z } from 'zod';
 import { elaborateBrowserConsultation } from './browser/result-turn';
 import { browserInitialToolChoice } from './browser/tool-routing';
+import { createPublicWebSearchTool } from './public-web-search';
+import { isPublicPageRequest, publicWebInitialToolChoice } from './public-web-routing';
 import type { ChatEnv, ChatServices } from './services';
 
 /**
@@ -69,6 +71,8 @@ export type ChatRuntimeOptions = {
   schedulePort?: SchedulePort;
   /** Ferramentas de automação no chat interno. Não entram no registro MCP. */
   automationPort?: AutomationPort;
+  /** Public search is enabled only for the customer-facing web/WhatsApp runtime. */
+  publicSearchApiKey?: string;
 };
 
 /**
@@ -136,6 +140,7 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
   const chatToolRegistry = new ToolRegistry([
     ...toolRegistry.list(),
     createSendEmailTool(directEmailSender),
+    ...(options.publicSearchApiKey ? [createPublicWebSearchTool(options.publicSearchApiKey)] : []),
     defineTool({
       name: 'load_company_skill',
       minRole: 'member',
@@ -269,6 +274,9 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
           })),
         };
       },
+      companyProfile: (ctx) => services.companyKnowledgeService.profile(ctx),
+      currentUser: (ctx) => services.companyKnowledgeService.currentUser(ctx),
+      conversationMemories: (ctx, query) => services.companyKnowledgeService.search(ctx, query),
     },
   });
 
@@ -295,8 +303,11 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
       cachedOrchestrator = new Orchestrator(
         { llm, tools: chatToolRegistry, contextBuilder },
         {
-          initialToolChoice: (request, availableToolNames) =>
-            browserInitialToolChoice(request.question, availableToolNames),
+          initialToolChoice: (request, availableToolNames) => {
+            const publicChoice = publicWebInitialToolChoice(request.question, availableToolNames);
+            if (publicChoice && isPublicPageRequest(request.question)) return publicChoice;
+            return browserInitialToolChoice(request.question, availableToolNames) ?? publicChoice;
+          },
         },
       );
     }

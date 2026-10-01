@@ -19,7 +19,10 @@ export type UntrustedOrigin =
   | 'playbook'
   | 'document'
   | 'media'
-  | 'channel';
+  | 'channel'
+  | 'user_profile'
+  | 'company_profile'
+  | 'conversation_memory';
 
 /**
  * Strip jailbreak phrases. Does not delete the surrounding text.

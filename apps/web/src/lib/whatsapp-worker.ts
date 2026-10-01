@@ -4,6 +4,7 @@ import { createId, logger, type RequestContext } from '@tactia/shared';
 import { answerMetadata, getOrchestrator, toToolContext } from '@/lib/ai';
 import { sendWhatsappImage, sendWhatsappText } from '@/lib/evolution';
 import {
+  companyKnowledgeService,
   conversationService,
   infographicService,
   whatsappAgentConfigService,
@@ -116,6 +117,13 @@ export async function runWhatsappAgentJob(tenantId: string, jobId: string): Prom
 
   await whatsappAgentJobService.markDone({ tenantId, id: jobId });
   await sendWhatsappText(resolved.phone, answer.content || FAILURE_REPLY);
+  if (job.conversationId) {
+    try {
+      await companyKnowledgeService.summarizeConversation(ctx, job.conversationId);
+    } catch (error) {
+      logger.warn({ err: error, conversationId: job.conversationId }, 'WhatsApp conversation summary failed');
+    }
+  }
 }
 
 type ResolvedNumber = {

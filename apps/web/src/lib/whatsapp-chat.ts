@@ -6,6 +6,7 @@ import { sendWhatsappImage, sendWhatsappText } from '@/lib/evolution';
 import { enqueueWhatsappAgentJob } from '@/lib/jobs';
 import { consumeRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import {
+  companyKnowledgeService,
   conversationService,
   evidenceClarificationService,
   infographicService,
@@ -216,6 +217,11 @@ export async function handleWhatsappInbound(input: {
   }
 
   await sendWhatsappText(input.phone, answer.content || ERROR_REPLY);
+  try {
+    await companyKnowledgeService.summarizeConversation(ctx, conversationId);
+  } catch (error) {
+    logger.warn({ err: error, conversationId }, 'WhatsApp conversation summary failed');
+  }
 }
 
 async function resolveConversationId(
