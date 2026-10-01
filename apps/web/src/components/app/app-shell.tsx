@@ -7,8 +7,6 @@ import { BrandLogo } from '@/components/app/brand-logo';
 import { BrandMark } from '@/components/app/brand-mark';
 import { ThemeToggle } from '@/components/app/theme-toggle';
 import { TenantSwitcher } from '@/components/app/tenant-switcher';
-import { TodayChrome } from '@/components/app/command-center/today-chrome';
-import type { TodaySnapshot } from '@/components/app/command-center/types';
 import {
   Sidebar,
   SidebarContent,
@@ -45,8 +43,6 @@ export function AppShell({
   tenantId,
   homeHref,
   sidebarDefaultOpen = true,
-  todaySnapshot,
-  todayBriefing,
   children,
 }: {
   nav: NavItem[];
@@ -54,8 +50,6 @@ export function AppShell({
   tenantId: string | null;
   homeHref: string;
   sidebarDefaultOpen?: boolean;
-  todaySnapshot?: TodaySnapshot | null;
-  todayBriefing?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -64,9 +58,6 @@ export function AppShell({
     pathname.startsWith(route),
   );
   const sectionTitle = sectionTitleFromPath(pathname);
-  const today = todaySnapshot ? (
-    <TodayChrome snapshot={todaySnapshot}>{todayBriefing}</TodayChrome>
-  ) : null;
 
   return (
     <SidebarProvider defaultOpen={sidebarDefaultOpen}>
@@ -119,13 +110,7 @@ export function AppShell({
               )}
             </div>
           </div>
-          {today ? (
-            <div className="min-w-0 flex-1 border-t border-border px-3 py-2 md:border-0 md:px-0 md:py-0">
-              {today}
-            </div>
-          ) : (
-            <div className="hidden flex-1 md:block" />
-          )}
+          <div className="hidden flex-1 md:block" />
         </header>
 
         <main
