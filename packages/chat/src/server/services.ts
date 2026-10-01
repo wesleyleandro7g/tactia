@@ -75,7 +75,7 @@ import {
   createEmbeddingAdapterFromEnv,
   createLLMAdapterFromEnv,
 } from '@tactia/ai';
-import type { RequestContext } from '@tactia/shared';
+import { logger, type RequestContext } from '@tactia/shared';
 import { createObjectStorageFromEnv, type ObjectStorage } from '@tactia/shared/storage';
 import { z } from 'zod';
 import { BrowserAutomationService, type BrowserTaskQueue } from './browser/automation';
@@ -337,6 +337,19 @@ export function createChatServices(input: CreateChatServicesInput) {
     },
   });
 
+  type BrowserResultElaborator = (input: {
+    tenantId: string;
+    conversationId: string;
+    taskId: string;
+    objective: string;
+    content: string;
+    summary: string;
+    extractionText?: string | null;
+    requestedBy?: string | null;
+    success: boolean;
+  }) => Promise<{ content: string; followUps?: string[]; sources?: unknown[] }>;
+  let elaborateBrowserResult: BrowserResultElaborator | null = null;
+
   const browserAutomationService = new BrowserAutomationService({
     queue: input.browserQueue,
     executionEngine: () => executionEngine,
@@ -349,11 +362,31 @@ export function createChatServices(input: CreateChatServicesInput) {
           id: input.conversationId,
         });
         if (!conversation) return null;
+        let content = input.content;
+        let followUps: string[] = [];
+        let sources: unknown[] = [];
+        if (elaborateBrowserResult) {
+          try {
+            const elaborated = await elaborateBrowserResult(input);
+            if (elaborated.content.trim()) {
+              content = elaborated.content;
+              followUps = elaborated.followUps ?? [];
+              sources = elaborated.sources ?? [];
+            }
+          } catch (error) {
+            logger.error({
+              operation: 'browser_result_elaboration_failed',
+              tenant_id: input.tenantId,
+              task_id: input.taskId,
+              error_message: error instanceof Error ? error.message : 'unknown',
+            });
+          }
+        }
         const message = await repositories.messages.createBrowserResult({
           tenantId: input.tenantId,
           conversationId: input.conversationId,
           browserTaskId: input.taskId,
-          content: input.content,
+          content,
           metadata: {
             browserResultTaskId: input.taskId,
             browserResult: {
@@ -361,8 +394,9 @@ export function createChatServices(input: CreateChatServicesInput) {
               objective: input.objective,
               summary: input.summary,
             },
+            ...(followUps.length > 0 ? { followUps } : {}),
             toolCalls: [{ name: 'browser_agent' }],
-            sources: [],
+            sources,
           },
         });
         await repositories.conversations.touch({
@@ -450,6 +484,9 @@ export function createChatServices(input: CreateChatServicesInput) {
     approvalService,
     browserAutomationService,
     rejectApproval,
+    bindBrowserResultElaborator(elaborator: BrowserResultElaborator) {
+      elaborateBrowserResult = elaborator;
+    },
   };
 }
 

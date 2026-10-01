@@ -124,7 +124,7 @@ const TOOL_GUIDE: Record<string, string> = {
   list_browser_profiles:
     'lista os sistemas web autorizados para a empresa. Chame automaticamente quando o usuário pedir para acessar, abrir, entrar, consultar ou verificar algo em um site, portal ou sistema cadastrado.',
   browser_delegate:
-    'delega a navegação de leitura ao Browser Agent. Depois de listar os perfis, escolha o perfil compatível e chame esta ferramenta com o objetivo completo do usuário; o resultado chegará em um cartão assíncrono.',
+    'delega a navegação de leitura ao Browser Agent. Depois de listar os perfis, escolha o perfil compatível e chame esta ferramenta com o objetivo completo do usuário. O resultado volta depois para você elaborar a resposta final; não invente a leitura neste turno.',
   load_company_skill:
     'carrega pelo slug a orientação operacional completa de uma skill secundária desta empresa. Use quando o catálogo indicar uma skill relevante.',
   propose_action: 'propor tarefa ou e-mail para aprovação humana.',
@@ -303,7 +303,7 @@ export function buildSystemPrompt(
       ? [
           '13. Para (e), SEMPRE chame list_browser_profiles primeiro, mesmo que o usuário não cite o nome das ferramentas. Se houver um perfil compatível com o sistema, domínio ou URL pedido, chame browser_delegate com o id desse perfil e preserve o objetivo completo do usuário.',
           '14. Nunca diga que não pode navegar ou que não tem acesso à internet antes de consultar list_browser_profiles. Se não houver perfil compatível, explique especificamente que o sistema ainda não está configurado ou peça ao usuário para escolher entre os perfis retornados.',
-          '15. browser_delegate é assíncrona: depois de delegar, informe que a tarefa foi iniciada e que o resultado aparecerá no cartão da conversa; não invente o resultado no mesmo turno.',
+          '15. browser_delegate é assíncrona: depois de delegar, avise que a leitura começou. Não invente o resultado nesse turno. Quando o resultado voltar, escreva a resposta final para a pessoa.',
         ]
       : []),
     '',

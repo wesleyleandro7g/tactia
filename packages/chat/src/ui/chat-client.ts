@@ -1,7 +1,9 @@
+import { formatPeriod, metricLabel } from '../format';
 import {
   CHAT_HISTORY_TURNS,
   CHAT_MAX_HISTORY_CONTENT,
   type ChatMessageView,
+  type ChatSource,
   type ChatStreamEvent,
 } from '../protocol';
 
@@ -103,11 +105,185 @@ export const TOOL_SHORT_LABELS: Record<string, string> = {
 };
 
 export function toolShortLabel(name: string): string {
-  return TOOL_SHORT_LABELS[name] ?? name;
+  return TOOL_SHORT_LABELS[name] ?? 'dados da empresa';
 }
 
 export function uniqueToolLabels(tools: string[]): string[] {
   return Array.from(new Set(tools.map(toolShortLabel)));
+}
+
+export type WorkPhaseId = 'numbers' | 'search' | 'analysis' | 'prepare' | 'system' | 'other';
+
+export const WORK_PHASE_LABELS: Record<WorkPhaseId, string> = {
+  numbers: 'Consultando os números',
+  search: 'Procurando nos registros',
+  analysis: 'Analisando o que mudou',
+  prepare: 'Preparando o próximo passo',
+  system: 'Acessando o sistema',
+  other: 'Consultando os dados da empresa',
+};
+
+const WORK_PHASE_DONE_LABELS: Record<WorkPhaseId, string> = {
+  numbers: 'Conferiu os números',
+  search: 'Procurou nos registros',
+  analysis: 'Analisou o que mudou',
+  prepare: 'Preparou o próximo passo',
+  system: 'Acessou o sistema',
+  other: 'Consultou os dados da empresa',
+};
+
+export const WORK_RETRY_LABEL = 'Não encontrei por aqui. Vou tentar de outro jeito.';
+export const WORK_THINKING_LABEL = 'Pensando';
+export const WORK_CHECKED_LABEL = 'Conferi os dados';
+
+const TOOL_PHASES: Record<string, WorkPhaseId> = {
+  get_revenue: 'numbers',
+  get_sales: 'numbers',
+  get_customers: 'numbers',
+  get_products: 'numbers',
+  get_sellers: 'numbers',
+  get_complaints: 'numbers',
+  get_data_freshness: 'numbers',
+  get_customer_profile: 'numbers',
+  search_documents: 'search',
+  search_interactions: 'search',
+  search_catalog: 'search',
+  get_insights: 'analysis',
+  get_customer_segments: 'analysis',
+  get_customer_voice: 'analysis',
+  get_period_projection: 'analysis',
+  get_pipeline: 'analysis',
+  get_product_affinity: 'analysis',
+  get_product_performance: 'analysis',
+  get_sales_health: 'analysis',
+  get_seller_performance: 'analysis',
+  compare_periods: 'analysis',
+  explain_change: 'analysis',
+  get_trend: 'analysis',
+  get_insight_detail: 'analysis',
+  get_forecast: 'analysis',
+  get_latest_briefing: 'analysis',
+  get_goals_progress: 'analysis',
+  get_funnel: 'analysis',
+  get_cohorts: 'analysis',
+  get_rfm: 'analysis',
+  simulate: 'analysis',
+  get_profitability: 'analysis',
+  get_cash_flow: 'analysis',
+  get_inventory_risk: 'analysis',
+  get_acquisition: 'analysis',
+  remember_fact: 'analysis',
+  list_business_facts: 'analysis',
+  propose_action: 'prepare',
+  generate_infographic: 'prepare',
+  list_browser_profiles: 'system',
+  browser_delegate: 'system',
+  browser_agent: 'system',
+};
+
+/** Unknown tools stay in the generic phase so a slug never reaches the screen. */
+export function workPhaseForTool(name: string): WorkPhaseId {
+  return TOOL_PHASES[name] ?? 'other';
+}
+
+export type WorkCursor = {
+  phase: WorkPhaseId;
+  retrying: boolean;
+};
+
+export type WorkTrailStep = {
+  phase: WorkPhaseId;
+  label: string;
+  status: 'active' | 'done' | 'retry';
+};
+
+const VISIBLE_WORK_STEPS = 3;
+
+/**
+ * Collapses consecutive tools of the same phase into one step. The live cursor
+ * marks the last matching phase as active or retrying. System steps can be
+ * omitted once the access card is already on screen.
+ */
+export function buildWorkTrail(
+  tools: string[],
+  cursor: WorkCursor | null,
+  options?: { omitSystem?: boolean },
+): { visible: WorkTrailStep[]; hidden: WorkTrailStep[] } {
+  const phases: WorkPhaseId[] = [];
+  for (const tool of tools) {
+    const phase = workPhaseForTool(tool);
+    if (options?.omitSystem && phase === 'system') continue;
+    if (phases.at(-1) !== phase) phases.push(phase);
+  }
+  if (cursor && !(options?.omitSystem && cursor.phase === 'system')) {
+    if (phases.at(-1) !== cursor.phase) phases.push(cursor.phase);
+  }
+
+  const steps: WorkTrailStep[] = phases.map((phase, index) => {
+    const live = index === phases.length - 1 && cursor?.phase === phase;
+    if (live && cursor.retrying) {
+      return { phase, label: WORK_RETRY_LABEL, status: 'retry' };
+    }
+    if (live) {
+      return { phase, label: WORK_PHASE_LABELS[phase], status: 'active' };
+    }
+    return { phase, label: WORK_PHASE_DONE_LABELS[phase], status: 'done' };
+  });
+
+  if (steps.length <= VISIBLE_WORK_STEPS) return { visible: steps, hidden: [] };
+  return {
+    hidden: steps.slice(0, steps.length - VISIBLE_WORK_STEPS),
+    visible: steps.slice(-VISIBLE_WORK_STEPS),
+  };
+}
+
+export function hasNonSystemWork(tools: string[]): boolean {
+  return tools.some((tool) => workPhaseForTool(tool) !== 'system');
+}
+
+export type SourceLine = {
+  key: string;
+  label: string;
+};
+
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  if (names.length === 2) return `${names[0]} e ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')} e ${names.at(-1)}`;
+}
+
+/** One line per metric and period. Tool names are never included. */
+export function sourceLines(sources: ChatSource[]): SourceLine[] {
+  const lines = new Map<string, SourceLine>();
+  for (const source of sources) {
+    const name = metricLabel(source.metric);
+    const period = source.period ? formatPeriod(source.period) : '';
+    const key = `${source.metric}|${period}`;
+    if (lines.has(key)) continue;
+    lines.set(key, { key, label: period ? `${name} — ${period}` : name });
+  }
+  return [...lines.values()];
+}
+
+/** Closed footer: "Baseado em Receita e Vendas · 01/08/2026 a 01/09/2026". */
+export function sourceSummary(sources: ChatSource[]): string | null {
+  const lines = sourceLines(sources);
+  if (lines.length === 0) return null;
+
+  const names: string[] = [];
+  const periods: string[] = [];
+  for (const source of sources) {
+    const name = metricLabel(source.metric);
+    if (!names.includes(name)) names.push(name);
+    if (source.period) {
+      const period = formatPeriod(source.period);
+      if (!periods.includes(period)) periods.push(period);
+    }
+  }
+
+  const shown = names.length > 3 ? [...names.slice(0, 2), 'outros'] : names;
+  const summary = `Baseado em ${joinNames(shown)}`;
+  return periods.length === 1 ? `${summary} · ${periods[0]}` : summary;
 }
 
 export function appendBrowserResponse(
@@ -142,8 +318,8 @@ export function parseSseFrames(buffer: string): { events: ChatStreamEvent[]; res
 
 export type StreamReduction = {
   messages: ChatMessageView[];
-  /** `undefined` keeps the current activity line; `null` clears it. */
-  activity?: string | null;
+  /** `undefined` keeps the current phase; `null` clears it (answer text started). */
+  work?: WorkCursor | null;
   /** Set on `error` events so the panel can show the banner. */
   error?: { code: string; message: string };
 };
@@ -158,12 +334,12 @@ function updateStreaming(
 /** Side effects of an event that do not depend on the message list. */
 export function streamEventEffects(event: ChatStreamEvent): Omit<StreamReduction, 'messages'> {
   if (event.type === 'tool_call') {
-    return { activity: TOOL_LABELS[event.name] ?? `usando ${event.name}` };
+    return { work: { phase: workPhaseForTool(event.name), retrying: false } };
   }
   if (event.type === 'tool_result' && event.error) {
-    return { activity: `não conseguiu ${toolShortLabel(event.name)} — tentando outra abordagem` };
+    return { work: { phase: workPhaseForTool(event.name), retrying: true } };
   }
-  if (event.type === 'text') return { activity: null };
+  if (event.type === 'text') return { work: null };
   if (event.type === 'error') return { error: { code: event.code, message: event.message } };
   return {};
 }

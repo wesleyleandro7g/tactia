@@ -13,9 +13,14 @@ export {
   applyStreamEvent,
   historyFromMessages,
   parseSseFrames,
+  buildWorkTrail,
+  hasNonSystemWork,
+  sourceLines,
+  sourceSummary,
   streamEventEffects,
   toolShortLabel,
   uniqueToolLabels,
+  workPhaseForTool,
 } from './chat-client';
 export { cn } from './cn';
 export { Alert, Badge, Button } from './primitives';

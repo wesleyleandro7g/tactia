@@ -45,8 +45,12 @@ export type BrowserTaskResultPublisher = {
     conversationId: string;
     taskId: string;
     objective: string;
+    /** Raw consultation text. The publisher may ask the chat agent to rewrite it. */
     content: string;
     summary: string;
+    extractionText?: string | null;
+    requestedBy?: string | null;
+    success: boolean;
   }): Promise<{ id: string } | null>;
 };
 
@@ -482,7 +486,7 @@ export class BrowserAutomationService {
           const result = parsedFinish.data;
           const evidence = await this.captureFinishEvidence(runtime, sessionId, tenantId, taskId);
           // Checkpoint 4: never record a conclusion over a user cancellation.
-          const chatContent = formatBrowserResultMessage(task.objective, result.answer);
+          const chatContent = formatBrowserResultMessage(result.answer);
           const recorded = await repo.finishTask(tenantId, taskId, {
             status: result.success ? 'COMPLETED' : 'FAILED',
             result: {
@@ -504,6 +508,9 @@ export class BrowserAutomationService {
                 objective: task.objective,
                 content: chatContent,
                 summary: result.answer,
+                extractionText: evidence.extractionText,
+                requestedBy: task.requestedBy,
+                success: result.success,
               });
             } catch (publishError) {
               logger.error({

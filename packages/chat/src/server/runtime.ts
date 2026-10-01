@@ -19,6 +19,7 @@ import {
 } from '@tactia/ai';
 import { AppError, ErrorCode, redactSensitiveDeep, type RequestContext } from '@tactia/shared';
 import { z } from 'zod';
+import { elaborateBrowserConsultation } from './browser/result-turn';
 import { browserInitialToolChoice } from './browser/tool-routing';
 import type { ChatEnv, ChatServices } from './services';
 
@@ -170,7 +171,7 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
       name: 'browser_delegate',
       minRole: 'member',
       description:
-        'Delega autonomamente uma tarefa de navegação e leitura ao perfil web escolhido. Use depois de list_browser_profiles quando o usuário pedir acesso a um sistema; não exija que ele mencione ferramentas. Retorna um cartão de acompanhamento e não entrega o resultado no mesmo turno.',
+        'Delega autonomamente uma tarefa de navegação e leitura ao perfil web escolhido. Use depois de list_browser_profiles quando o usuário pedir acesso a um sistema; não exija que ele mencione ferramentas. A consulta volta depois para você escrever a resposta final. Neste turno, só avise que a leitura começou.',
       inputSchema: z.object({
         profileId: z.string().uuid().optional(),
         objective: z.string().trim().min(8).max(2000),
@@ -187,7 +188,7 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
           conversationId: ctx.conversationId,
         });
         return {
-          data: { ...task, message: 'Tarefa iniciada. O resultado aparecerá no cartão da conversa.' },
+          data: { ...task, message: 'Leitura iniciada. Avise a pessoa e aguarde o resultado para escrever a resposta final. Não invente o que foi lido.' },
           sources: [],
           browserTaskId: task.taskId,
         };
@@ -301,6 +302,15 @@ export function createChatRuntime(services: ChatServices, options: ChatRuntimeOp
     }
     return cachedOrchestrator;
   }
+
+  services.bindBrowserResultElaborator(async (draft) => {
+    const answer = await elaborateBrowserConsultation({ services, getOrchestrator, draft });
+    return {
+      content: answer.content,
+      followUps: answer.followUps,
+      sources: answer.sources.filter((source) => source.metric !== 'browser_consultation'),
+    };
+  });
 
   return { toolRegistry, chatToolRegistry, contextBuilder, getOrchestrator };
 }

@@ -2,11 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { ChatMessageView, ChatStreamEvent } from '../protocol';
 import {
   STREAMING_MESSAGE_ID,
+  WORK_PHASE_LABELS,
+  WORK_RETRY_LABEL,
   appendBrowserResponse,
   applyStreamEvent,
+  buildWorkTrail,
+  hasNonSystemWork,
   historyFromMessages,
   parseSseFrames,
+  sourceLines,
+  sourceSummary,
   streamEventEffects,
+  toolShortLabel,
+  workPhaseForTool,
 } from '../ui/chat-client';
 import {
   operatorTenantChatEndpoints,
@@ -93,18 +101,98 @@ describe('applyStreamEvent', () => {
 });
 
 describe('streamEventEffects', () => {
-  it('drives the activity line', () => {
-    expect(streamEventEffects({ type: 'tool_call', name: 'get_revenue', input: {} }).activity).toBe(
-      'consultando a receita',
-    );
-    expect(streamEventEffects({ type: 'tool_call', name: 'new_tool', input: {} }).activity).toBe(
-      'usando new_tool',
-    );
-    expect(streamEventEffects({ type: 'tool_result', name: 'get_sales', error: 'x' }).activity).toContain(
-      'não conseguiu vendas',
-    );
+  it('drives the work phase without leaking tool slugs', () => {
+    expect(streamEventEffects({ type: 'tool_call', name: 'get_revenue', input: {} }).work).toEqual({
+      phase: 'numbers',
+      retrying: false,
+    });
+    expect(streamEventEffects({ type: 'tool_call', name: 'new_tool', input: {} }).work).toEqual({
+      phase: 'other',
+      retrying: false,
+    });
+    expect(workPhaseForTool('new_tool')).toBe('other');
+    expect(WORK_PHASE_LABELS.other).toBe('Consultando os dados da empresa');
+    expect(toolShortLabel('new_tool')).toBe('dados da empresa');
+    expect(streamEventEffects({ type: 'tool_result', name: 'get_sales', error: 'x' }).work).toEqual({
+      phase: 'numbers',
+      retrying: true,
+    });
     expect(streamEventEffects({ type: 'tool_result', name: 'get_sales' })).toEqual({});
-    expect(streamEventEffects({ type: 'text', delta: 'a' })).toEqual({ activity: null });
+    expect(streamEventEffects({ type: 'text', delta: 'a' })).toEqual({ work: null });
+  });
+});
+
+describe('buildWorkTrail', () => {
+  it('collapses consecutive tools of the same phase and keeps the live one', () => {
+    const trail = buildWorkTrail(
+      ['get_revenue', 'get_sales', 'get_rfm', 'browser_delegate'],
+      { phase: 'system', retrying: false },
+    );
+    expect(trail.hidden).toEqual([]);
+    expect(trail.visible.map((step) => step.label)).toEqual([
+      'Conferiu os números',
+      'Analisou o que mudou',
+      'Acessando o sistema',
+    ]);
+    expect(trail.visible.map((step) => step.status)).toEqual(['done', 'done', 'active']);
+  });
+
+  it('hides older phases behind a short visible tail', () => {
+    const trail = buildWorkTrail(
+      ['get_revenue', 'search_documents', 'get_trend', 'propose_action'],
+      { phase: 'prepare', retrying: false },
+    );
+    expect(trail.hidden.map((step) => step.phase)).toEqual(['numbers']);
+    expect(trail.visible.map((step) => step.phase)).toEqual(['search', 'analysis', 'prepare']);
+  });
+
+  it('turns the current phase into a retry sentence without naming the tool', () => {
+    const trail = buildWorkTrail(['get_cohorts'], { phase: 'analysis', retrying: true });
+    expect(trail.visible).toEqual([
+      { phase: 'analysis', label: WORK_RETRY_LABEL, status: 'retry' },
+    ]);
+    expect(WORK_RETRY_LABEL).not.toContain('get_cohorts');
+  });
+
+  it('drops the system phase once the access card is on screen', () => {
+    const trail = buildWorkTrail(
+      ['get_revenue', 'browser_delegate'],
+      { phase: 'system', retrying: false },
+      { omitSystem: true },
+    );
+    expect(trail.visible.map((step) => step.phase)).toEqual(['numbers']);
+    expect(hasNonSystemWork(['browser_delegate'])).toBe(false);
+    expect(hasNonSystemWork(['get_revenue', 'browser_agent'])).toBe(true);
+  });
+});
+
+describe('sourceSummary', () => {
+  const period = { from: '2026-08-01T00:00:00.000Z', to: '2026-09-01T00:00:00.000Z' };
+
+  it('groups repeated metrics and omits tool names', () => {
+    const sources = [
+      { metric: 'revenue', period, tool: 'get_revenue' },
+      { metric: 'revenue', period, tool: 'get_revenue' },
+      { metric: 'sales_count', period, tool: 'get_sales' },
+    ];
+    expect(sourceSummary(sources)).toBe('Baseado em Receita e Vendas · 01/08/2026 a 01/09/2026');
+    expect(sourceLines(sources).map((line) => line.label)).toEqual([
+      'Receita — 01/08/2026 a 01/09/2026',
+      'Vendas — 01/08/2026 a 01/09/2026',
+    ]);
+    expect(sourceLines(sources).some((line) => line.label.includes('get_'))).toBe(false);
+  });
+
+  it('drops the period from the summary when the sources disagree', () => {
+    const summary = sourceSummary([
+      { metric: 'revenue', period },
+      { metric: 'revenue', period: { from: '2026-07-01T00:00:00.000Z', to: '2026-08-01T00:00:00.000Z' } },
+    ]);
+    expect(summary).toBe('Baseado em Receita');
+    expect(sourceLines([
+      { metric: 'revenue', period },
+      { metric: 'revenue', period: { from: '2026-07-01T00:00:00.000Z', to: '2026-08-01T00:00:00.000Z' } },
+    ])).toHaveLength(2);
   });
 });
 

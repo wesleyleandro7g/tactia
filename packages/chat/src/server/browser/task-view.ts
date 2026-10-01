@@ -72,27 +72,13 @@ export function safeProgressUrl(raw: string | null): string | null {
 }
 
 
-export function formatBrowserResultMessage(objective: string, summary: string): string {
-  return [
-    '## Resultado do Browser Agent',
-    `**Solicitação:** ${objective}`,
-    '',
-    '**Resposta:**',
-    summary,
-  ].join('\n');
+/** The assistant reply that follows the card: the answer itself, without the request. */
+export function formatBrowserResultMessage(answer: string): string {
+  return answer.trim();
 }
 
 /** Public, secret-free view of a Browser Agent task consumed by the chat card. */
 export function toPublicBrowserTask(task: BrowserTaskRecord) {
-  const result = task.result && typeof task.result === 'object'
-    ? task.result as { summary?: unknown; chatContent?: unknown }
-    : null;
-  const summary = typeof result?.summary === 'string' ? result.summary : null;
-  const chatContent = typeof result?.chatContent === 'string'
-    ? result.chatContent
-    : summary
-      ? formatBrowserResultMessage(task.objective, summary)
-      : null;
   return {
     id: task.id,
     profileId: task.profileId,
@@ -103,11 +89,11 @@ export function toPublicBrowserTask(task: BrowserTaskRecord) {
     stepCount: task.stepCount,
     result: task.result,
     safeError: task.safeError,
-    chatResponse: (task.status === 'COMPLETED' || task.status === 'FAILED') && chatContent
+    chatResponse: (task.status === 'COMPLETED' || task.status === 'FAILED') && task.resultMessage
       ? {
-          id: task.resultMessage?.id ?? `browser-result-${task.id}`,
+          id: task.resultMessage.id,
           role: 'assistant' as const,
-          content: task.resultMessage?.content ?? chatContent,
+          content: task.resultMessage.content,
           browserResultTaskId: task.id,
           toolsUsed: ['browser_agent'],
         }

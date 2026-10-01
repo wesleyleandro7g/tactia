@@ -51,6 +51,13 @@ export type OrchestratorConfig = {
   ) => 'required' | { type: 'tool'; toolName: string } | undefined;
 };
 
+export type ChatContinuation = {
+  /** Trusted instruction appended to the system prompt. Server-authored, never user text. */
+  directive: string;
+  /** Evidence already in hand, so the final answer can cite it. */
+  evidence: MessageSource[];
+};
+
 export type ChatRequest = {
   ctx: ToolContext;
   question: string;
@@ -59,6 +66,11 @@ export type ChatRequest = {
   period?: { from: Date; to: Date };
   /** Optional channel context (e.g. WhatsApp tone/contact). Absent for web chat. */
   channel?: WhatsappChannelContext;
+  /**
+   * Continuation after an async tool, such as a finished browser consultation.
+   * The directive is trusted; the consultation text inside it stays untrusted.
+   */
+  continuation?: ChatContinuation;
 };
 
 const UNSOURCED_FALLBACK =
@@ -76,6 +88,10 @@ const MAX_RECOVERY_TOOL_BATCHES = 2;
 const MAX_RECOVERY_TOOL_CALLS = 4;
 const MAX_RECOVERY_REVISIONS = 2;
 const EXPLICIT_PERIOD = /\b(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|ontem|hoje|semana|trimestre|ano|passado|anterior|últim[oa]s?|dias?|meses|bimestre|semestre)\b|\d{1,2}\/\d{1,2}|\b20\d{2}\b/;
+
+function seedSources(contextSources: MessageSource[], request: ChatRequest): MessageSource[] {
+  return [...contextSources, ...(request.continuation?.evidence ?? [])];
+}
 
 function contextualClarification(question: string, context: AiContext, history: ChatTurn[] = []): string {
   const previous = [...history].reverse().find((turn) => turn.role === 'user')?.content ?? '';
@@ -360,7 +376,7 @@ export class Orchestrator {
   /** Single-shot answer (no streaming). */
   async run(request: ChatRequest): Promise<ChatAnswer> {
     const { context, system, messages } = await this.prepare(request);
-    const sources: MessageSource[] = [...context.sources];
+    const sources: MessageSource[] = seedSources(context.sources, request);
     const executed: ExecutedToolCall[] = [];
     const proposals: ActionProposal[] = [];
     const attachments: ChatAttachment[] = [];
@@ -421,7 +437,7 @@ export class Orchestrator {
    */
   async *stream(request: ChatRequest): AsyncGenerator<ChatStreamEvent> {
     const { context, system, messages } = await this.prepare(request);
-    const sources: MessageSource[] = [...context.sources];
+    const sources: MessageSource[] = seedSources(context.sources, request);
     const executed: ExecutedToolCall[] = [];
     const proposals: ActionProposal[] = [];
     const attachments: ChatAttachment[] = [];
@@ -690,7 +706,10 @@ export class Orchestrator {
       query: request.question,
     });
 
-    const system = buildSystemPrompt(context, this.deps.tools.names(request.ctx.role), request.channel);
+    const system = [
+      buildSystemPrompt(context, this.deps.tools.names(request.ctx.role), request.channel),
+      request.continuation?.directive,
+    ].filter(Boolean).join('\n\n');
     const history = (request.history ?? []).slice(-this.historyLimit);
 
     const messages: LLMMessage[] = [

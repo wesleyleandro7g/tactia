@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildClaimAllowlist } from '@tactia/domain';
 import { AppError, ErrorCode, type RequestContext } from '@tactia/shared';
 import {
   browserStepNeedsApproval,
@@ -7,6 +8,11 @@ import {
 } from '../server/browser/policy';
 import { safeProgressUrl, toPublicBrowserTask } from '../server/browser/task-view';
 import { browserRuntimeErrorCode } from '../server/browser/runtime-client';
+import {
+  BROWSER_RESULT_QUESTION,
+  browserResultEvidence,
+  browserResultQuestionStaysWithAgent,
+} from '../server/browser/result-turn';
 import { browserInitialToolChoice } from '../server/browser/tool-routing';
 import {
   BrowserRepeatGuard,
@@ -223,6 +229,14 @@ describe('browser tool routing', () => {
     expect(browserInitialToolChoice('Consulte o faturamento deste mês', tools)).toBeUndefined();
   });
 
+  it('returns the consultation to the chat agent without starting another navigation', () => {
+    expect(browserResultQuestionStaysWithAgent(BROWSER_RESULT_QUESTION)).toBe(true);
+    const allowed = buildClaimAllowlist([], [
+      browserResultEvidence('O saldo em aberto é R$ 1.250,40.'),
+    ]);
+    expect(allowed.has('n:1250')).toBe(true);
+  });
+
   it('does not force a tool hidden from the caller role', () => {
     expect(browserInitialToolChoice('Acesse o sistema Torge', ['get_revenue'])).toBeUndefined();
   });
@@ -403,7 +417,7 @@ describe('browser task chat response', () => {
     });
   });
 
-  it('surfaces the agent diagnosis when the task finished as FAILED', () => {
+  it('waits for the elaborated message instead of publishing the raw consultation', () => {
     const task = toPublicBrowserTask({
       id: 'task-result-2',
       profileId: 'profile-1',
@@ -417,10 +431,6 @@ describe('browser task chat response', () => {
       artifacts: [],
     });
 
-    expect(task.chatResponse).toMatchObject({
-      role: 'assistant',
-      content: expect.stringContaining('O login não avançou após preencher usuário e senha.'),
-      browserResultTaskId: 'task-result-2',
-    });
+    expect(task.chatResponse).toBeNull();
   });
 });

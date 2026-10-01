@@ -590,9 +590,9 @@ describe('Browser Agent chat result publishing', () => {
       tenantId: TENANT,
       taskId: TASK,
       summary: 'Usuários: Ana, Bruno',
-      content: expect.stringContaining('## Resultado do Browser Agent'),
+      content: 'Usuários: Ana, Bruno',
     }));
-    expect(publishResult.mock.calls[0]?.[0].content).toContain('**Resposta:**\nUsuários: Ana, Bruno');
+    expect(publishResult.mock.calls[0]?.[0].content).not.toContain('Solicitação');
   });
 
   it('persists the agent diagnosis when finish screenshot storage is down', async () => {

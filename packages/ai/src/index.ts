@@ -18,6 +18,7 @@ export {
   Orchestrator,
   extractFollowUps,
   CLAIM_MISMATCH_FALLBACK,
+  type ChatContinuation,
   type ChatRequest,
   type ContextSource,
   type OrchestratorConfig,

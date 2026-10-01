@@ -1,28 +1,41 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Eye, EyeOff, RotateCcw, StopCircle, Wand, Zap } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUp, RotateCcw, StopCircle, Wand, Zap } from 'lucide-react';
 import {
-  BROWSER_PROGRESS_STATUS_LABELS,
   BROWSER_RETRY_POLL_MS,
-  BROWSER_STATUS_LABELS,
+  browserResultWaitExpired,
+  browserDownloadLabel,
+  browserProgressHost,
+  browserStatusLabel,
+  browserUserError,
   isBrowserTaskQueuedStale,
+  browserCardBlocksFollowUps,
   browserTaskPollDelay,
   canStopBrowserTask,
+  conversationBlocksFollowUps,
   isBrowserTaskActive,
 } from '../browser-task-ui';
-import { ACTION_TYPE_LABELS, errorMessage, formatPeriod, metricLabel } from '../format';
+import { ACTION_TYPE_LABELS, errorMessage } from '../format';
 import type { ChatMessageView, ChatProposal, ChatSource } from '../protocol';
 import {
   STREAMING_MESSAGE_ID,
+  WORK_CHECKED_LABEL,
+  WORK_THINKING_LABEL,
   appendBrowserResponse,
   applyStreamEvent,
+  buildWorkTrail,
+  hasNonSystemWork,
   historyFromMessages,
   parseSseFrames,
+  sourceLines,
+  sourceSummary,
   streamEventEffects,
-  uniqueToolLabels,
+  type WorkCursor,
+  type WorkTrailStep,
 } from './chat-client';
 import { cn } from './cn';
+import './tactia-shine.css';
 import type { ChatEndpoints } from './endpoints';
 import { ChatMessageContent } from './message-content';
 import {
@@ -105,16 +118,28 @@ export function ChatPanel({
     prefill && !prefill.autoSend ? prefill.question.trim() : '',
   );
   const [streaming, setStreaming] = useState(false);
-  const [activity, setActivity] = useState<string | null>(null);
+  const [work, setWork] = useState<WorkCursor | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const prefillHandled = useRef(false);
+  const initialBrowserIds = useRef(
+    new Set(initialMessages.flatMap((message) => message.browserTaskIds ?? [])),
+  );
+  const [browserActivity, setBrowserActivity] = useState<Record<string, boolean>>({});
+  const reportBrowserActivity = useCallback((taskId: string, working: boolean) => {
+    setBrowserActivity((current) => (current[taskId] === working ? current : { ...current, [taskId]: working }));
+  }, []);
 
   const visibleMessages = messages.filter(
     (message) => message.role === 'user' || message.role === 'assistant',
   );
   const isEmpty = visibleMessages.length === 0;
   const lastAssistant = [...visibleMessages].reverse().find((m) => m.role === 'assistant');
+  const browserTaskIds = visibleMessages.flatMap((message) => message.browserTaskIds ?? []);
+  const pendingBrowserIds = new Set(
+    browserTaskIds.filter((id) => !initialBrowserIds.current.has(id)),
+  );
+  const browserWorking = conversationBlocksFollowUps(browserTaskIds, browserActivity, pendingBrowserIds);
 
   /** Prefill (ex.: "Perguntar no chat" de um insight): enviado uma única vez. */
   useEffect(() => {
@@ -154,7 +179,7 @@ export function ChatPanel({
     setDraft('');
     setError(null);
     setStreaming(true);
-    setActivity('pensando');
+    setWork(null);
     setMessages((current) => [
       ...current,
       { id: `local-${Date.now()}`, role: 'user', content },
@@ -191,7 +216,7 @@ export function ChatPanel({
         for (const event of parsed.events) {
           setMessages((current) => applyStreamEvent(current, event).messages);
           const effects = streamEventEffects(event);
-          if (effects.activity !== undefined) setActivity(effects.activity);
+          if (effects.work !== undefined) setWork(effects.work);
           if (effects.error) setError(errorMessage(effects.error.code, effects.error.message));
         }
       }
@@ -201,7 +226,7 @@ export function ChatPanel({
       setMessages((current) => current.filter((item) => item.id !== STREAMING_MESSAGE_ID));
     } finally {
       setStreaming(false);
-      setActivity(null);
+      setWork(null);
       inputRef.current?.focus();
       onTurnComplete?.({
         conversationId: conversation.id,
@@ -264,10 +289,13 @@ export function ChatPanel({
                   >
                     <MessageRow
                       message={message}
+                      work={message.id === STREAMING_MESSAGE_ID ? work : null}
                       canApprove={canApprove}
                       canControl={canControl}
                       endpoints={endpoints}
                       onBrowserResponse={receiveBrowserResponse}
+                      onBrowserActivity={reportBrowserActivity}
+                      pendingBrowserIds={pendingBrowserIds}
                       {...(onApprovalResolved ? { onApprovalResolved } : {})}
                     />
                   </MessageScrollerItem>
@@ -275,6 +303,7 @@ export function ChatPanel({
               )}
 
               {!streaming &&
+              !browserWorking &&
               lastAssistant &&
               !lastAssistant.error &&
               lastAssistant.followUps &&
@@ -285,12 +314,6 @@ export function ChatPanel({
                     disabled={!llmConfigured}
                     onPick={(question) => void send(question)}
                   />
-                </MessageScrollerItem>
-              ) : null}
-
-              {activity ? (
-                <MessageScrollerItem messageId="activity">
-                  <ActivityIndicator activity={activity} />
                 </MessageScrollerItem>
               ) : null}
             </MessageScrollerContent>
@@ -314,7 +337,7 @@ export function ChatPanel({
           }}
           className="mx-auto max-w-3xl"
         >
-          <div className="relative flex items-end gap-2 rounded-3xl border border-input bg-card p-2 shadow-none transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-ring/40">
+          <div className="relative flex items-end gap-2 rounded-3xl border border-input bg-card p-2 shadow-none transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-primary">
             <label htmlFor="chat-input" className="sr-only">
               Sua pergunta
             </label>
@@ -326,7 +349,7 @@ export function ChatPanel({
               value={draft}
               disabled={!llmConfigured || streaming}
               placeholder={placeholder}
-              className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-60"
+              className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none! disabled:cursor-not-allowed disabled:opacity-60"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -344,7 +367,7 @@ export function ChatPanel({
               aria-label="Enviar mensagem"
               className="size-9 shrink-0 rounded-full"
             >
-              <ArrowUp className="size-4" />
+              {streaming ? null : <ArrowUp className="size-4" />}
             </Button>
           </div>
 
@@ -421,18 +444,24 @@ function EmptyState({
 
 function MessageRow({
   message,
+  work,
   canApprove,
   canControl,
   endpoints,
   onApprovalResolved,
   onBrowserResponse,
+  onBrowserActivity,
+  pendingBrowserIds,
 }: {
   message: ChatMessageView;
+  work: WorkCursor | null;
   canApprove: boolean;
   canControl: boolean;
   endpoints: ChatEndpoints;
   onApprovalResolved?: () => void;
   onBrowserResponse: (response: ChatMessageView) => void;
+  onBrowserActivity: (taskId: string, working: boolean) => void;
+  pendingBrowserIds: ReadonlySet<string>;
 }) {
   const isUser = message.role === 'user';
   const isError = Boolean(message.error);
@@ -456,19 +485,23 @@ function MessageRow({
         'min-w-0 text-sm leading-relaxed',
         isError && 'rounded-xl border border-danger/30 bg-danger-soft px-4 py-3',
       )}
-      aria-live={message.id === STREAMING_MESSAGE_ID ? 'polite' : undefined}
     >
-      {message.id === STREAMING_MESSAGE_ID && message.toolsUsed && message.toolsUsed.length > 0 ? (
-        <p className="mb-2 text-xs text-muted-foreground" aria-live="polite">
-          Consultou: {uniqueToolLabels(message.toolsUsed).join(', ')}
-        </p>
+      {message.id === STREAMING_MESSAGE_ID ? (
+        <WorkTrail
+          toolsUsed={message.toolsUsed ?? []}
+          cursor={work}
+          answering={message.content.length > 0}
+          hasSystemCard={(message.browserTaskIds?.length ?? 0) > 0}
+        />
       ) : null}
 
-      <ChatMessageContent
-        content={message.content}
-        streaming={message.id === STREAMING_MESSAGE_ID}
-        variant={isError ? 'error' : 'assistant'}
-      />
+      {message.content || message.id !== STREAMING_MESSAGE_ID ? (
+        <ChatMessageContent
+          content={message.content}
+          streaming={message.id === STREAMING_MESSAGE_ID}
+          variant={isError ? 'error' : 'assistant'}
+        />
+      ) : null}
 
       {message.attachments && message.attachments.length > 0 ? (
         <div className="mt-4 flex flex-col gap-3">
@@ -506,7 +539,7 @@ function MessageRow({
       ) : null}
 
       {message.id !== STREAMING_MESSAGE_ID && message.sources && message.sources.length > 0 ? (
-        <SourceChips sources={message.sources} toolsUsed={message.toolsUsed ?? []} />
+        <SourceFooter sources={message.sources} />
       ) : null}
 
       {message.proposals?.map((proposal) => (
@@ -520,7 +553,15 @@ function MessageRow({
       ))}
 
       {message.browserTaskIds?.map((id) => (
-        <BrowserTaskCard key={id} taskId={id} canControl={canControl} endpoints={endpoints} onResponse={onBrowserResponse} />
+        <BrowserTaskCard
+          key={id}
+          taskId={id}
+          canControl={canControl}
+          endpoints={endpoints}
+          assumeWorking={pendingBrowserIds.has(id)}
+          onResponse={onBrowserResponse}
+          onActivity={onBrowserActivity}
+        />
       ))}
     </div>
   );
@@ -550,67 +591,49 @@ type BrowserTaskView = {
   chatResponse?: ChatMessageView | null;
 };
 
-const BROWSER_ERROR_MESSAGES: Record<string, string> = {
-  BROWSER_RUNTIME_UNAUTHORIZED:
-    'O Browser Runtime rejeitou a autenticação. Verifique se o token do Web e dos containers é o mesmo.',
-  BROWSER_RUNTIME_UNAVAILABLE: 'O Browser Runtime está indisponível no momento.',
-  NETWORK_BLOCKED: 'O domínio acessado não está autorizado no perfil deste sistema.',
-  ELEMENT_NOT_FOUND:
-    'O elemento indicado não existe mais no snapshot atual da página. A tarefa foi interrompida antes de executar uma ação no elemento errado.',
-  NO_PROGRESS:
-    'A página não mudou após três tentativas de recuperação. O agente interrompeu a tarefa para não entrar em loop.',
-  'Browser Agent reached its step limit':
-    'O Browser Agent atingiu o limite de ações sem concluir a tarefa. A execução foi interrompida para evitar um loop.',
-};
-
-function browserErrorMessage(error: string): string {
-  return BROWSER_ERROR_MESSAGES[error] ?? error;
-}
-
-function progressLocation(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return `${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}${parsed.hash}`;
-  } catch {
-    return null;
-  }
-}
-
-function progressTime(createdAt: string): string {
-  return new Date(createdAt).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
 /**
- * Cartão do Browser Agent: a tarefa roda de forma autônoma; o usuário acompanha
- * as ações ao vivo e pode interrompê-la a qualquer momento.
+ * Acesso a um sistema web: o objetivo e o passo atual ficam à vista.
+ * O histórico é uma lista de frases, sem horário, código ou caminho.
  */
 function BrowserTaskCard({
   taskId,
   canControl,
   endpoints,
+  assumeWorking,
   onResponse,
+  onActivity,
 }: {
   taskId: string;
   canControl: boolean;
   endpoints: ChatEndpoints;
+  /** Task started in this visit: treat it as working before the first status arrives. */
+  assumeWorking: boolean;
   onResponse: (response: ChatMessageView) => void;
+  onActivity: (taskId: string, working: boolean) => void;
 }) {
   const [task, setTask] = useState<BrowserTaskView | null>(null);
   const [error, setError] = useState('');
   const [live, setLive] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState('');
+  const [resultWaitExpired, setResultWaitExpired] = useState(false);
   const onResponseRef = useRef(onResponse);
+  const resultWaitStarted = useRef<number | null>(null);
   onResponseRef.current = onResponse;
 
   const status = task?.status ?? 'QUEUED';
   const active = isBrowserTaskActive(status);
   const queuedStale = isBrowserTaskQueuedStale(status, task?.createdAt);
+  const working =
+    task != null &&
+    !resultWaitExpired &&
+    browserCardBlocksFollowUps(task.status, Boolean(task.chatResponse));
+  const awaitingAnswer = task != null && !active && working;
+
+  useEffect(() => {
+    if (!task) return;
+    onActivity(taskId, working);
+  }, [task, taskId, working, onActivity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -629,13 +652,26 @@ function BrowserTaskCard({
         const next = payload.data;
         setError('');
         if (next.chatResponse) onResponseRef.current(next.chatResponse);
-        // A poll that started before "Parar agente" must not resurrect the task in the UI.
+        // A poll that started before "Parar" must not resurrect the task in the UI.
         setTask((current) =>
           current && !isBrowserTaskActive(current.status) && isBrowserTaskActive(next.status)
             ? current
             : next,
         );
-        const delay = browserTaskPollDelay(next.status, live);
+        const awaitingResult =
+          !isBrowserTaskActive(next.status) &&
+          browserCardBlocksFollowUps(next.status, Boolean(next.chatResponse));
+        if (!awaitingResult) resultWaitStarted.current = null;
+        else resultWaitStarted.current ??= Date.now();
+        const expired = browserResultWaitExpired(resultWaitStarted.current);
+        if (expired) setResultWaitExpired(true);
+        const delay = expired
+          ? null
+          : browserTaskPollDelay(
+              next.status,
+              live,
+              browserCardBlocksFollowUps(next.status, Boolean(next.chatResponse)),
+            );
         if (delay !== null) timer = setTimeout(() => void poll(), delay);
       } catch (cause) {
         if (cancelled) return;
@@ -668,7 +704,7 @@ function BrowserTaskCard({
       }
       setTask(payload.data);
     } catch (cause) {
-      setStopError(cause instanceof Error ? cause.message : 'Não foi possível parar o agente.');
+      setStopError(cause instanceof Error ? cause.message : 'Não foi possível parar.');
     } finally {
       setStopping(false);
     }
@@ -679,71 +715,70 @@ function BrowserTaskCard({
   const showStop = canStopBrowserTask(status, canControl);
   const showTimelineToggle = active || progress.length > 0;
 
+  const currentAction = active && latest ? progressSentence(latest) : null;
+
+  const showShine = task ? working : assumeWorking;
+
   return (
     <section
-      className="mt-4 max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
-      aria-label="Tarefa do Browser Agent"
+      className={cn(
+        'relative mt-4 overflow-hidden rounded-2xl border border-border bg-card',
+        showShine && 'tactia-card-working',
+      )}
+      aria-label="Acessando o sistema"
+      aria-busy={showShine || undefined}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary/40 px-4 py-3">
+      {showShine ? <div className="tactia-card-shine" aria-hidden /> : null}
+      <div className="relative">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <span
             className={cn(
               'size-2 rounded-full',
-              active ? 'animate-pulse bg-primary' : status === 'COMPLETED' ? 'bg-success' : 'bg-muted-foreground/60',
+              active ? 'bg-primary motion-safe:animate-pulse' : status === 'COMPLETED' ? 'bg-success' : 'bg-muted-foreground/60',
             )}
             aria-hidden
           />
-          <strong className="font-mono text-xs uppercase tracking-[0.12em]">Browser Agent</strong>
+          <h3 className="text-sm font-medium">Acessando o sistema</h3>
         </div>
         <span role="status" className="text-xs text-muted-foreground">
-          {BROWSER_STATUS_LABELS[status] ?? status}
+          {awaitingAnswer ? 'Escrevendo a resposta' : browserStatusLabel(status)}
         </span>
       </div>
 
       <div className="space-y-3 px-4 py-4">
-        {task ? (
-          <p className="text-sm">{task.objective}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">Carregando tarefa…</p>
-        )}
+        {!task ? (
+          <p className="text-sm text-muted-foreground">Preparando o acesso…</p>
+        ) : null}
 
-        {status === 'RUNNING' ? (
-          <p className="text-xs text-muted-foreground">
-            {task?.stepCount ?? 0} {task?.stepCount === 1 ? 'ação concluída' : 'ações concluídas'}
-            {latest ? ` · ${latest.label}` : ''}
+        {currentAction ? (
+          <p className="text-sm" aria-live="polite">
+            {currentAction}
           </p>
         ) : null}
 
         {queuedStale ? (
-          <Alert tone="warning" title="Aguardando serviço de execução">
-            A tarefa foi enfileirada, mas o worker ainda não a iniciou. Confirme que o processo Web está ativo com JOBS_ENABLED=true.
+          <Alert tone="warning" title="Ainda não começou">
+            Se continuar assim, quem administra a Tactia precisa conferir o serviço.
           </Alert>
         ) : null}
 
         {task?.legacyApproval ? (
-          <Alert tone="warning" title="Execução antiga">
-            Esta tarefa foi criada quando o Browser Agent ainda pedia aprovação e não continuará.
-            Interrompa-a e solicite a tarefa novamente para rodar no modo autônomo.
+          <Alert tone="warning" title="Esta tarefa não continua">
+            Peça de novo.
           </Alert>
         ) : null}
 
-        {task?.result?.summary ? (
-          <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-            {task.result.summary}
-          </p>
-        ) : null}
-
         {status === 'CANCELLED' && !task?.safeError ? (
-          <p className="text-xs text-muted-foreground">Interrompida pelo usuário.</p>
+          <p className="text-xs text-muted-foreground">Interrompida por você.</p>
         ) : null}
 
         {task?.safeError ? (
           <Alert
             tone={status === 'CANCELLED' ? 'warning' : 'danger'}
-            title={status === 'CANCELLED' ? 'Tarefa encerrada' : 'Não foi possível concluir a tarefa'}
+            title={status === 'CANCELLED' ? 'Acesso encerrado' : 'Não consegui concluir'}
           >
-            {browserErrorMessage(task.safeError)}
-            {status === 'FAILED' && latest ? ` Última ação: ${latest.label.toLowerCase()}.` : ''}
+            {browserUserError(task.safeError)}
           </Alert>
         ) : null}
 
@@ -751,45 +786,36 @@ function BrowserTaskCard({
           <Collapsible open={live} onOpenChange={setLive}>
             <div className="flex flex-wrap items-center gap-2">
               {showTimelineToggle ? (
-                <CollapsibleTrigger render={<Button type="button" variant="outline" size="sm" />}>
-                  {live ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-                  {live
-                    ? active
-                      ? 'Ocultar acompanhamento'
-                      : 'Ocultar histórico'
-                    : active
-                      ? 'Acompanhar ao vivo'
-                      : `Ver histórico (${progress.length})`}
+                <CollapsibleTrigger
+                  render={<Button type="button" variant="outline" className="min-h-11" />}
+                >
+                  {live ? 'Ocultar' : 'Ver o que foi feito'}
                 </CollapsibleTrigger>
               ) : null}
               {showStop ? (
                 <Button
                   type="button"
                   variant="destructive"
-                  size="sm"
+                  className="min-h-11"
                   loading={stopping}
                   onClick={() => void stop()}
                 >
                   {stopping ? null : <StopCircle aria-hidden />}
-                  {stopping ? 'Parando…' : 'Parar agente'}
+                  {stopping ? 'Parando…' : 'Parar'}
                 </Button>
               ) : null}
             </div>
             <CollapsibleContent>
-              <ol
-                role="log"
-                aria-live="polite"
-                aria-label="Ações executadas pelo Browser Agent"
-                className="mt-3 max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs"
-              >
+              <ol aria-label="O que foi feito" className="mt-3 space-y-2 text-sm">
                 {progress.length === 0 ? (
                   <li className="text-muted-foreground">
-                    {status === 'QUEUED' ? 'Aguardando início…' : 'Nenhuma ação registrada ainda.'}
+                    {status === 'QUEUED' ? 'Preparando o acesso…' : 'Ainda não há passos.'}
                   </li>
                 ) : (
                   progress.map((item, index) => {
                     const current = active && index === progress.length - 1;
-                    const location = progressLocation(item.url);
+                    const host = browserProgressHost(item.url);
+                    const failed = item.status === 'FAILED' || item.status === 'REJECTED';
                     return (
                       <li
                         key={item.id}
@@ -798,31 +824,17 @@ function BrowserTaskCard({
                       >
                         <span
                           className={cn(
-                            'mt-1 size-1.5 shrink-0 rounded-full',
-                            item.status === 'FAILED'
-                              ? 'bg-danger'
-                              : current
-                                ? 'animate-pulse bg-primary'
-                                : 'bg-muted-foreground/50',
+                            'mt-2 h-px w-3 shrink-0',
+                            failed ? 'bg-danger' : current ? 'bg-primary' : 'bg-muted-foreground/40',
                           )}
                           aria-hidden
                         />
-                        <span className="shrink-0 font-mono text-muted-foreground">
-                          {progressTime(item.createdAt)}
-                        </span>
                         <span className="min-w-0">
-                          <span className={cn(current && 'font-medium text-foreground')}>
-                            {item.label}
+                          <span className={cn(current ? 'text-foreground' : 'text-muted-foreground')}>
+                            {progressSentence(item)}
                           </span>
-                          {item.status === 'FAILED' ? (
-                            <span className="text-danger">
-                              {' '}
-                              — {BROWSER_PROGRESS_STATUS_LABELS.FAILED}
-                              {item.errorCode ? ` (${item.errorCode})` : ''}
-                            </span>
-                          ) : null}
-                          {location ? (
-                            <span className="block truncate text-muted-foreground">{location}</span>
+                          {host ? (
+                            <span className="block truncate text-xs text-muted-foreground">{host}</span>
                           ) : null}
                         </span>
                       </li>
@@ -851,29 +863,116 @@ function BrowserTaskCard({
               <li key={artifact.id}>
                 <a
                   href={endpoints.assetUrl(artifact.url)}
-                  className="inline-flex rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-primary hover:border-primary/40"
+                  className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 text-xs font-medium text-primary hover:border-primary/40"
                 >
-                  Baixar {artifact.filename}
+                  {browserDownloadLabel(artifact.filename)}
                 </a>
               </li>
             ))}
           </ul>
         ) : null}
       </div>
+      </div>
     </section>
   );
 }
 
-function ActivityIndicator({ activity }: { activity: string }) {
+function progressSentence(item: BrowserTaskProgress): string {
+  if (item.status === 'FAILED' || item.status === 'REJECTED') return 'Não consegui concluir esse passo';
+  return item.label;
+}
+
+function WorkTrail({
+  toolsUsed,
+  cursor,
+  answering,
+  hasSystemCard,
+}: {
+  toolsUsed: string[];
+  cursor: WorkCursor | null;
+  answering: boolean;
+  hasSystemCard: boolean;
+}) {
+  const [showHidden, setShowHidden] = useState(false);
+
+  if (answering) {
+    if (!hasNonSystemWork(toolsUsed)) return null;
+    return <p className="mb-3 text-xs text-muted-foreground">{WORK_CHECKED_LABEL}</p>;
+  }
+
+  const { visible, hidden } = buildWorkTrail(toolsUsed, cursor, { omitSystem: hasSystemCard });
+  if (visible.length === 0) {
+    if (hasSystemCard) return null;
+    return (
+      <ul className="mb-3">
+        <WorkTrailLine label={WORK_THINKING_LABEL} status="active" live />
+      </ul>
+    );
+  }
+
+  const liveStep = visible.find((step) => step.status !== 'done');
+
   return (
-    <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
-      <span className="inline-flex gap-1" aria-hidden="true">
-        <span className="size-1.5 animate-bounce rounded-full bg-primary [animation-delay:0ms]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-primary [animation-delay:150ms]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-primary [animation-delay:300ms]" />
-      </span>
-      <span>Tactia está {activity}…</span>
+    <div className="mb-3">
+      {hidden.length > 0 ? (
+        <button
+          type="button"
+          aria-expanded={showHidden}
+          onClick={() => setShowHidden((open) => !open)}
+          className="mb-1 min-h-11 text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          {showHidden
+            ? 'Ocultar'
+            : `Já conferi mais ${hidden.length} ${hidden.length === 1 ? 'item' : 'itens'}`}
+        </button>
+      ) : null}
+      <ul className="space-y-1.5">
+        {showHidden
+          ? hidden.map((step, index) => (
+              <WorkTrailLine key={`hidden-${step.phase}-${index}`} label={step.label} status={step.status} />
+            ))
+          : null}
+        {visible.map((step, index) => (
+          <WorkTrailLine
+            key={`${step.phase}-${index}`}
+            label={step.label}
+            status={step.status}
+            live={liveStep === step}
+          />
+        ))}
+      </ul>
     </div>
+  );
+}
+
+function WorkTrailLine({
+  label,
+  status,
+  live = false,
+}: {
+  label: string;
+  status: WorkTrailStep['status'];
+  live?: boolean;
+}) {
+  const current = status !== 'done';
+  return (
+    <li
+      className="flex items-start gap-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200"
+      {...(live ? { 'aria-live': 'polite' as const } : {})}
+    >
+      {current ? (
+        <span
+          className={cn(
+            'mt-1.5 size-1.5 shrink-0 rounded-full bg-primary',
+            status === 'active' && 'motion-safe:animate-pulse',
+          )}
+          aria-hidden
+        />
+      ) : (
+        <span className="mt-2 h-px w-3 shrink-0 bg-muted-foreground/40" aria-hidden />
+      )}
+      <span className={cn(current ? 'text-sm text-foreground' : 'text-xs text-muted-foreground')}>{label}</span>
+    </li>
   );
 }
 
@@ -913,35 +1012,23 @@ function FollowUpChips({
   );
 }
 
-/** "Fonte: receita — 01/08/2026 a 01/09/2026" (spec §43). */
-function SourceChips({ sources, toolsUsed }: { sources: ChatSource[]; toolsUsed: string[] }) {
-  const metricNames = Array.from(new Set(sources.map((source) => metricLabel(source.metric))));
+/** Quiet citation: metric and period, never the tool that fetched them. */
+function SourceFooter({ sources }: { sources: ChatSource[] }) {
+  const summary = sourceSummary(sources);
+  const lines = sourceLines(sources);
+  if (!summary || lines.length === 0) return null;
+
   return (
-    <Collapsible className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2">
-      <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between text-left text-xs font-medium text-muted-foreground">
-        <span>
-          Fontes · {metricNames.slice(0, 4).join(', ')}
-          {metricNames.length > 4 ? ` +${metricNames.length - 4}` : ''}
-        </span>
-        {toolsUsed.length > 0 ? (
-          <span className="ml-2 shrink-0 font-normal">
-            {toolsUsed.length} {toolsUsed.length === 1 ? 'consulta' : 'consultas'}
-          </span>
-        ) : null}
+    <Collapsible className="mt-4">
+      <CollapsibleTrigger
+        className="inline-flex min-h-11 items-center text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      >
+        {summary}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        {toolsUsed.length > 0 ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Consultou: {uniqueToolLabels(toolsUsed).join(', ')}
-          </p>
-        ) : null}
-        <ul className="mt-2 flex flex-col gap-1 border-t border-border/60 pt-2 text-xs text-muted-foreground">
-          {sources.map((source, index) => (
-            <li key={`${source.metric}-${index}`}>
-              {metricLabel(source.metric)}
-              {source.period ? ` — ${formatPeriod(source.period)}` : ''}
-              {source.tool ? ` · ${source.tool}` : ''}
-            </li>
+        <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+          {lines.map((line) => (
+            <li key={line.key}>{line.label}</li>
           ))}
         </ul>
       </CollapsibleContent>

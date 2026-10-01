@@ -1,0 +1,57 @@
+/* Warm sheen while a system-access card is still working. Brand colors, low enough to keep the text readable. */
+.tactia-card-working {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--brand-from, #fe2204) 9%, var(--card, #fffcfa)) 0%,
+    var(--card, #fffcfa) 46%,
+    color-mix(in srgb, var(--brand-to, #fe7200) 12%, var(--card, #fffcfa)) 100%
+  );
+}
+
+.tactia-card-shine {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.tactia-card-shine::after {
+  content: '';
+  position: absolute;
+  top: -30%;
+  bottom: -30%;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in srgb, var(--brand-from, #fe2204) 18%, transparent) 38%,
+    color-mix(in srgb, var(--brand-to, #fe7200) 55%, white) 50%,
+    color-mix(in srgb, var(--brand-to, #fe7200) 20%, transparent) 64%,
+    transparent 100%
+  );
+  animation: tactia-card-shine 2.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes tactia-card-shine {
+  0% {
+    transform: translateX(-160%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tactia-card-shine::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.35;
+    background: linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--brand-from, #fe2204) 12%, transparent),
+      color-mix(in srgb, var(--brand-to, #fe7200) 16%, transparent)
+    );
+  }
+}
