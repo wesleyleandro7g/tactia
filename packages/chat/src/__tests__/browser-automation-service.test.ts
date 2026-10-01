@@ -594,4 +594,43 @@ describe('Browser Agent chat result publishing', () => {
     }));
     expect(publishResult.mock.calls[0]?.[0].content).toContain('**Resposta:**\nUsuários: Ana, Bruno');
   });
+
+  it('persists the agent diagnosis when finish screenshot storage is down', async () => {
+    const storage = {
+      put: vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:9000')),
+      get: vi.fn(),
+      delete: vi.fn(),
+      exists: vi.fn(),
+    };
+    const service = new BrowserAutomationService({
+      queue: () => ({ publish }),
+      executionEngine: () => mocks.executionEngine,
+      storage,
+    });
+    mocks.llm.complete.mockResolvedValueOnce(
+      toolCall('browser_finish', {
+        success: false,
+        answer: 'O login não avançou após preencher usuário e senha.',
+      }),
+    );
+
+    await service.run(TENANT, TASK);
+
+    expect(mocks.repo.finishTask).toHaveBeenCalledWith(
+      TENANT,
+      TASK,
+      expect.objectContaining({
+        status: 'FAILED',
+        result: expect.objectContaining({
+          summary: 'O login não avançou após preencher usuário e senha.',
+          chatContent: expect.stringContaining('O login não avançou após preencher usuário e senha.'),
+        }),
+      }),
+    );
+    expect(mocks.repo.finishTask).not.toHaveBeenCalledWith(
+      TENANT,
+      TASK,
+      expect.objectContaining({ safeError: 'Falha na automação do navegador.' }),
+    );
+  });
 });

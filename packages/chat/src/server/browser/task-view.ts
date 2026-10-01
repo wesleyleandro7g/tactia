@@ -103,7 +103,7 @@ export function toPublicBrowserTask(task: BrowserTaskRecord) {
     stepCount: task.stepCount,
     result: task.result,
     safeError: task.safeError,
-    chatResponse: task.status === 'COMPLETED' && chatContent
+    chatResponse: (task.status === 'COMPLETED' || task.status === 'FAILED') && chatContent
       ? {
           id: task.resultMessage?.id ?? `browser-result-${task.id}`,
           role: 'assistant' as const,

@@ -146,6 +146,14 @@ function browserStateFingerprint(state: BrowserState): string {
   });
 }
 
+function browserStorageFailureMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  if (/ECONNREFUSED|ENOTFOUND|S3|NoSuchBucket|credentials provider/i.test(message)) {
+    return 'Não foi possível gravar a evidência da tarefa porque o armazenamento de arquivos está indisponível.';
+  }
+  return 'Falha na automação do navegador.';
+}
+
 function browserStateForModel(state: BrowserState): string {
   const navigation = (state.navigationItems ?? [])
     .slice(0, 100)
@@ -472,17 +480,7 @@ export class BrowserAutomationService {
             continue;
           }
           const result = parsedFinish.data;
-          const extraction = await runtime.extract(sessionId);
-          const screenshot = await runtime.screenshot(sessionId);
-          const artifact = await this.saveArtifact(
-            tenantId,
-            taskId,
-            sessionId,
-            'SCREENSHOT',
-            'final.png',
-            Buffer.from(screenshot.base64, 'base64'),
-            'image/png',
-          );
+          const evidence = await this.captureFinishEvidence(runtime, sessionId, tenantId, taskId);
           // Checkpoint 4: never record a conclusion over a user cancellation.
           const chatContent = formatBrowserResultMessage(task.objective, result.answer);
           const recorded = await repo.finishTask(tenantId, taskId, {
@@ -490,14 +488,14 @@ export class BrowserAutomationService {
             result: {
               summary: result.answer,
               shortSummary: result.summary,
-              text: extraction.text.slice(0, 10000),
-              screenshotId: artifact.id,
-              ...(result.success ? { chatContent } : {}),
+              text: evidence.extractionText,
+              ...(evidence.screenshotId ? { screenshotId: evidence.screenshotId } : {}),
+              chatContent,
             },
             stepCount: index,
           });
           if (!recorded) throw new BrowserTaskStopped('Browser task was stopped by the user');
-          if (result.success && task.conversationId && this.deps.resultPublisher) {
+          if (task.conversationId && this.deps.resultPublisher) {
             try {
               await this.deps.resultPublisher.publish({
                 tenantId,
@@ -707,7 +705,7 @@ export class BrowserAutomationService {
         outcome = 'CANCELLED';
       } else {
         const safeError =
-          error instanceof AppError ? error.message : 'Falha na automação do navegador.';
+          error instanceof AppError ? error.message : browserStorageFailureMessage(error);
         logger.error({
           operation: 'browser_task_failed',
           tenant_id: tenantId,
@@ -942,6 +940,48 @@ export class BrowserAutomationService {
       action_type: actionType,
       error_code: errorCode,
     });
+  }
+
+  private async captureFinishEvidence(
+    runtime: BrowserRuntimeClient,
+    sessionId: string,
+    tenantId: string,
+    taskId: string,
+  ): Promise<{ extractionText: string; screenshotId?: string }> {
+    let extractionText = '';
+    let screenshotId: string | undefined;
+    try {
+      const extraction = await runtime.extract(sessionId);
+      extractionText = extraction.text.slice(0, 10000);
+    } catch (error) {
+      logger.warn({
+        operation: 'browser_task_extract_failed',
+        tenant_id: tenantId,
+        task_id: taskId,
+        error_message: error instanceof Error ? error.message.slice(0, 200) : 'extract failed',
+      });
+    }
+    try {
+      const screenshot = await runtime.screenshot(sessionId);
+      const artifact = await this.saveArtifact(
+        tenantId,
+        taskId,
+        sessionId,
+        'SCREENSHOT',
+        'final.png',
+        Buffer.from(screenshot.base64, 'base64'),
+        'image/png',
+      );
+      screenshotId = artifact.id;
+    } catch (error) {
+      logger.warn({
+        operation: 'browser_task_finish_artifact_failed',
+        tenant_id: tenantId,
+        task_id: taskId,
+        error_message: error instanceof Error ? error.message.slice(0, 200) : 'screenshot failed',
+      });
+    }
+    return { extractionText, screenshotId };
   }
 
   private async saveArtifact(

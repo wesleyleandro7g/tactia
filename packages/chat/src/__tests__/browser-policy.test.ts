@@ -402,4 +402,25 @@ describe('browser task chat response', () => {
       toolsUsed: ['browser_agent'],
     });
   });
+
+  it('surfaces the agent diagnosis when the task finished as FAILED', () => {
+    const task = toPublicBrowserTask({
+      id: 'task-result-2',
+      profileId: 'profile-1',
+      objective: 'Entre no ERP',
+      status: 'FAILED',
+      stepCount: 7,
+      result: { summary: 'O login não avançou após preencher usuário e senha.' },
+      safeError: null,
+      createdAt: new Date(),
+      finishedAt: new Date(),
+      artifacts: [],
+    });
+
+    expect(task.chatResponse).toMatchObject({
+      role: 'assistant',
+      content: expect.stringContaining('O login não avançou após preencher usuário e senha.'),
+      browserResultTaskId: 'task-result-2',
+    });
+  });
 });
