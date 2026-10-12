@@ -7,6 +7,9 @@ if (site && !/^https?:\/\//.test(site))
 export default defineConfig({
   site,
   output: 'static',
+  redirects: {
+    '/funcionarios-digitais': '/workforce',
+  },
   server: { port: 4321 },
   vite: {
     server: {
