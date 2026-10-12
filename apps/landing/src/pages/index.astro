@@ -87,11 +87,6 @@ const needs = [
   updateHeader();
   window.addEventListener('scroll', updateHeader, { passive: true });
 
-  const menu = document.querySelector<HTMLDetailsElement>('.home-nav-menu');
-  document.addEventListener('click', (event) => { if (menu && !menu.contains(event.target as Node)) menu.open = false; });
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && menu?.open) { menu.open = false; menu.querySelector('summary')?.focus(); } });
-  menu?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => { menu.open = false; }));
-
   document.querySelectorAll<HTMLAnchorElement>('[data-home-hero]').forEach((link) => link.addEventListener('click', () => emit(link.dataset.homeHero === 'primary' ? 'hero_primary_click' : 'hero_secondary_click', { placement: 'hero' })));
   document.querySelectorAll<HTMLAnchorElement>('[data-home-selector]').forEach((link) => link.addEventListener('click', () => emit('solution_selector_click', { need: link.dataset.homeSelector || '', destination: link.getAttribute('href') || '' })));
   document.querySelectorAll<HTMLAnchorElement>('[data-home-product]').forEach((link) => link.addEventListener('click', () => emit('product_card_click', { product: link.dataset.homeProduct || '', placement: 'home' })));

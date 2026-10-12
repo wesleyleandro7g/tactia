@@ -5,6 +5,7 @@ import '@fontsource/ibm-plex-sans/latin-500.css';
 import '../styles/global.css';
 import '../styles/workforce.css';
 import Icon from './Icon.astro';
+import SolutionsMenu from './SolutionsMenu.astro';
 
 interface Props {
   title: string;
@@ -52,49 +53,45 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
         </a>
         {academy ? (
           <nav aria-label="Navegação da Academy">
+            <SolutionsMenu current="academy" />
             <a href="#como-funciona">Como funciona</a>
             <a href="#formacoes">Trilhas</a>
             <a href="#para-quem">Para quem é</a>
             <a href="#comunidade">Comunidade</a>
             <a href="#perguntas">Perguntas frequentes</a>
-            <a class="nav-action" href="#formacoes">Explorar formações <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
+            <a class="nav-action" href="#formacoes"><span class="nav-action__full">Explorar formações</span><span class="nav-action__short">Formações</span> <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : build ? (
           <nav aria-label="Navegação da Build">
-            <a href="#solucoes">Soluções</a>
+            <SolutionsMenu current="build" />
+            <a href="#solucoes">Serviços</a>
             <a href="#processo">Como trabalhamos</a>
             <a href="#investimento">Investimento</a>
             <a href="#faq">Dúvidas</a>
-            <a class="nav-action" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
+            <a class="nav-action" href="#diagnostico"><span class="nav-action__full">Solicitar diagnóstico</span><span class="nav-action__short">Diagnóstico</span> <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : workforce ? (
           <nav aria-label="Navegação da Workforce">
+            <SolutionsMenu current="workforce" />
             <a href="#funcionarios">Funcionários digitais</a>
             <a href="#como-funciona">Como funciona</a>
             <a href="#planos">Contratação</a>
             <a href="#duvidas">Dúvidas</a>
-            <a class="nav-action" href="#diagnostico">Montar minha Workforce <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
+            <a class="nav-action" href="#diagnostico"><span class="nav-action__full">Montar minha Workforce</span><span class="nav-action__short">Montar</span> <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : intelligence ? (
           <nav aria-label="Navegação da Intelligence">
+            <SolutionsMenu current="intelligence" />
             <a href="#visao-geral">Visão geral</a>
             <a href="#como-funciona">Como funciona</a>
             <a href="#aplicacoes">Aplicações</a>
             <a href="#seguranca">Segurança</a>
             <a href="#duvidas">Dúvidas</a>
-            <a class="nav-action" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
+            <a class="nav-action" href="#diagnostico"><span class="nav-action__full">Solicitar diagnóstico</span><span class="nav-action__short">Diagnóstico</span> <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : (
           <nav aria-label="Navegação principal">
-            <details class="home-nav-menu">
-              <summary>Soluções <span aria-hidden="true"><Icon name="chevron-down" /><Icon name="menu" /></span></summary>
-              <div class="home-nav-menu__links">
-                <a href="/academy">Academy · Aprenda</a>
-                <a href="/build">Build · Construa</a>
-                <a href="/workforce">Workforce · Delegue</a>
-                <a href="/intelligence">Intelligence · Decida</a>
-              </div>
-            </details>
+            <SolutionsMenu />
             <a href="#como-funciona">Como funciona</a>
             <a href="#por-que-tactia">Por que a Tactia</a>
             <a href="#diagnostico">Contato</a>

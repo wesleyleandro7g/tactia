@@ -1,0 +1,37 @@
+---
+import Icon from './Icon.astro';
+
+interface Props {
+  current?: 'academy' | 'build' | 'workforce' | 'intelligence';
+}
+
+const { current } = Astro.props;
+
+const solutions = [
+  { href: '/academy', key: 'academy', label: 'Academy · Aprenda' },
+  { href: '/build', key: 'build', label: 'Build · Construa' },
+  { href: '/workforce', key: 'workforce', label: 'Workforce · Delegue' },
+  { href: '/intelligence', key: 'intelligence', label: 'Intelligence · Decida' },
+] as const;
+---
+
+<details class="solutions-menu">
+  <summary>Soluções <span aria-hidden="true"><Icon name="chevron-down" /><Icon name="menu" /></span></summary>
+  <div class="solutions-menu__links">
+    {solutions.map(({ href, key, label }) => <a href={href} aria-current={current === key ? 'page' : undefined}>{label}</a>)}
+  </div>
+</details>
+
+<script>
+  document.querySelectorAll<HTMLDetailsElement>('.solutions-menu').forEach((menu) => {
+    document.addEventListener('click', (event) => {
+      if (!menu.contains(event.target as Node)) menu.open = false;
+    });
+    menu.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || !menu.open) return;
+      menu.open = false;
+      menu.querySelector('summary')?.focus();
+    });
+    menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => { menu.open = false; }));
+  });
+</script>
