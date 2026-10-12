@@ -11,9 +11,10 @@ interface Props {
   requireContext?: boolean;
   contextLabel?: string;
   contextPlaceholder?: string;
+  needs?: { value: string; label: string }[];
 }
 
-const { id, offer, heading, intro, submitLabel, compact = false, successHeading = 'Obrigado. Vamos olhar para o seu contexto.', successMessage = 'Recebemos seus dados e a equipe da Tactia seguirá com o próximo passo pelo contato informado.', requireContext = false, contextLabel = 'O que você quer melhorar?', contextPlaceholder = 'Uma tarefa, processo ou contexto que vale a pena conhecer.' } = Astro.props;
+const { id, offer, heading, intro, submitLabel, compact = false, successHeading = 'Obrigado. Vamos olhar para o seu contexto.', successMessage = 'Recebemos seus dados e a equipe da Tactia seguirá com o próximo passo pelo contato informado.', requireContext = false, contextLabel = 'O que você quer melhorar?', contextPlaceholder = 'Uma tarefa, processo ou contexto que vale a pena conhecer.', needs } = Astro.props;
 ---
 
 <section class:list={['lead-form', { 'lead-form--compact': compact }]} aria-labelledby={`${id}-title`}>
@@ -39,6 +40,13 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
         <label for={`${id}-whatsapp`}>WhatsApp com DDD <span aria-hidden="true">*</span></label>
         <input id={`${id}-whatsapp`} name="whatsapp" type="tel" autocomplete="tel" maxlength="30" required placeholder="(11) 99999-9999" />
       </div>
+      {needs && <div class="lead-field lead-field--full">
+        <label for={`${id}-need`}>O que você quer resolver? <span aria-hidden="true">*</span></label>
+        <select id={`${id}-need`} name="need" required>
+          <option value="">Selecione a prioridade da sua empresa</option>
+          {needs.map(({ value, label }) => <option value={value}>{label}</option>)}
+        </select>
+      </div>}
       <div class="lead-field lead-field--full">
         <label for={`${id}-context`}>{contextLabel} {requireContext ? <span aria-hidden="true">*</span> : <span class="lead-field__optional">Opcional</span>}</label>
         <textarea id={`${id}-context`} name="context" rows="3" maxlength="1600" minlength={requireContext ? 10 : undefined} required={requireContext} data-require-context={requireContext ? 'true' : undefined} placeholder={contextPlaceholder}></textarea>
@@ -106,6 +114,13 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
         tracker('form_validation_failed', { offer: form.dataset.offer || 'unknown' });
         return;
       }
+      if (form.querySelector('[name="need"]') && !clean(data.get('need'))) {
+        status.textContent = 'Escolha a necessidade principal da sua empresa.';
+        status.hidden = false;
+        form.querySelector<HTMLSelectElement>('[name="need"]')?.focus();
+        tracker('form_validation_failed', { offer: form.dataset.offer || 'unknown' });
+        return;
+      }
       if (form.querySelector('[data-require-context]') && clean(data.get('context')).length < 10) {
         status.textContent = 'Descreva brevemente o desafio que você quer resolver (pelo menos 10 caracteres).';
         status.hidden = false;
@@ -127,6 +142,7 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
       });
       const context = [
         `[Oferta: ${form.dataset.offer || 'Tactia'}]`,
+        clean(data.get('need')) && `[Necessidade inicial: ${clean(data.get('need'))}]`,
         clean(data.get('diagnosis')),
         clean(data.get('context')),
       ].filter(Boolean).join('\n\n');
@@ -158,7 +174,7 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
         form.hidden = true;
         success.hidden = false;
         success.focus();
-        tracker('lead_submitted', { offer: form.dataset.offer || 'unknown' });
+        tracker('lead_submitted', { offer: form.dataset.offer || 'unknown', ...(clean(data.get('need')) ? { need: clean(data.get('need')) } : {}) });
       } catch (error) {
         status.textContent = error instanceof Error ? error.message : 'Não foi possível enviar agora. Tente novamente em instantes.';
         status.hidden = false;
