@@ -13,19 +13,20 @@ interface Props {
   academy?: boolean;
   build?: boolean;
   workforce?: boolean;
+  intelligence?: boolean;
 }
 
-const { title, description, canonicalPath = '/', theme = 'light', academy = false, build = false, workforce = false } = Astro.props;
+const { title, description, canonicalPath = '/', theme = 'light', academy = false, build = false, workforce = false, intelligence = false } = Astro.props;
 const canonical = Astro.site ? new URL(canonicalPath, Astro.site).href : undefined;
 const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-black.svg';
 ---
 
 <!doctype html>
-<html lang="pt-BR" data-theme={theme} data-brand={academy ? 'academy' : build ? 'build' : workforce ? 'workforce' : undefined}>
+<html lang="pt-BR" data-theme={theme} data-brand={academy ? 'academy' : build ? 'build' : workforce ? 'workforce' : intelligence ? 'intelligence' : undefined}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content={academy ? '#171a19' : build ? '#edece6' : workforce ? '#191d1b' : theme === 'dark' ? '#112523' : '#f5f3ed'} />
+    <meta name="theme-color" content={academy ? '#171a19' : build ? '#edece6' : workforce ? '#191d1b' : intelligence ? '#1c211e' : theme === 'dark' ? '#112523' : '#f5f3ed'} />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="preload" href={bricolageFont} as="font" type="font/woff2" crossorigin />
@@ -43,9 +44,9 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
     <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
     <header class="workforce-header">
       <div class="workforce-shell workforce-nav">
-        <a class="workforce-brand" href={academy ? '/academy' : build ? '/build' : workforce ? '/workforce' : '/'} aria-label={academy ? 'Tactia Academy, início' : build ? 'Tactia Build, início' : workforce ? 'Tactia Workforce, início' : 'Tactia, início'}>
+        <a class="workforce-brand" href={academy ? '/academy' : build ? '/build' : workforce ? '/workforce' : intelligence ? '/intelligence' : '/'} aria-label={academy ? 'Tactia Academy, início' : build ? 'Tactia Build, início' : workforce ? 'Tactia Workforce, início' : intelligence ? 'Tactia Intelligence, início' : 'Tactia, início'}>
           <img src={headerLogo} alt="Tactia" width="116" height="36" />
-          <span>{academy ? 'ACADEMY' : build ? 'BUILD' : workforce ? 'WORKFORCE' : 'AI WORKFORCE'}</span>
+          <span>{academy ? 'ACADEMY' : build ? 'BUILD' : workforce ? 'WORKFORCE' : intelligence ? 'INTELLIGENCE' : 'AI WORKFORCE'}</span>
         </a>
         {academy ? (
           <nav aria-label="Navegação da Academy">
@@ -72,6 +73,15 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
             <a href="#duvidas">Dúvidas</a>
             <a class="nav-action" href="#diagnostico">Montar minha Workforce <span aria-hidden="true">↗</span></a>
           </nav>
+        ) : intelligence ? (
+          <nav aria-label="Navegação da Intelligence">
+            <a href="#visao-geral">Visão geral</a>
+            <a href="#como-funciona">Como funciona</a>
+            <a href="#aplicacoes">Aplicações</a>
+            <a href="#seguranca">Segurança</a>
+            <a href="#duvidas">Dúvidas</a>
+            <a class="nav-action" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true">↗</span></a>
+          </nav>
         ) : (
           <nav aria-label="Navegação principal">
             <a href="/#solucoes">Soluções</a>
@@ -86,11 +96,11 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
     <footer class="workforce-footer">
       <div class="workforce-shell workforce-footer-grid">
         <div>
-          <a class="workforce-brand" href={academy ? '/academy' : build ? '/build' : workforce ? '/workforce' : '/'} aria-label={academy ? 'Tactia Academy, início' : build ? 'Tactia Build, início' : workforce ? 'Tactia Workforce, início' : 'Tactia, início'}>
+          <a class="workforce-brand" href={academy ? '/academy' : build ? '/build' : workforce ? '/workforce' : intelligence ? '/intelligence' : '/'} aria-label={academy ? 'Tactia Academy, início' : build ? 'Tactia Build, início' : workforce ? 'Tactia Workforce, início' : intelligence ? 'Tactia Intelligence, início' : 'Tactia, início'}>
             <img src="/tactia-logo-white.svg" alt="Tactia" width="116" height="36" loading="lazy" />
-            <span>{academy ? 'ACADEMY' : build ? 'BUILD' : workforce ? 'WORKFORCE' : 'AI WORKFORCE'}</span>
+            <span>{academy ? 'ACADEMY' : build ? 'BUILD' : workforce ? 'WORKFORCE' : intelligence ? 'INTELLIGENCE' : 'AI WORKFORCE'}</span>
           </a>
-          <p>{academy ? 'Aprendizado prático em IA, automação e tecnologia aplicada a negócios.' : build ? 'Software sob medida para sua operação.' : workforce ? 'Delegue o trabalho. Mantenha o controle.' : 'Forças de trabalho de IA desenhadas para processos reais.'}</p>
+          <p>{academy ? 'Aprendizado prático em IA, automação e tecnologia aplicada a negócios.' : build ? 'Software sob medida para sua operação.' : workforce ? 'Delegue o trabalho. Mantenha o controle.' : intelligence ? 'Dados conectados para entender melhor o negócio.' : 'Forças de trabalho de IA desenhadas para processos reais.'}</p>
         </div>
         {academy ? (
           <div class="footer-links">
@@ -115,11 +125,21 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
             <a href="/academy">Academy</a>
             <a href="/build">Build</a>
           </div>
+        ) : intelligence ? (
+          <div class="footer-links">
+            <a href="#visao-geral">Visão geral</a>
+            <a href="#como-funciona">Como funciona</a>
+            <a href="#diagnostico">Solicitar diagnóstico</a>
+            <a href="/academy">Academy</a>
+            <a href="/build">Build</a>
+            <a href="/workforce">Workforce</a>
+          </div>
         ) : (
           <div class="footer-links">
             <a href="/academy">Tactia Academy</a>
             <a href="/workforce">Tactia Workforce</a>
             <a href="/build">Tactia Build</a>
+            <a href="/intelligence">Tactia Intelligence</a>
           </div>
         )}
         <div class="footer-legal">

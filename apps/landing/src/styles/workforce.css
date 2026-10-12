@@ -469,6 +469,7 @@
 
 .offer-card--orange { background: var(--wf-orange); border-color: var(--wf-orange); }
 .offer-card--dark { background: var(--wf-green); border-color: var(--wf-green); color: var(--wf-paper); }
+.offer-card--intelligence { background: #dedfd3; border-color: #b9c6b3; }
 
 .offer-card--orange .offer-card__text,
 .offer-card--orange .offer-card__price span {
@@ -538,6 +539,12 @@
 
 .offer-card__link span { font-size: 18px; transition: transform 160ms ease; }
 .offer-card__link:hover span { transform: translate(3px, -3px); }
+
+@media (min-width: 761px) {
+  .offer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .offer-card { min-height: 380px; }
+  .offer-card h3 { font-size: clamp(2.7rem, 4vw, 3.7rem); }
+}
 
 .offer-disclaimer,
 .possibility-note {

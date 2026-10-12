@@ -1,0 +1,100 @@
+---
+import LeadForm from '../components/LeadForm.astro';
+import SiteLayout from '../components/SiteLayout.astro';
+import '../styles/intelligence.css';
+
+const questions = [
+  ['VENDAS', 'Por que minhas vendas caíram?', 'No mock, a queda coincide com menos pedidos em duas categorias. Confira a disponibilidade de produtos e a conversão comercial antes de atribuir a mudança a uma causa.', 'Pedidos · categorias · período do mock'],
+  ['FINANCEIRO', 'A receita cresceu, mas a margem também?', 'No mock, o crescimento de receita não basta para explicar a margem. Compare custos e composição das vendas antes de concluir.', 'Receita · custos · período do mock'],
+  ['COMERCIAL', 'Onde perdemos oportunidades?', 'O mock aponta uma etapa do funil para investigação. É preciso verificar volume, critérios de qualificação e histórico das propostas.', 'CRM · etapas do funil · período do mock'],
+  ['OPERAÇÃO', 'Quais pedidos merecem atenção?', 'O mock destaca pedidos com status pendente. A prioridade dependeria dos prazos, responsáveis e dados disponíveis na empresa.', 'Pedidos · prazos · período do mock'],
+];
+
+const areas = [
+  ['Direção', 'Compare tendências e encontre os indicadores que merecem atenção.'],
+  ['Financeiro', 'Investigue recebimentos, despesas e evolução conforme as fontes conectadas.'],
+  ['Comercial', 'Relacione funil, propostas, clientes e vendas para localizar gargalos.'],
+  ['Operação', 'Acompanhe pedidos, prazos e ocorrências em uma visão organizada.'],
+  ['Marketing', 'Associe campanhas e origem de leads aos resultados comerciais disponíveis.'],
+];
+
+const steps = [
+  ['01', 'Entendemos o negócio', 'Mapeamos sistemas, indicadores, perguntas prioritárias e necessidades de acesso.'],
+  ['02', 'Avaliamos conexões', 'Verificamos fontes, permissões, qualidade e caminhos técnicos viáveis para integrar dados.'],
+  ['03', 'Organizamos a visão', 'Definimos métricas e painéis úteis, com períodos e critérios comparáveis.'],
+  ['04', 'Validamos a experiência', 'Avaliamos consultas em linguagem natural e suas limitações no contexto da empresa.'],
+];
+
+const faq = [
+  ['Preciso trocar meu ERP ou CRM?', 'Não necessariamente. O diagnóstico avalia como acessar dados dos sistemas que sua empresa já usa, de forma autorizada.'],
+  ['Funciona com qualquer sistema?', 'Não há integração universal. A viabilidade depende de APIs, exportações, permissões e qualidade dos dados de cada fonte.'],
+  ['Posso perguntar qualquer coisa à IA?', 'As perguntas e respostas dependem dos dados disponíveis e das métricas definidas no escopo. Perguntas fora desse contexto podem não ter resposta confiável.'],
+  ['As respostas são sempre corretas?', 'Não. A IA pode interpretar dados incorretamente. Fontes, premissas e conclusões precisam ser verificadas antes de decisões importantes.'],
+  ['Os dados são atualizados em tempo real?', 'A frequência depende de cada fonte e da arquitetura acordada. Não prometemos atualização em tempo real para todas as integrações.'],
+  ['Preciso ter uma equipe de dados?', 'Não é requisito universal. A necessidade de apoio interno depende dos sistemas, da qualidade dos dados e da complexidade das análises.'],
+  ['É possível personalizar os painéis?', 'Indicadores, visualizações e integrações são definidos em conjunto após a avaliação de viabilidade e escopo.'],
+  ['A Intelligence também executa tarefas?', 'Seu foco é apoiar visibilidade e análise. Para execução recorrente, conheça a Workforce; software e integrações sob medida podem envolver a Build.'],
+  ['Quanto custa?', 'Ainda não há preço público definido. O investimento será dimensionado após avaliar fontes, usuários, indicadores e necessidades de implantação e suporte.'],
+  ['Como começo?', 'Descreva os sistemas que utiliza e as perguntas que gostaria de responder. A equipe avaliará o contexto e entrará em contato sobre o próximo passo.'],
+];
+---
+
+<SiteLayout title="Tactia Intelligence | Seus dados já sabem a resposta" description="Conecte ERP, CRM, financeiro e planilhas em uma visão integrada. Explore indicadores e perguntas aos seus dados com IA para decidir com mais clareza." canonicalPath="/intelligence" theme="dark" intelligence>
+  <section id="visao-geral" class="in-hero in-shell" aria-labelledby="in-title"><div class="in-hero__copy"><p class="in-label"><span aria-hidden="true">✳</span> TACTIA INTELLIGENCE · INTELIGÊNCIA PARA O NEGÓCIO</p><h1 id="in-title">Seus dados já sabem <em>a resposta.</em></h1><p class="in-hero__tagline">Agora você pode fazer as perguntas certas.</p><p class="in-hero__intro">Seu ERP, CRM, financeiro e planilhas guardam partes da história da empresa. A proposta da Intelligence é conectar essas informações, organizar indicadores e permitir novas formas de investigar o negócio — com IA quando os dados e o escopo permitirem.</p><div class="in-actions"><a class="in-button" href="#diagnostico" data-in-hero-cta>Quero entender melhor meu negócio <span aria-hidden="true">↗</span></a><a class="in-link" href="#como-funciona">Ver como funciona <span aria-hidden="true">↘</span></a></div><p class="in-hero__note">Começamos pelas perguntas, pelos sistemas e pela qualidade dos dados da sua operação.</p></div><div class="in-hero__visual"><div class="in-preview" aria-label="Mock de dados conectados e uma pergunta de negócio"><div class="in-preview__bar"><span>INTELLIGENCE / VISÃO GERAL</span></div><div class="in-preview__content"><div class="in-preview__sources"><span>ERP</span><span>CRM</span><span>FINANCEIRO</span></div><div class="in-preview__paths" aria-hidden="true"><i></i><i></i><i></i></div><div class="in-preview__panel"><div class="in-preview__panel-top"><span>VISÃO CONECTADA</span></div><div class="in-preview__bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="in-preview__question"><small>PERGUNTA</small><strong>“Por que minhas vendas caíram?”</strong><p>Uma hipótese começa nas fontes e termina em uma pergunta melhor.</p></div></div></div></div></section>
+
+  <section class="in-source"><div class="in-shell in-source__grid"><div><p class="in-label">FONTES EM CONTEXTO</p><h2>A resposta não está em mais uma planilha. <em>Está na conexão entre elas.</em></h2><p>Uma visão integrada depende das fontes disponíveis, da qualidade dos dados e das integrações viáveis.</p></div><div class="in-source__chips" aria-label="Exemplos de categorias de fontes a avaliar"><span>ERP</span><span>CRM</span><span>FINANCEIRO</span><span>PLANILHAS</span><span>MARKETING</span><span>OPERAÇÃO</span></div></div></section>
+
+  <section class="in-section in-problem in-shell" aria-labelledby="in-problem-title"><div class="in-heading"><p class="in-label">01 / O DESAFIO</p><h2 id="in-problem-title">Sua empresa gera dados todos os dias. <em>Mas eles não conversam.</em></h2><p>Você abre o ERP para conferir vendas, consulta o financeiro, verifica o CRM e ainda precisa reunir tudo numa planilha para enxergar a mesma operação.</p></div><div class="in-problem__grid"><article><span>01 / VISÃO</span><h3>Quais áreas avançam e quais recuam?</h3></article><article><span>02 / RESULTADO</span><h3>Estamos vendendo mais e lucrando menos?</h3></article><article><span>03 / CONTEXTO</span><h3>Quais clientes ou produtos pedem atenção?</h3></article><article><span>04 / DECISÃO</span><h3>O que os relatórios separados deixam escapar?</h3></article></div><p class="in-problem__statement">O desafio não é ter poucos dados. É transformá-los em entendimento suficiente para decidir com mais critério.</p></section>
+
+  <section class="in-section in-solution"><div class="in-shell"><div class="in-heading in-heading--split"><div><p class="in-label">02 / DA INFORMAÇÃO À CLAREZA</p><h2>Todos os dados importantes. <em>Uma visão mais inteligente.</em></h2></div><p>A proposta combina informações existentes, indicadores úteis e perguntas em linguagem natural, conforme as fontes que puderem ser conectadas.</p></div><div class="in-solution__grid"><article><span>01 / CONECTE</span><h3>Reúna o que está espalhado.</h3><p>Identifique sistemas e bases relevantes para as decisões da empresa.</p></article><article><span>02 / ENTENDA</span><h3>Enxergue relações.</h3><p>Compare períodos, áreas e definições sem perder de vista a origem dos números.</p></article><article><span>03 / DECIDA</span><h3>Investigue com contexto.</h3><p>Faça perguntas e revise hipóteses antes de escolher o próximo passo.</p></article></div><a class="in-link" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true">↗</span></a></div></section>
+
+  <section id="perguntas" class="in-section in-questions" aria-labelledby="in-questions-title"><div class="in-shell"><div class="in-heading in-heading--split"><div><p class="in-label">03 / PERGUNTE AO NEGÓCIO</p><h2 id="in-questions-title">Se você sabe fazer uma pergunta, <em>já sabe por onde começar.</em></h2></div><p>Selecione uma pergunta para explorar as respostas do mock.</p></div><div class="in-questions__grid"><div class="in-questions__list" aria-label="Perguntas do mock">{questions.map(([area, question, answer, source], index) => <button type="button" class:list={['in-question', { 'is-active': index === 0 }]} data-in-question={index} data-in-area={area} data-in-answer-text={answer} data-in-source-text={source} aria-pressed={index === 0}><span>{area} / 0{index + 1}</span><strong>{question}</strong><span aria-hidden="true">↗</span></button>)}</div><div class="in-answer"><p class="in-answer__prompt" data-in-prompt>“{questions[0][1]}”</p><p class="in-answer__body" data-in-answer aria-live="polite">{questions[0][2]}</p><div class="in-answer__source"><span>FONTES DO EXEMPLO</span><strong data-in-source>{questions[0][3]}</strong></div></div></div></div></section>
+
+  <section id="aplicacoes" class="in-section in-areas" aria-labelledby="in-areas-title"><div class="in-shell"><div class="in-heading in-heading--split"><div><p class="in-label">04 / DIFERENTES PERSPECTIVAS</p><h2 id="in-areas-title">Seu negócio não funciona em silos. <em>A análise também não deveria.</em></h2></div><p>São possibilidades de aplicação, não funcionalidades prontas para todos os contextos. Indicadores e cruzamentos exigem validação das fontes.</p></div><div class="in-areas__list">{areas.map(([title, description], index) => <article><span>0{index + 1}</span><h3>{title}</h3><p>{description}</p></article>)}</div><a class="in-link in-link--dark" href="#diagnostico">Descobrir o potencial dos meus dados <span aria-hidden="true">↗</span></a></div></section>
+
+  <section id="como-funciona" class="in-section in-method" aria-labelledby="in-method-title"><div class="in-shell"><div class="in-heading in-heading--split"><div><p class="in-label">05 / IMPLEMENTAÇÃO</p><h2 id="in-method-title">Da sua operação para uma visão conectada, <em>em quatro passos.</em></h2></div><p>Não é preciso abandonar sistemas existentes. Cada conexão e experiência analítica depende de acesso autorizado, qualidade e viabilidade técnica.</p></div><ol class="in-method__steps">{steps.map(([number, title, text]) => <li><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><b aria-hidden="true">↗</b></li>)}</ol><a class="in-link" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true">↗</span></a></div></section>
+
+  <section class="in-section in-scenario"><div class="in-shell in-scenario__grid"><div><p class="in-label">06 / NA PRÁTICA</p><h2>A primeira explicação nem sempre está <em>no primeiro gráfico.</em></h2><p>Uma distribuidora nota menos vendas e considera aumentar o investimento em marketing. Ao reunir informações comerciais e operacionais, surgem outras hipóteses: rupturas em alguns produtos e clientes que compraram menos vezes.</p><p>O cenário não prova uma causa. Ele mostra por que vale investigar as fontes antes de decidir.</p></div><ol><li><span>01</span><strong>Sintoma</strong><p>Vendas caíram.</p></li><li><span>02</span><strong>Investigação</strong><p>Cruzar produtos, clientes e pedidos.</p></li><li><span>03</span><strong>Hipótese</strong><p>Checar rupturas e frequência de compra.</p></li><li><span>04</span><strong>Decisão</strong><p>Validar dados e agir com contexto.</p></li></ol></div></section>
+
+  <section id="seguranca" class="in-section in-trust in-shell" aria-labelledby="in-trust-title"><div class="in-heading in-heading--split"><div><p class="in-label">07 / CONTROLE E CONFIANÇA</p><h2 id="in-trust-title">Seus dados são estratégicos. <em>O controle continua com sua empresa.</em></h2></div><p>Permissões, referências de fontes, qualidade e tratamento dos dados precisam ser definidos na avaliação e no contrato. Não há garantia universal para sistemas ou análises.</p></div><div class="in-trust__grid"><article><span>01</span><h3>Acessos definidos</h3><p>Perfis e permissões conforme o ambiente e o escopo acordados.</p></article><article><span>02</span><h3>Fontes identificadas</h3><p>Origem e período dos indicadores quando tecnicamente viável.</p></article><article><span>03</span><h3>Métricas alinhadas</h3><p>Regras de negócio e definições validadas com as pessoas responsáveis.</p></article><article><span>04</span><h3>Dados tratados com critério</h3><p>Privacidade, responsabilidades e segurança especificadas para cada operação.</p></article></div><p class="in-trust__note">Análises de IA auxiliam a investigação, mas não substituem conferência das informações nem decisões humanas.</p></section>
+
+  <section class="in-section in-ecosystem"><div class="in-shell in-ecosystem__grid"><div><p class="in-label">08 / UM ECOSSISTEMA PARA EVOLUIR</p><h2>Entender o problema é o começo. <em>O próximo passo depende dele.</em></h2><p>Intelligence ajuda a analisar. Build desenvolve sistemas quando necessário. Workforce executa rotinas no escopo contratado. Academy prepara pessoas. São ofertas distintas.</p></div><div class="in-ecosystem__list"><p><span>DECIDA</span> Intelligence <small>Conecte informações e investigue.</small></p><p><span>CONSTRUA</span> Build <small>Estruture software e integrações.</small></p><p><span>DELEGUE</span> Workforce <small>Execute rotinas recorrentes.</small></p><p><span>APRENDA</span> Academy <small>Desenvolva capacidade na equipe.</small></p></div></div></section>
+
+  <section id="duvidas" class="in-section in-faq" aria-labelledby="in-faq-title"><div class="in-shell in-faq__grid"><div><p class="in-label">09 / PERGUNTAS FREQUENTES</p><h2 id="in-faq-title">Antes de conectar dados, <em>conecte as expectativas.</em></h2></div><div class="in-faq__list">{faq.map(([question, answer], index) => <details><summary><span>{String(index + 1).padStart(2, '0')}</span>{question}<b aria-hidden="true">+</b></summary><p>{answer}</p></details>)}</div></div></section>
+
+  <section id="diagnostico" class="in-section in-contact" aria-labelledby="in-contact-title"><div class="in-shell in-contact__grid"><div><p class="in-label">10 / O PRÓXIMO PASSO</p><h2 id="in-contact-title">Seus dados já sabem a resposta. <em>Vamos descobrir que perguntas fazer.</em></h2><p>Conte quais sistemas você usa e o que gostaria de entender melhor. Vamos avaliar as fontes, a viabilidade e um próximo passo útil para sua empresa.</p><p class="in-contact__note">A Intelligence está em validação. O envio solicita contato para diagnóstico, não acesso a um produto pronto nem agendamento confirmado. O formulário atual requer empresa, e-mail e WhatsApp.</p></div><LeadForm id="intelligence-form" offer="Tactia Intelligence — diagnóstico de dados" heading="Que resposta faz falta hoje?" intro="Compartilhe seus sistemas e a principal pergunta sobre o negócio." submitLabel="Solicitar meu diagnóstico" contextLabel="O que você gostaria de enxergar ou entender melhor?" contextPlaceholder="Ex.: usamos ERP e CRM, mas não sabemos por que a conversão caiu." requireContext successHeading="Recebemos seu interesse." successMessage="Vamos avaliar as informações e entrar em contato pelos dados informados. Pense em três perguntas que hoje exigem consultar mais de um sistema." /></div></section>
+  <div class="in-signoff"><div class="in-shell"><span>TACTIA / INTELLIGENCE</span><strong>Seus dados já sabem a resposta.</strong></div></div>
+</SiteLayout>
+
+<script>
+  const emit = (event: string, detail: Record<string, string> = {}) => window.dispatchEvent(new CustomEvent('tactia:funnel', { detail: { event, ...detail } }));
+  emit('intelligence_page_view');
+
+  const header = document.querySelector<HTMLElement>('.workforce-header');
+  const updateHeader = () => header?.classList.toggle('in-header--compact', window.scrollY > 40);
+  updateHeader();
+  window.addEventListener('scroll', updateHeader, { passive: true });
+  document.querySelector('[data-in-hero-cta]')?.addEventListener('click', () => emit('intelligence_hero_cta_click', { placement: 'hero' }));
+
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-in-question]');
+  buttons.forEach((button) => button.addEventListener('click', () => {
+    buttons.forEach((item) => { item.classList.toggle('is-active', item === button); item.setAttribute('aria-pressed', String(item === button)); });
+    document.querySelector<HTMLElement>('[data-in-prompt]')!.textContent = `“${button.querySelector('strong')?.textContent || ''}”`;
+    document.querySelector<HTMLElement>('[data-in-answer]')!.textContent = button.dataset.inAnswerText || '';
+    document.querySelector<HTMLElement>('[data-in-source]')!.textContent = button.dataset.inSourceText || '';
+    emit('intelligence_demo_question_click', { area: button.dataset.inArea || '', question_id: String(Number(button.dataset.inQuestion) + 1) });
+  }));
+
+  const preview = document.getElementById('perguntas');
+  if (preview && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) { emit('intelligence_demo_view', { variant: 'mock' }); observer.disconnect(); }
+    }, { threshold: 0.15 });
+    observer.observe(preview);
+  }
+  window.addEventListener('tactia:funnel', (event) => {
+    if (!(event instanceof CustomEvent) || event.detail?.offer !== 'Tactia Intelligence — diagnóstico de dados') return;
+    if (event.detail.event === 'form_started') emit('intelligence_form_start', { form_id: 'intelligence-form' });
+    if (event.detail.event === 'lead_submitted') emit('intelligence_form_submit');
+  });
+</script>
