@@ -1,0 +1,77 @@
+---
+import bricolageFont from '@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2?url';
+import '@fontsource/ibm-plex-sans/latin-400.css';
+import '@fontsource/ibm-plex-sans/latin-500.css';
+import '../styles/global.css';
+import '../styles/workforce.css';
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath?: string;
+  theme?: 'light' | 'dark';
+}
+
+const { title, description, canonicalPath = '/', theme = 'light' } = Astro.props;
+const canonical = Astro.site ? new URL(canonicalPath, Astro.site).href : undefined;
+const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-black.svg';
+---
+
+<!doctype html>
+<html lang="pt-BR" data-theme={theme}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content={theme === 'dark' ? '#112523' : '#f5f3ed'} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="preload" href={bricolageFont} as="font" type="font/woff2" crossorigin />
+    {canonical && <link rel="canonical" href={canonical} />}
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    {canonical && <meta property="og:url" content={canonical} />}
+    {Astro.site && <meta property="og:image" content={new URL('/social-card.png', Astro.site).href} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+  </head>
+  <body class="workforce-body">
+    <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+    <header class="workforce-header">
+      <div class="workforce-shell workforce-nav">
+        <a class="workforce-brand" href="/" aria-label="Tactia, início">
+          <img src={headerLogo} alt="Tactia" width="116" height="36" />
+          <span>AI WORKFORCE</span>
+        </a>
+        <nav aria-label="Navegação principal">
+          <a href="/#solucoes">Soluções</a>
+          <a href="/funcionarios-digitais">Funcionários digitais</a>
+          <a href="/implementacao-ai-workforce">Para empresas</a>
+          <a class="nav-action" href="/implementacao-ai-workforce#diagnostico">Agendar diagnóstico <span aria-hidden="true">↗</span></a>
+        </nav>
+      </div>
+    </header>
+    <main id="conteudo"><slot /></main>
+    <footer class="workforce-footer">
+      <div class="workforce-shell workforce-footer-grid">
+        <div>
+          <a class="workforce-brand" href="/" aria-label="Tactia, início">
+            <img src="/tactia-logo-white.svg" alt="Tactia" width="116" height="36" loading="lazy" />
+            <span>AI WORKFORCE</span>
+          </a>
+          <p>Forças de trabalho de IA desenhadas para processos reais.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/curso-ai-workforce">Curso AI Workforce</a>
+          <a href="/funcionarios-digitais">Funcionários digitais</a>
+          <a href="/implementacao-ai-workforce">Implementação sob medida</a>
+        </div>
+        <div class="footer-legal">
+          <span>© {new Date().getFullYear()} Tactia</span>
+          <a href="mailto:contato@tactia.com.br">contato@tactia.com.br</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

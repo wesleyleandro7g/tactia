@@ -1,0 +1,160 @@
+---
+interface Props {
+  id: string;
+  offer: string;
+  heading: string;
+  intro: string;
+  submitLabel: string;
+  compact?: boolean;
+}
+
+const { id, offer, heading, intro, submitLabel, compact = false } = Astro.props;
+---
+
+<section class:list={['lead-form', { 'lead-form--compact': compact }]} aria-labelledby={`${id}-title`}>
+  <div class="lead-form__signal" aria-hidden="true"><span></span><span></span><span></span></div>
+  <p class="eyebrow"><span class="dot"></span> PRÓXIMO PASSO</p>
+  <h2 id={`${id}-title`}>{heading}</h2>
+  <p class="lead-form__intro">{intro}</p>
+  <form id={id} data-lead-form data-offer={offer} novalidate>
+    <div class="lead-form__fields">
+      <div class="lead-field">
+        <label for={`${id}-name`}>Seu nome <span aria-hidden="true">*</span></label>
+        <input id={`${id}-name`} name="name" type="text" autocomplete="name" maxlength="120" required placeholder="Como podemos chamar você?" />
+      </div>
+      <div class="lead-field">
+        <label for={`${id}-company`}>Empresa <span aria-hidden="true">*</span></label>
+        <input id={`${id}-company`} name="company" type="text" autocomplete="organization" maxlength="120" required placeholder="Nome da sua empresa" />
+      </div>
+      <div class="lead-field">
+        <label for={`${id}-email`}>E-mail <span aria-hidden="true">*</span></label>
+        <input id={`${id}-email`} name="email" type="email" autocomplete="email" maxlength="254" required placeholder="voce@empresa.com.br" />
+      </div>
+      <div class="lead-field">
+        <label for={`${id}-whatsapp`}>WhatsApp com DDD <span aria-hidden="true">*</span></label>
+        <input id={`${id}-whatsapp`} name="whatsapp" type="tel" autocomplete="tel" maxlength="30" required placeholder="(11) 99999-9999" />
+      </div>
+      <div class="lead-field lead-field--full">
+        <label for={`${id}-context`}>O que você quer melhorar? <span class="lead-field__optional">Opcional</span></label>
+        <textarea id={`${id}-context`} name="context" rows="3" maxlength="1600" placeholder="Uma tarefa, processo ou contexto que vale a pena conhecer."></textarea>
+      </div>
+      <input type="hidden" name="diagnosis" value="" />
+      <div class="lead-form__honeypot" aria-hidden="true">
+        <label for={`${id}-website`}>Website</label>
+        <input id={`${id}-website`} name="website" tabindex="-1" autocomplete="off" maxlength="200" />
+      </div>
+    </div>
+    <label class="lead-consent" for={`${id}-consent`}>
+      <input id={`${id}-consent`} name="consent" type="checkbox" required />
+      <span>Autorizo a Tactia a usar meus dados para responder a esta solicitação.</span>
+    </label>
+    <p class="lead-form__privacy">Não envie dados sensíveis ou credenciais. Seus dados são usados para atender seu pedido.</p>
+    <button class="button workforce-button workforce-button--full" type="submit">
+      <span>{submitLabel}</span><span aria-hidden="true">↗</span>
+    </button>
+    <p class="lead-form__status" role="alert" aria-live="polite" hidden></p>
+  </form>
+  <div class="lead-form__success" hidden tabindex="-1">
+    <span class="lead-form__check" aria-hidden="true">✓</span>
+    <p class="eyebrow"><span class="dot"></span> SOLICITAÇÃO RECEBIDA</p>
+    <h3>Obrigado. Vamos olhar para o seu contexto.</h3>
+    <p>Recebemos seus dados e a equipe da Tactia seguirá com o próximo passo pelo contato informado.</p>
+  </div>
+  <noscript><p class="lead-form__status">Ative o JavaScript para enviar sua solicitação por este formulário.</p></noscript>
+</section>
+
+<script>
+  const clean = (value: FormDataEntryValue | null) => (typeof value === 'string' ? value.trim() : '');
+  const tracker = (event: string, detail: Record<string, string>) =>
+    window.dispatchEvent(new CustomEvent('tactia:funnel', { detail: { event, ...detail } }));
+
+  document.querySelectorAll<HTMLFormElement>('[data-lead-form]').forEach((form) => {
+    const status = form.querySelector<HTMLElement>('.lead-form__status')!;
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    const buttonLabel = button.querySelector('span')!;
+    const initialButtonLabel = buttonLabel.textContent || 'Enviar solicitação';
+    const parent = form.closest<HTMLElement>('.lead-form')!;
+    const success = parent.querySelector<HTMLElement>('.lead-form__success')!;
+    let submitting = false;
+    let submissionId = '';
+    let started = false;
+
+    form.addEventListener('focusin', () => {
+      if (started) return;
+      started = true;
+      tracker('form_started', { offer: form.dataset.offer || 'unknown' });
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (submitting) return;
+      status.hidden = true;
+      status.textContent = '';
+      const data = new FormData(form);
+      const required = ['name', 'company', 'email', 'whatsapp'];
+      const missing = required.some((field) => clean(data.get(field)).length < 2);
+      const email = clean(data.get('email'));
+      const phone = clean(data.get('whatsapp')).replace(/\D/g, '');
+      if (missing || !/^\S+@\S+\.\S+$/.test(email) || phone.length < 10 || phone.length > 15) {
+        status.textContent = 'Revise nome, empresa, e-mail e WhatsApp antes de continuar.';
+        status.hidden = false;
+        tracker('form_validation_failed', { offer: form.dataset.offer || 'unknown' });
+        return;
+      }
+      if (data.get('consent') !== 'on') {
+        status.textContent = 'Confirme a autorização para que possamos responder sua solicitação.';
+        status.hidden = false;
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const attribution: Record<string, string> = {};
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((key) => {
+        const value = params.get(key)?.trim().slice(0, 200);
+        if (value) attribution[key] = value;
+      });
+      const context = [
+        `[Oferta: ${form.dataset.offer || 'Tactia'}]`,
+        clean(data.get('diagnosis')),
+        clean(data.get('context')),
+      ].filter(Boolean).join('\n\n');
+      submitting = true;
+      button.disabled = true;
+      buttonLabel.textContent = 'Enviando solicitação…';
+      try {
+        submissionId ||= crypto.randomUUID();
+        const response = await fetch('/api/v1/consultation-leads', {
+          method: 'POST',
+          credentials: 'omit',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: clean(data.get('name')),
+            company: clean(data.get('company')),
+            email,
+            whatsapp: clean(data.get('whatsapp')),
+            context: context.slice(0, 2000),
+            website: clean(data.get('website')),
+            submissionId,
+            ...(Object.keys(attribution).length ? { attribution } : {}),
+          }),
+          signal: AbortSignal.timeout(20000),
+        });
+        const body = await response.json().catch(() => null);
+        if (!response.ok || !body?.data?.received) {
+          throw new Error(response.status === 429 ? 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' : 'Não foi possível enviar agora. Tente novamente em instantes.');
+        }
+        form.hidden = true;
+        success.hidden = false;
+        success.focus();
+        tracker('lead_submitted', { offer: form.dataset.offer || 'unknown' });
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'Não foi possível enviar agora. Tente novamente em instantes.';
+        status.hidden = false;
+      } finally {
+        submitting = false;
+        button.disabled = false;
+        buttonLabel.textContent = initialButtonLabel;
+      }
+    });
+  });
+</script>

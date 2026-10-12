@@ -1,0 +1,75 @@
+---
+const sectors = ['Serviços', 'Varejo', 'Distribuição', 'Clínicas', 'Outro'];
+const pains = [
+  ['reports', 'Relatórios e controles manuais'],
+  ['sales', 'Leads e acompanhamento comercial'],
+  ['finance', 'Rotinas financeiras'],
+  ['operations', 'Processos operacionais'],
+] as const;
+---
+
+<section id="diagnostico" class="diagnostic workforce-shell" aria-labelledby="diagnostic-title">
+  <div class="diagnostic__intro">
+    <p class="eyebrow"><span class="dot"></span> DIAGNÓSTICO INICIAL</p>
+    <h2 id="diagnostic-title">Descubra onde a IA pode começar a trabalhar na sua empresa.</h2>
+    <p>Em poucos passos, encontre uma hipótese inicial de oportunidade para levar à conversa com a Tactia.</p>
+    <div class="diagnostic__legend"><span></span> Resposta ilustrativa, sem compromisso e sujeita à análise de processo e integrações.</div>
+  </div>
+  <form class="diagnostic__card" data-diagnostic novalidate>
+    <div class="diagnostic__progress" aria-hidden="true"><span></span><span></span></div>
+    <fieldset>
+      <legend>1. Qual é o segmento da sua empresa?</legend>
+      <div class="diagnostic__choices diagnostic__choices--sectors">
+        {sectors.map((sector, index) => (
+          <label><input type="radio" name="sector" value={sector} checked={index === 0} /><span>{sector}</span></label>
+        ))}
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>2. Qual tarefa mais consome tempo da sua equipe?</legend>
+      <div class="diagnostic__choices">
+        {pains.map(([value, label], index) => (
+          <label><input type="radio" name="pain" value={value} checked={index === 0} /><span>{label}</span></label>
+        ))}
+      </div>
+    </fieldset>
+    <button class="button workforce-button workforce-button--dark" type="submit"><span>Identificar oportunidade</span><span aria-hidden="true">↗</span></button>
+    <p class="diagnostic__error" role="alert" hidden></p>
+  </form>
+  <aside class="diagnostic__result" data-diagnostic-result hidden aria-live="polite">
+    <p class="eyebrow"><span class="dot"></span> OPORTUNIDADE INICIAL</p>
+    <h3 data-diagnosis-title>Agente de Gestão</h3>
+    <p data-diagnosis-text>Consolidar indicadores, consultar dados e preparar relatórios gerenciais.</p>
+    <p class="diagnostic__disclaimer">Sugestão ilustrativa, sujeita a diagnóstico de processos e viabilidade das integrações.</p>
+    <a class="text-link" href="#formulario-implementacao">Explorar esta oportunidade <span aria-hidden="true">↓</span></a>
+  </aside>
+</section>
+
+<script>
+  const opportunities: Record<string, { title: string; text: string }> = {
+    reports: { title: 'Agente de Gestão', text: 'Consolidar indicadores, consultar dados e preparar relatórios gerenciais.' },
+    sales: { title: 'Agente Comercial', text: 'Organizar oportunidades, atualizar o CRM e preparar acompanhamentos.' },
+    finance: { title: 'Agente Financeiro', text: 'Acompanhar pendências, consultar informações e preparar relatórios financeiros.' },
+    operations: { title: 'Agente Operacional', text: 'Acompanhar tarefas e ordens de serviço, sinalizando atrasos e pendências.' },
+  };
+  document.querySelectorAll<HTMLFormElement>('[data-diagnostic]').forEach((form) => {
+    const result = document.querySelector<HTMLElement>('[data-diagnostic-result]')!;
+    const title = result.querySelector<HTMLElement>('[data-diagnosis-title]')!;
+    const text = result.querySelector<HTMLElement>('[data-diagnosis-text]')!;
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const sector = data.get('sector')?.toString();
+      const pain = data.get('pain')?.toString();
+      if (!sector || !pain || !opportunities[pain]) return;
+      const opportunity = opportunities[pain];
+      title.textContent = opportunity.title;
+      text.textContent = opportunity.text;
+      result.hidden = false;
+      const destination = document.querySelector<HTMLInputElement>('#formulario-implementacao [name="diagnosis"]');
+      if (destination) destination.value = `Diagnóstico inicial\nSegmento: ${sector}\nGargalo: ${form.querySelector<HTMLInputElement>('input[name="pain"]:checked')?.parentElement?.textContent?.trim() || pain}\nOportunidade sugerida: ${opportunity.title}`;
+      window.dispatchEvent(new CustomEvent('tactia:funnel', { detail: { event: 'diagnosis_completed', pain, suggestion: opportunity.title } }));
+      result.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+    });
+  });
+</script>
