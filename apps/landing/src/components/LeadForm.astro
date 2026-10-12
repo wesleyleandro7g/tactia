@@ -1,4 +1,5 @@
 ---
+import Icon from './Icon.astro';
 interface Props {
   id: string;
   offer: string;
@@ -63,12 +64,12 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
     </label>
     <p class="lead-form__privacy">Não envie dados sensíveis ou credenciais. Seus dados são usados para atender seu pedido.</p>
     <button class="button workforce-button workforce-button--full" type="submit">
-      <span>{submitLabel}</span><span aria-hidden="true">↗</span>
+      <span>{submitLabel}</span><span aria-hidden="true"><Icon name="arrow-up-right" /></span>
     </button>
     <p class="lead-form__status" role="alert" aria-live="polite" hidden></p>
   </form>
   <div class="lead-form__success" hidden tabindex="-1">
-    <span class="lead-form__check" aria-hidden="true">✓</span>
+    <span class="lead-form__check" aria-hidden="true"><Icon name="check" /></span>
     <p class="eyebrow"><span class="dot"></span> SOLICITAÇÃO RECEBIDA</p>
     <h3>{successHeading}</h3>
     <p>{successMessage}</p>

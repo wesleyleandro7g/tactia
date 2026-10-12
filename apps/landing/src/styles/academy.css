@@ -47,6 +47,8 @@ html[data-brand='academy'] .workforce-footer { background: #101311; border-top: 
 .academy-preview { position: relative; min-width: 0; border: 1px solid #566057; background: #2d342e; box-shadow: 25px 28px 0 #0e120fa8; transform: rotate(2deg); animation: academy-rise .8s .12s both; }
 .academy-preview__top { display: flex; justify-content: space-between; padding: 13px 18px; border-bottom: 1px solid #546156; color: #c0cbbc; font-size: 9px; letter-spacing: .12em; }
 .academy-preview__top span:last-child { color: var(--ac-orange); letter-spacing: .4em; }
+.academy-preview__dots { display: inline-flex; align-items: center; gap: 5px; }
+.academy-preview__dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .academy-preview__body { padding: 36px 29px 27px; background: radial-gradient(circle at 85% 0, #5267508a, transparent 55%), #2d342e; }
 .academy-preview__eyebrow { color: var(--ac-orange); font-size: 9px; letter-spacing: .17em; }
 .academy-preview__title { font-family: var(--wf-display); font-size: clamp(2.9rem, 4.2vw, 4.8rem); line-height: 1; letter-spacing: -.07em; margin: 22px 0 35px; }
@@ -106,7 +108,7 @@ html[data-brand='academy'] .workforce-footer { background: #101311; border-top: 
 .academy-featured__summary { max-width: 490px; color: #c4cdc2; font-size: 14px; }
 .academy-featured ul { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; padding: 22px 0 24px; list-style: none; }
 .academy-featured li { color: #c8d0c5; font-size: 11px; line-height: 1.5; padding-left: 17px; position: relative; }
-.academy-featured li::before { content: '✳'; position: absolute; left: 0; color: var(--ac-orange); }
+.academy-featured li .ui-icon { position: absolute; left: 0; top: 2px; color: var(--ac-orange); }
 .academy-featured__fine { color: #aab4aa; font-size: 10px; margin-top: 12px; }
 .academy-featured__diagram { position: relative; display: grid; place-items: center; overflow: hidden; min-height: 520px; border-left: 1px solid #55493e; background: radial-gradient(circle at center, #4d5030, #252a22 55%, #1d211c 75%); }
 .academy-featured__diagram::before { content: ''; position: absolute; inset: 0; background: radial-gradient(#f4b27842 1px, transparent 1px) 0 0 / 20px 20px; mask-image: radial-gradient(circle at center, #000 25%, transparent 72%); }

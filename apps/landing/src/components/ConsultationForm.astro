@@ -1,4 +1,5 @@
 ---
+import Icon from './Icon.astro';
 import { CONSULTATION_CALENDAR_URL } from '@tactia/shared/acquisition';
 import Arrow from './Arrow.astro';
 const fields = [
@@ -106,7 +107,7 @@ const fields = [
   </div>
   <div id="form-success" class="form-success" hidden>
     <div class="success-icon" aria-hidden="true">
-      ✓
+      <Icon name="check" />
     </div>
     <p class="eyebrow">Contato recebido</p>
     <h3 id="success-title" tabindex="-1">

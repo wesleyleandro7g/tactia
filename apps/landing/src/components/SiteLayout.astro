@@ -4,6 +4,7 @@ import '@fontsource/ibm-plex-sans/latin-400.css';
 import '@fontsource/ibm-plex-sans/latin-500.css';
 import '../styles/global.css';
 import '../styles/workforce.css';
+import Icon from './Icon.astro';
 
 interface Props {
   title: string;
@@ -56,7 +57,7 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
             <a href="#para-quem">Para quem é</a>
             <a href="#comunidade">Comunidade</a>
             <a href="#perguntas">Perguntas frequentes</a>
-            <a class="nav-action" href="#formacoes">Explorar formações <span aria-hidden="true">↗</span></a>
+            <a class="nav-action" href="#formacoes">Explorar formações <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : build ? (
           <nav aria-label="Navegação da Build">
@@ -64,7 +65,7 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
             <a href="#processo">Como trabalhamos</a>
             <a href="#investimento">Investimento</a>
             <a href="#faq">Dúvidas</a>
-            <a class="nav-action" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true">↗</span></a>
+            <a class="nav-action" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : workforce ? (
           <nav aria-label="Navegação da Workforce">
@@ -72,7 +73,7 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
             <a href="#como-funciona">Como funciona</a>
             <a href="#planos">Contratação</a>
             <a href="#duvidas">Dúvidas</a>
-            <a class="nav-action" href="#diagnostico">Montar minha Workforce <span aria-hidden="true">↗</span></a>
+            <a class="nav-action" href="#diagnostico">Montar minha Workforce <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : intelligence ? (
           <nav aria-label="Navegação da Intelligence">
@@ -81,12 +82,12 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
             <a href="#aplicacoes">Aplicações</a>
             <a href="#seguranca">Segurança</a>
             <a href="#duvidas">Dúvidas</a>
-            <a class="nav-action" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true">↗</span></a>
+            <a class="nav-action" href="#diagnostico">Solicitar diagnóstico <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : (
           <nav aria-label="Navegação principal">
             <details class="home-nav-menu">
-              <summary>Soluções <span aria-hidden="true">⌄</span></summary>
+              <summary>Soluções <span aria-hidden="true"><Icon name="chevron-down" /><Icon name="menu" /></span></summary>
               <div class="home-nav-menu__links">
                 <a href="/academy">Academy · Aprenda</a>
                 <a href="/build">Build · Construa</a>
@@ -97,7 +98,7 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
             <a href="#como-funciona">Como funciona</a>
             <a href="#por-que-tactia">Por que a Tactia</a>
             <a href="#diagnostico">Contato</a>
-            <a class="nav-action" href="#encontre-sua-solucao"><span class="home-nav-action__full">Encontrar minha solução</span><span class="home-nav-action__short">Encontrar</span> <span aria-hidden="true">↗</span></a>
+            <a class="nav-action" href="#encontre-sua-solucao"><span class="home-nav-action__full">Encontrar minha solução</span><span class="home-nav-action__short">Encontrar</span> <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         )}
       </div>

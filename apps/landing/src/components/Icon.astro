@@ -1,0 +1,21 @@
+---
+type IconName = 'arrow-up-right' | 'arrow-down-right' | 'arrow-right' | 'arrow-down' | 'sparkle' | 'play' | 'check' | 'chevron-down' | 'menu';
+
+interface Props {
+  name: IconName;
+}
+
+const { name } = Astro.props;
+---
+
+<svg class:list={['ui-icon', `ui-icon--${name}`]} viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  {name === 'arrow-up-right' && <path d="M5 19 19 5M8 5h11v11" />}
+  {name === 'arrow-down-right' && <path d="m5 5 14 14M19 8v11H8" />}
+  {name === 'arrow-right' && <path d="M4 12h16m-6-6 6 6-6 6" />}
+  {name === 'arrow-down' && <path d="M12 4v16m-6-6 6 6 6-6" />}
+  {name === 'sparkle' && <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93 4.93 19.07" />}
+  {name === 'play' && <path d="m8 5 11 7-11 7V5Z" fill="currentColor" stroke="none" />}
+  {name === 'check' && <path d="m5 12 4 4L19 6" />}
+  {name === 'chevron-down' && <path d="m6 9 6 6 6-6" />}
+  {name === 'menu' && <path d="M4 6h16M4 12h16M4 18h16" />}
+</svg>

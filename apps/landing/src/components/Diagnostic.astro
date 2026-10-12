@@ -1,4 +1,5 @@
 ---
+import Icon from './Icon.astro';
 const sectors = ['Serviços', 'Varejo', 'Distribuição', 'Clínicas', 'Outro'];
 const pains = [
   ['reports', 'Relatórios e controles manuais'],
@@ -33,7 +34,7 @@ const pains = [
         ))}
       </div>
     </fieldset>
-    <button class="button workforce-button workforce-button--dark" type="submit"><span>Identificar oportunidade</span><span aria-hidden="true">↗</span></button>
+    <button class="button workforce-button workforce-button--dark" type="submit"><span>Identificar oportunidade</span><span aria-hidden="true"><Icon name="arrow-up-right" /></span></button>
     <p class="diagnostic__error" role="alert" hidden></p>
   </form>
   <aside class="diagnostic__result" data-diagnostic-result hidden aria-live="polite">
@@ -41,7 +42,7 @@ const pains = [
     <h3 data-diagnosis-title>Agente de Gestão</h3>
     <p data-diagnosis-text>Consolidar indicadores, consultar dados e preparar relatórios gerenciais.</p>
     <p class="diagnostic__disclaimer">Sugestão ilustrativa, sujeita a diagnóstico de processos e viabilidade das integrações.</p>
-    <a class="text-link" href="#formulario-implementacao">Explorar esta oportunidade <span aria-hidden="true">↓</span></a>
+    <a class="text-link" href="#formulario-implementacao">Explorar esta oportunidade <span aria-hidden="true"><Icon name="arrow-down" /></span></a>
   </aside>
 </section>
 

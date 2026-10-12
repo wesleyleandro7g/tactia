@@ -59,6 +59,13 @@ svg {
   display: block;
   max-width: 100%;
 }
+.ui-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  vertical-align: -0.12em;
+}
 button:disabled {
   cursor: wait;
 }

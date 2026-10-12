@@ -29,15 +29,17 @@
   color: inherit;
 }
 
-.workforce-body h1,
-.workforce-body h2 {
+/* Astro emits page CSS before layout CSS in production. Keep these shared
+   defaults weaker so product-specific typography wins in either load order. */
+:where(.workforce-body) h1,
+:where(.workforce-body) h2 {
   font-family: var(--wf-display);
   font-weight: 560;
   letter-spacing: -0.055em;
 }
 
-.workforce-body h1 em,
-.workforce-body h2 em {
+:where(.workforce-body) h1 em,
+:where(.workforce-body) h2 em {
   color: var(--wf-orange);
   font-style: normal;
 }
@@ -636,14 +638,15 @@
 .course-boundary .eyebrow,
 .implementation-boundary .eyebrow { margin-bottom: 19px; }
 
-html[data-theme='dark'] .workforce-body { background: var(--wf-green-deep); color: var(--wf-paper); }
-html[data-theme='dark'] .workforce-header { background: color-mix(in srgb, var(--wf-green-deep) 90%, transparent); border-color: #29443f; }
+/* The dark layout is a fallback; each branded page controls its own theme. */
+html[data-theme='dark'] :where(.workforce-body) { background: var(--wf-green-deep); color: var(--wf-paper); }
+html[data-theme='dark'] :where(.workforce-header) { background: color-mix(in srgb, var(--wf-green-deep) 90%, transparent); border-color: #29443f; }
 html[data-theme='dark'] .workforce-header .workforce-brand img { filter: brightness(0) invert(1); }
 html[data-theme='dark'] .workforce-brand span { color: #aac0b1; }
-html[data-theme='dark'] .workforce-header nav > a:not(.nav-action) { color: #c2d1c6; }
-html[data-theme='dark'] .workforce-header nav > a:not(.nav-action):hover { color: var(--wf-orange-soft); }
-html[data-theme='dark'] .nav-action { border-color: #c4d6c8; color: var(--wf-paper); }
-html[data-theme='dark'] .nav-action:hover { background: var(--wf-paper); color: var(--wf-green-deep); }
+html[data-theme='dark'] :where(.workforce-header) nav > a:not(.nav-action) { color: #c2d1c6; }
+html[data-theme='dark'] :where(.workforce-header) nav > a:not(.nav-action):hover { color: var(--wf-orange-soft); }
+html[data-theme='dark'] :where(.nav-action) { border-color: #c4d6c8; color: var(--wf-paper); }
+html[data-theme='dark'] :where(.nav-action):hover { background: var(--wf-paper); color: var(--wf-green-deep); }
 
 .product-hero--workers { min-height: 650px; }
 .product-hero--workers h1 { color: var(--wf-paper); }
@@ -755,7 +758,7 @@ html[data-theme='dark'] .nav-action:hover { background: var(--wf-paper); color: 
 .lead-form__signal span { display: block; width: 3px; background: var(--wf-orange); }
 .lead-form__signal span:nth-child(1) { height: 6px; }.lead-form__signal span:nth-child(2) { height: 11px; }.lead-form__signal span:nth-child(3) { height: 17px; }
 .lead-form .eyebrow { margin-bottom: 15px; }
-.lead-form h2 { font-size: 29px; line-height: 1.05; letter-spacing: -.045em; max-width: 400px; }
+:where(.lead-form) h2 { font-size: 29px; line-height: 1.05; letter-spacing: -.045em; max-width: 400px; }
 .lead-form__intro { color: var(--wf-ink-soft); font-size: 12px; line-height: 1.55; margin: 10px 0 23px; }
 .lead-form__fields { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
 .lead-field--full { grid-column: 1 / -1; }
