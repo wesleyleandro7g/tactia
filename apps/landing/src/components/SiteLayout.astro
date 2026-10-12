@@ -10,19 +10,20 @@ interface Props {
   description: string;
   canonicalPath?: string;
   theme?: 'light' | 'dark';
+  academy?: boolean;
 }
 
-const { title, description, canonicalPath = '/', theme = 'light' } = Astro.props;
+const { title, description, canonicalPath = '/', theme = 'light', academy = false } = Astro.props;
 const canonical = Astro.site ? new URL(canonicalPath, Astro.site).href : undefined;
 const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-black.svg';
 ---
 
 <!doctype html>
-<html lang="pt-BR" data-theme={theme}>
+<html lang="pt-BR" data-theme={theme} data-brand={academy ? 'academy' : undefined}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content={theme === 'dark' ? '#112523' : '#f5f3ed'} />
+    <meta name="theme-color" content={academy ? '#171a19' : theme === 'dark' ? '#112523' : '#f5f3ed'} />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="preload" href={bricolageFont} as="font" type="font/woff2" crossorigin />
@@ -40,33 +41,53 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
     <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
     <header class="workforce-header">
       <div class="workforce-shell workforce-nav">
-        <a class="workforce-brand" href="/" aria-label="Tactia, início">
+        <a class="workforce-brand" href={academy ? '/curso-ai-workforce' : '/'} aria-label={academy ? 'Tactia Academy, início' : 'Tactia, início'}>
           <img src={headerLogo} alt="Tactia" width="116" height="36" />
-          <span>AI WORKFORCE</span>
+          <span>{academy ? 'ACADEMY' : 'AI WORKFORCE'}</span>
         </a>
-        <nav aria-label="Navegação principal">
-          <a href="/#solucoes">Soluções</a>
-          <a href="/funcionarios-digitais">Funcionários digitais</a>
-          <a href="/implementacao-ai-workforce">Para empresas</a>
-          <a class="nav-action" href="/implementacao-ai-workforce#diagnostico">Agendar diagnóstico <span aria-hidden="true">↗</span></a>
-        </nav>
+        {academy ? (
+          <nav aria-label="Navegação da Academy">
+            <a href="#como-funciona">Como funciona</a>
+            <a href="#formacoes">Trilhas</a>
+            <a href="#para-quem">Para quem é</a>
+            <a href="#comunidade">Comunidade</a>
+            <a href="#perguntas">Perguntas frequentes</a>
+            <a class="nav-action" href="#formacoes">Explorar formações <span aria-hidden="true">↗</span></a>
+          </nav>
+        ) : (
+          <nav aria-label="Navegação principal">
+            <a href="/#solucoes">Soluções</a>
+            <a href="/funcionarios-digitais">Funcionários digitais</a>
+            <a href="/implementacao-ai-workforce">Para empresas</a>
+            <a class="nav-action" href="/implementacao-ai-workforce#diagnostico">Agendar diagnóstico <span aria-hidden="true">↗</span></a>
+          </nav>
+        )}
       </div>
     </header>
     <main id="conteudo"><slot /></main>
     <footer class="workforce-footer">
       <div class="workforce-shell workforce-footer-grid">
         <div>
-          <a class="workforce-brand" href="/" aria-label="Tactia, início">
+          <a class="workforce-brand" href={academy ? '/curso-ai-workforce' : '/'} aria-label={academy ? 'Tactia Academy, início' : 'Tactia, início'}>
             <img src="/tactia-logo-white.svg" alt="Tactia" width="116" height="36" loading="lazy" />
-            <span>AI WORKFORCE</span>
+            <span>{academy ? 'ACADEMY' : 'AI WORKFORCE'}</span>
           </a>
-          <p>Forças de trabalho de IA desenhadas para processos reais.</p>
+          <p>{academy ? 'Aprendizado prático em IA, automação e tecnologia aplicada a negócios.' : 'Forças de trabalho de IA desenhadas para processos reais.'}</p>
         </div>
-        <div class="footer-links">
-          <a href="/curso-ai-workforce">Curso AI Workforce</a>
-          <a href="/funcionarios-digitais">Funcionários digitais</a>
-          <a href="/implementacao-ai-workforce">Implementação sob medida</a>
-        </div>
+        {academy ? (
+          <div class="footer-links">
+            <a href="#formacoes">Formações</a>
+            <a href="#como-funciona">Como funciona</a>
+            <a href="/">Sobre a Tactia</a>
+            <a href="mailto:contato@tactia.com.br">Contato</a>
+          </div>
+        ) : (
+          <div class="footer-links">
+            <a href="/curso-ai-workforce">Tactia Academy</a>
+            <a href="/funcionarios-digitais">Funcionários digitais</a>
+            <a href="/implementacao-ai-workforce">Implementação sob medida</a>
+          </div>
+        )}
         <div class="footer-legal">
           <span>© {new Date().getFullYear()} Tactia</span>
           <a href="mailto:contato@tactia.com.br">contato@tactia.com.br</a>

@@ -6,9 +6,11 @@ interface Props {
   intro: string;
   submitLabel: string;
   compact?: boolean;
+  successHeading?: string;
+  successMessage?: string;
 }
 
-const { id, offer, heading, intro, submitLabel, compact = false } = Astro.props;
+const { id, offer, heading, intro, submitLabel, compact = false, successHeading = 'Obrigado. Vamos olhar para o seu contexto.', successMessage = 'Recebemos seus dados e a equipe da Tactia seguirá com o próximo passo pelo contato informado.' } = Astro.props;
 ---
 
 <section class:list={['lead-form', { 'lead-form--compact': compact }]} aria-labelledby={`${id}-title`}>
@@ -57,8 +59,8 @@ const { id, offer, heading, intro, submitLabel, compact = false } = Astro.props;
   <div class="lead-form__success" hidden tabindex="-1">
     <span class="lead-form__check" aria-hidden="true">✓</span>
     <p class="eyebrow"><span class="dot"></span> SOLICITAÇÃO RECEBIDA</p>
-    <h3>Obrigado. Vamos olhar para o seu contexto.</h3>
-    <p>Recebemos seus dados e a equipe da Tactia seguirá com o próximo passo pelo contato informado.</p>
+    <h3>{successHeading}</h3>
+    <p>{successMessage}</p>
   </div>
   <noscript><p class="lead-form__status">Ative o JavaScript para enviar sua solicitação por este formulário.</p></noscript>
 </section>
