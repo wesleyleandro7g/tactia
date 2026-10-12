@@ -8,9 +8,12 @@ interface Props {
   compact?: boolean;
   successHeading?: string;
   successMessage?: string;
+  requireContext?: boolean;
+  contextLabel?: string;
+  contextPlaceholder?: string;
 }
 
-const { id, offer, heading, intro, submitLabel, compact = false, successHeading = 'Obrigado. Vamos olhar para o seu contexto.', successMessage = 'Recebemos seus dados e a equipe da Tactia seguirá com o próximo passo pelo contato informado.' } = Astro.props;
+const { id, offer, heading, intro, submitLabel, compact = false, successHeading = 'Obrigado. Vamos olhar para o seu contexto.', successMessage = 'Recebemos seus dados e a equipe da Tactia seguirá com o próximo passo pelo contato informado.', requireContext = false, contextLabel = 'O que você quer melhorar?', contextPlaceholder = 'Uma tarefa, processo ou contexto que vale a pena conhecer.' } = Astro.props;
 ---
 
 <section class:list={['lead-form', { 'lead-form--compact': compact }]} aria-labelledby={`${id}-title`}>
@@ -37,8 +40,8 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
         <input id={`${id}-whatsapp`} name="whatsapp" type="tel" autocomplete="tel" maxlength="30" required placeholder="(11) 99999-9999" />
       </div>
       <div class="lead-field lead-field--full">
-        <label for={`${id}-context`}>O que você quer melhorar? <span class="lead-field__optional">Opcional</span></label>
-        <textarea id={`${id}-context`} name="context" rows="3" maxlength="1600" placeholder="Uma tarefa, processo ou contexto que vale a pena conhecer."></textarea>
+        <label for={`${id}-context`}>{contextLabel} {requireContext ? <span aria-hidden="true">*</span> : <span class="lead-field__optional">Opcional</span>}</label>
+        <textarea id={`${id}-context`} name="context" rows="3" maxlength="1600" minlength={requireContext ? 10 : undefined} required={requireContext} data-require-context={requireContext ? 'true' : undefined} placeholder={contextPlaceholder}></textarea>
       </div>
       <input type="hidden" name="diagnosis" value="" />
       <div class="lead-form__honeypot" aria-hidden="true">
@@ -100,6 +103,13 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
       if (missing || !/^\S+@\S+\.\S+$/.test(email) || phone.length < 10 || phone.length > 15) {
         status.textContent = 'Revise nome, empresa, e-mail e WhatsApp antes de continuar.';
         status.hidden = false;
+        tracker('form_validation_failed', { offer: form.dataset.offer || 'unknown' });
+        return;
+      }
+      if (form.querySelector('[data-require-context]') && clean(data.get('context')).length < 10) {
+        status.textContent = 'Descreva brevemente o desafio que você quer resolver (pelo menos 10 caracteres).';
+        status.hidden = false;
+        form.querySelector<HTMLTextAreaElement>('[name="context"]')?.focus();
         tracker('form_validation_failed', { offer: form.dataset.offer || 'unknown' });
         return;
       }

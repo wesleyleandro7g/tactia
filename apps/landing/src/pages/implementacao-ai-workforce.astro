@@ -1,13 +1,131 @@
 ---
-import Diagnostic from '../components/Diagnostic.astro';
 import LeadForm from '../components/LeadForm.astro';
 import SiteLayout from '../components/SiteLayout.astro';
+import '../styles/build.css';
+
+const challenges = [
+  ['01', 'A mesma informação em lugares diferentes', 'Vendas, atendimento, financeiro e operação não compartilham o mesmo contexto.'],
+  ['02', 'Planilhas que viraram sistemas', 'Arquivos, fórmulas e pessoas específicas sustentam processos essenciais.'],
+  ['03', 'Ferramentas que não acompanham a operação', 'A equipe contorna diariamente as limitações do software.'],
+  ['04', 'Trabalho manual entre sistemas', 'Alguém copia, confere e repete tarefas para manter tudo funcionando.'],
+  ['05', 'Pouca visibilidade e controle', 'Erros e gargalos são difíceis de rastrear ao longo do processo.'],
+  ['06', 'Crescimento com mais complexidade', 'Cada novo cliente, unidade ou colaborador amplia a dependência de fluxos frágeis.'],
+];
+
+const solutions = [
+  ['01', 'Sistemas internos', 'Organize aprovações, cadastros, ordens de serviço, estoque e rotinas em uma aplicação feita para a operação.', 'Sistemas internos'],
+  ['02', 'CRM e ferramentas comerciais', 'Estruture oportunidades, propostas, comissões e atendimento de acordo com o processo real do seu time.', 'CRM e comercial'],
+  ['03', 'Integrações entre sistemas', 'Conecte ERP, CRM, e-commerce, bancos de dados e outras ferramentas quando houver acessos tecnicamente viáveis.', 'Integrações'],
+  ['04', 'Modernização de software', 'Evolua aplicações existentes, melhore a experiência de uso e reduza obstáculos à manutenção.', 'Modernização'],
+  ['05', 'Portais e experiências digitais', 'Crie áreas de clientes, portais de parceiros e aplicações para acompanhar o trabalho de ponta a ponta.', 'Portais'],
+  ['06', 'IA e automação incorporadas', 'Adicione busca, classificação e execução assistida quando elas resolverem uma necessidade concreta.', 'IA e automação'],
+];
+
+const approaches = [
+  ['01', 'Integrar', 'Os sistemas atuais funcionam, mas a informação não circula.', 'Avaliamos APIs, fluxo de dados, segurança e manutenção.'],
+  ['02', 'Modernizar', 'Uma aplicação atende parte do negócio, mas já cria gargalos.', 'Avaliamos acessos, arquitetura, riscos e impacto sobre quem usa.'],
+  ['03', 'Construir', 'O processo é específico e as soluções prontas não o atendem bem.', 'Avaliamos escopo, custo de evolução, suporte e dependências.'],
+];
+
+const examples = [
+  ['Comercial', 'Um CRM que acompanha a venda', 'Leads chegam por canais distintos; propostas e comissões perdem contexto. Um fluxo próprio pode conectar atendimento, pipeline e negociação.', 'CRM · PROPOSTAS · INTEGRAÇÕES'],
+  ['Operações', 'Do pedido à entrega, sem perder o fio', 'Pedidos passam por planilhas e mensagens. Uma aplicação pode organizar responsáveis, etapas, aprovações e histórico.', 'PORTAL · APROVAÇÕES · HISTÓRICO'],
+  ['Financeiro', 'Informações que chegam organizadas', 'Dados espalhados exigem conferência manual. Integrações e rotinas rastreáveis podem apoiar aprovações e acompanhamento.', 'DADOS · CONFERÊNCIA · CONTROLE'],
+  ['Atendimento', 'Um processo conectado do início ao fim', 'Solicitações de vários canais perdem histórico. Um fluxo estruturado pode reunir registros, distribuição e acompanhamento.', 'REGISTROS · WORKFLOW · INTEGRAÇÕES'],
+];
+
+const steps = [
+  ['01', 'Entendemos sua operação', 'Conhecemos o problema, os usuários, os sistemas atuais e o impacto no negócio.'],
+  ['02', 'Definimos solução e escopo', 'Priorizamos requisitos, integrações, entregáveis, responsabilidades e critérios de aceite.'],
+  ['03', 'Projetamos e desenvolvemos', 'Construímos por entregas verificáveis, com acompanhamento e validações.'],
+  ['04', 'Testamos e implantamos', 'Validamos fluxos, acessos e cenários relevantes antes de colocar em operação.'],
+  ['05', 'Evoluímos com o negócio', 'Sustentação e novas funcionalidades podem ser acordadas em contrato próprio.'],
+];
+
+const benefits = [
+  ['Processos consistentes', 'Regras e informações em fluxos compreensíveis.'],
+  ['Menos retrabalho', 'Menos duplicação e movimentação manual desnecessária.'],
+  ['Sistemas conectados', 'Dados circulam melhor entre ferramentas e equipes.'],
+  ['Mais visibilidade', 'Etapas, responsáveis e ocorrências ficam rastreáveis.'],
+  ['Autonomia para evoluir', 'Uma solução desenhada para as prioridades da operação.'],
+  ['Base para o próximo passo', 'Processos digitais facilitam automação e IA quando fizer sentido.'],
+];
+
+const safeguards = [
+  ['Acessos e permissões', 'Perfis e regras de autorização são definidos conforme os riscos do projeto.'],
+  ['Proteção de dados', 'Privacidade e segurança são avaliadas segundo os dados e integrações envolvidos.'],
+  ['Documentação e continuidade', 'Entregas, transição de conhecimento e responsabilidades entram no escopo acordado.'],
+  ['Manutenção e evolução', 'Suporte, correções e mudanças dependem das condições contratadas.'],
+];
+
+const questions = [
+  ['Vocês substituem o ERP ou CRM que já utilizamos?', 'Não necessariamente. Primeiro avaliamos se é melhor integrar, adaptar ou construir. Substituir sistemas inteiros só faz sentido após análise técnica e econômica.'],
+  ['É possível integrar nossos sistemas atuais?', 'Em muitos casos, sim. A viabilidade depende de APIs, permissões, documentação e regras de acesso de cada ferramenta.'],
+  ['Vocês trabalham apenas com inteligência artificial?', 'Não. A Build desenvolve software, integrações e aplicações empresariais. IA e automação entram quando contribuem para o problema.'],
+  ['Quanto custa desenvolver um sistema?', 'Cada projeto é orçado após diagnóstico, com escopo, fases, implantação e eventual sustentação definidos em proposta.'],
+  ['Quanto tempo leva para ficar pronto?', 'Depende das funcionalidades, integrações e validações. Marcos e prazos são definidos após o levantamento.'],
+  ['Minha empresa precisa de uma equipe de tecnologia?', 'Não necessariamente. É importante contar com pessoas do negócio para explicar regras, validar prioridades e aprovar entregas.'],
+  ['Quem cuida do sistema depois da entrega?', 'A transição e as opções de sustentação são definidas no projeto. Suporte e evolução contínua exigem condições acordadas separadamente.'],
+  ['O sistema será da minha empresa?', 'Direitos de uso, titularidade do código, licenças de terceiros e transferência são definidos expressamente no contrato de cada projeto.'],
+  ['Posso começar por um único processo?', 'Sim. Priorizar um gargalo e validar a solução antes de expandir costuma ser um caminho prudente.'],
+  ['Como funciona o primeiro contato?', 'Você descreve o desafio. A equipe avalia a aderência e retorna pelos contatos informados para combinar os próximos passos. O envio não confirma uma reunião.'],
+];
 ---
 
-<SiteLayout title="Implementação de AI Workforce sob medida | Tactia" description="Mapeie oportunidades e implemente uma força de trabalho de IA alinhada aos processos da sua empresa." canonicalPath="/implementacao-ai-workforce">
-  <section class="implementation-hero workforce-shell"><div class="implementation-hero__copy"><p class="eyebrow"><span class="dot"></span> IMPLEMENTAÇÃO SOB MEDIDA</p><p class="product-hero__kicker">PARA EMPRESAS</p><h1>Transforme processos críticos em uma força de trabalho de IA.</h1><p>Mapeamos oportunidades, desenhamos a solução e implementamos uma operação de IA conectada à realidade da sua empresa.</p><div class="implementation-hero__price"><div><strong>R$ 20–30 mil</strong><span>faixa de implementação, conforme escopo</span></div><div><strong>A partir de R$ 500/mês</strong><span>referência de manutenção</span></div></div><div class="workforce-actions"><a class="button workforce-button" href="#diagnostico"><span>Agendar diagnóstico</span><span aria-hidden="true">↗</span></a><a class="workforce-text-action" href="#processo">Como funciona <span aria-hidden="true">↓</span></a></div><p class="implementation-hero__note">Valores de referência. Processo, integrações, suporte e cronograma são definidos após diagnóstico de viabilidade.</p></div><div class="implementation-map" aria-label="Mapa ilustrativo de implantação de AI Workforce"><span class="implementation-map__caption">MAPA DE OPORTUNIDADE</span><div class="implementation-map__grid" aria-hidden="true"></div><div class="implementation-map__rail" aria-hidden="true"></div><div class="implementation-map__point implementation-map__point--one"><span>01</span><strong>Processos</strong><small>onde o trabalho se concentra</small></div><div class="implementation-map__point implementation-map__point--two"><span>02</span><strong>Oportunidades</strong><small>onde a IA pode apoiar</small></div><div class="implementation-map__point implementation-map__point--three"><span>03</span><strong>Implementação</strong><small>o que entra em operação</small></div><div class="implementation-map__outcome"><i></i><span>Uma operação mais clara,<br /><strong>desenhada para evoluir.</strong></span></div></div></section>
-  <Diagnostic />
-  <section id="processo" class="implementation-process workforce-section workforce-section--dark"><div class="workforce-shell"><div class="section-lead"><div><p class="eyebrow"><span class="dot"></span> O QUE ACONTECE DEPOIS</p><h2>Do processo de hoje à operação que vem <em>depois dele.</em></h2></div><p>O diagnóstico não é uma demonstração de ferramenta. É a base para decidir se, onde e como a IA deveria entrar na sua empresa.</p></div><ol class="implementation-process__steps"><li><span>01</span><h3>Diagnóstico</h3><p>Entendemos tarefas, decisões, gargalos e prioridades do seu contexto.</p></li><li><span>02</span><h3>Mapa e viabilidade</h3><p>Organizamos oportunidades e avaliamos o que depende de dados, regras e integrações.</p></li><li><span>03</span><h3>Desenho de escopo</h3><p>Traduzimos a oportunidade priorizada em uma proposta de implementação clara.</p></li><li><span>04</span><h3>Implementação e evolução</h3><p>Colocamos a solução aprovada em operação e acompanhamos conforme o contrato.</p></li></ol></div></section>
-  <section class="implementation-boundary workforce-shell"><div><p class="eyebrow"><span class="dot"></span> EXPECTATIVA CORRETA</p><h2>IA responsável exige decisões e supervisão <em>humanas.</em></h2></div><p>A Tactia não promete uma operação 100% autônoma, compatibilidade com qualquer sistema ou um resultado financeiro específico. Cada projeto parte de uma realidade concreta, com critérios, limites e acompanhamento definidos em conjunto.</p></section>
-  <section class="form-section form-section--implementation"><div class="workforce-shell form-section__grid"><div><p class="eyebrow"><span class="dot"></span> VAMOS CONVERSAR</p><h2>Leve seu diagnóstico para a próxima conversa.</h2><p>Preencha seus dados para a Tactia receber seu contexto e organizar o próximo passo com você.</p><p class="form-section__small">Projetos na faixa de R$ 20–30 mil de implementação, conforme escopo. Manutenção de referência a partir de R$ 500/mês.</p></div><LeadForm id="formulario-implementacao" offer="Implementação AI Workforce sob medida" heading="Agende seu diagnóstico" intro="Comece compartilhando o contexto da sua operação." submitLabel="Enviar solicitação de diagnóstico" /></div></section>
+<SiteLayout title="Tactia Build | Software Sob Medida e Integração de Sistemas" description="Desenvolvemos sistemas sob medida, integramos ferramentas e modernizamos processos da sua empresa. Conheça a Tactia Build e solicite um diagnóstico." canonicalPath="/implementacao-ai-workforce" build>
+  <section class="build-hero build-shell" aria-labelledby="build-title">
+    <div class="build-hero__copy"><p class="build-eyebrow"><span>✳</span> TACTIA BUILD · SOFTWARE SOB MEDIDA</p><h1 id="build-title">Sua empresa não precisa se adaptar ao software. <em>O software precisa trabalhar para sua empresa.</em></h1><p class="build-hero__intro">Criamos, modernizamos e conectamos sistemas para reduzir retrabalho, organizar processos e dar à sua operação a estrutura tecnológica de que ela precisa. Com IA e automação quando fazem sentido.</p><div class="build-actions"><a class="build-button" href="#diagnostico" data-build-cta="hero">Solicitar diagnóstico <span aria-hidden="true">↗</span></a><a class="build-text-link" href="#solucoes" data-build-cta="hero-solutions">Explorar soluções <span aria-hidden="true">↘</span></a></div><p class="build-hero__note">Converse com nossa equipe sobre o seu desafio. Sem compromisso de contratação.</p><p class="build-hero__services">Sistemas internos <i></i> CRMs <i></i> Integrações <i></i> Portais <i></i> IA aplicada</p></div>
+    <div class="build-blueprint" aria-label="Diagrama ilustrativo de ferramentas conectadas a uma aplicação operacional"><div class="build-blueprint__top"><span>ARQUITETURA / OPERAÇÃO CONECTADA</span><span>FIG. 01</span></div><div class="build-blueprint__canvas"><div class="build-blueprint__sources"><span>CRM</span><span>ERP</span><span>FINANCEIRO</span><span>PORTAL</span></div><div class="build-blueprint__rails" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="build-blueprint__core"><small>CAMADA OPERACIONAL</small><strong>O sistema que<br />faz sentido <em>aqui.</em></strong><div><span>01 / PROCESSOS</span><span>02 / PESSOAS</span><span>03 / DADOS</span></div></div><div class="build-blueprint__output">UMA OPERAÇÃO MAIS CONECTADA <span aria-hidden="true">↗</span></div></div><p class="build-blueprint__caption">Diagrama conceitual · não representa um sistema já entregue.</p></div>
+  </section>
+
+  <div class="build-rule"><div class="build-shell"><span>ENTENDER O PROBLEMA</span><span>AVALIAR O CAMINHO</span><span>CONSTRUIR COM PROPÓSITO</span></div></div>
+
+  <section id="desafios" class="build-section build-challenges build-shell" aria-labelledby="challenges-title"><div class="build-heading"><p class="build-eyebrow">01 / O CUSTO DO IMPROVISO</p><h2 id="challenges-title">Seu negócio cresceu. <em>A tecnologia ficou para trás?</em></h2><p>Ferramentas prontas e planilhas ajudam a começar. O problema aparece quando a operação evolui, os sistemas continuam separados e a equipe precisa preencher as lacunas manualmente.</p></div><div class="build-challenges__grid">{challenges.map(([number, title, text]) => <article><span>{number}</span><h3>{title}</h3><p>{text}</p></article>)}</div><div class="build-challenges__bottom"><strong>Você não precisa reconstruir tudo. Precisa resolver o que está limitando o negócio.</strong><a class="build-text-link" href="#diagnostico" data-build-cta="challenges">Solicitar diagnóstico <span aria-hidden="true">↗</span></a></div></section>
+
+  <section id="solucoes" class="build-section build-solutions" aria-labelledby="solutions-title"><div class="build-shell"><div class="build-heading build-heading--split"><div><p class="build-eyebrow">02 / ENGENHARIA QUE RESOLVE</p><h2 id="solutions-title">Da necessidade da operação ao <em>software certo.</em></h2></div><p>Atendimento, financeiro, comercial ou operação: começamos pelo fluxo de trabalho e escolhemos uma solução compatível com as necessidades do negócio.</p></div><div class="build-solutions__grid">{solutions.map(([number, title, text, interest]) => <article><span class="build-solutions__index">{number} / 06</span><div class="build-solutions__mark" aria-hidden="true">↗</div><h3>{title}</h3><p>{text}</p><a href="#diagnostico" data-build-interest={interest} data-build-cta="solutions">Conversar sobre esta solução <span aria-hidden="true">↗</span></a></article>)}</div></div></section>
+
+  <section class="build-section build-decision build-shell" aria-labelledby="decision-title"><div class="build-heading"><p class="build-eyebrow">03 / A SOLUÇÃO CERTA, NÃO A MAIS COMPLEXA</p><h2 id="decision-title">Antes de construir, descobrimos o que <em>realmente vale a pena.</em></h2><p>Software pronto pode ser a melhor escolha. Às vezes basta conectar ferramentas ou modernizar o que já existe. Nosso trabalho começa por essa decisão, não por uma proposta de programação.</p></div><div class="build-decision__grid">{approaches.map(([number, title, when, evaluate]) => <article><span>{number} / CAMINHO</span><h3>{title}<span aria-hidden="true">↗</span></h3><p>{when}</p><small>{evaluate}</small></article>)}</div><p class="build-decision__statement">Software sob medida não é a resposta para tudo. É a resposta quando sua operação realmente precisa dele.</p><a class="build-text-link" href="#diagnostico" data-build-cta="decision">Solicitar diagnóstico <span aria-hidden="true">↗</span></a></section>
+
+  <section class="build-section build-examples" aria-labelledby="examples-title"><div class="build-shell"><div class="build-heading build-heading--split"><div><p class="build-eyebrow">04 / EXEMPLOS DE APLICAÇÃO</p><h2 id="examples-title">O que poderíamos construir <em>para a sua empresa?</em></h2></div><p>Possibilidades ilustrativas, não cases ou soluções já entregues. O desenho real depende dos seus sistemas, processos e acessos.</p></div><div class="build-examples__grid">{examples.map(([area, title, scenario, deliverable]) => <article><span>{area}</span><h3>{title}</h3><p>{scenario}</p><small>EXEMPLO DE ENTREGA / {deliverable}</small></article>)}</div><a class="build-text-link" href="#diagnostico" data-build-cta="examples">Solicitar diagnóstico <span aria-hidden="true">↗</span></a></div></section>
+
+  <section id="processo" class="build-section build-process build-shell" aria-labelledby="process-title"><div class="build-heading build-heading--split"><div><p class="build-eyebrow">05 / UM PROCESSO TRANSPARENTE</p><h2 id="process-title">Do problema ao software <em>em produção.</em></h2></div><p>Cada etapa tem uma decisão a validar. Prazos, marcos e responsabilidades são definidos depois do diagnóstico e da avaliação técnica.</p></div><ol class="build-process__steps">{steps.map(([number, title, text]) => <li><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><b aria-hidden="true">↗</b></li>)}</ol><a class="build-text-link" href="#diagnostico" data-build-cta="process">Solicitar diagnóstico <span aria-hidden="true">↗</span></a></section>
+
+  <section class="build-section build-benefits"><div class="build-shell"><div class="build-heading"><p class="build-eyebrow">06 / TECNOLOGIA A SERVIÇO DA OPERAÇÃO</p><h2>Menos atrito no dia a dia. <em>Mais capacidade para crescer.</em></h2></div><div class="build-benefits__grid">{benefits.map(([title, text], index) => <article><span>0{index + 1}</span><h3>{title}</h3><p>{text}</p></article>)}</div><p class="build-benefits__statement">A melhor tecnologia é a que sua equipe consegue usar e seu negócio consegue sustentar.</p></div></section>
+
+  <section class="build-section build-trust build-shell" aria-labelledby="trust-title"><div class="build-heading build-heading--split"><div><p class="build-eyebrow">07 / PENSADO PARA OPERAR DE VERDADE</p><h2 id="trust-title">Um sistema importante não pode depender <em>de improviso.</em></h2></div><p>Regras de acesso, documentação, qualidade e continuidade entram na definição técnica e contratual de cada projeto — de acordo com sua necessidade.</p></div><div class="build-trust__grid">{safeguards.map(([title, text], index) => <article><span>0{index + 1}</span><h3>{title}</h3><p>{text}</p></article>)}</div><p class="build-trust__note">Propriedade intelectual, hospedagem, níveis de serviço e suporte são definidos expressamente na proposta e no contrato quando aplicáveis.</p></section>
+
+  <section class="build-section build-ecosystem"><div class="build-shell build-ecosystem__grid"><div><p class="build-eyebrow">08 / UM ECOSSISTEMA QUE SE COMPLEMENTA</p><h2>Construir é uma parte <em>da transformação.</em></h2><p>A Build cria e integra a base tecnológica da operação. Os outros caminhos da Tactia atendem a necessidades diferentes, com ofertas e condições próprias.</p></div><div class="build-ecosystem__list"><p><span>APRENDA</span> Academy <small>Capacite pessoas para aplicar tecnologia.</small></p><p><span>CONSTRUA</span> Build <small>Desenvolva e conecte seus sistemas.</small></p><p><span>DELEGUE</span> Workforce <small>Explore serviços e rotinas com IA.</small></p><p><span>DECIDA</span> Intelligence <small>Transforme dados em respostas para o negócio.</small></p></div></div></section>
+
+  <section id="investimento" class="build-section build-investment build-shell" aria-labelledby="investment-title"><div class="build-heading build-heading--split"><div><p class="build-eyebrow">09 / UM PROJETO DEFINIDO PELA NECESSIDADE</p><h2 id="investment-title">Escopo claro. Investimento <em>proporcional ao desafio.</em></h2></div><p>O investimento depende do que será construído, dos sistemas envolvidos, dos acessos disponíveis, da complexidade e da operação necessária depois da entrega.</p></div><div class="build-investment__card"><div><span>COMO ORÇAMOS</span><h3>Primeiro o problema. Depois a proposta.</h3><p>Cada projeto é orçado após diagnóstico. Implantação, infraestrutura e eventual sustentação são especificadas conforme o caso; não há preço fixo publicado para todos os escopos.</p><a class="build-button" href="#diagnostico" data-build-cta="investment">Solicitar diagnóstico <span aria-hidden="true">↗</span></a></div><div><span>O QUE A PROPOSTA DEVE ESCLARECER</span><ul><li>Objetivos, entregáveis e exclusões</li><li>Fases e critérios de aceite</li><li>Cronograma e condições comerciais</li><li>Acessos e infraestrutura necessários</li><li>Documentação e implantação</li><li>Opções de sustentação e evolução</li></ul></div></div></section>
+
+  <section id="faq" class="build-section build-faq" aria-labelledby="faq-title"><div class="build-shell build-faq__grid"><div><p class="build-eyebrow">10 / DÚVIDAS FREQUENTES</p><h2 id="faq-title">Perguntas comuns antes de construir <em>um software sob medida.</em></h2></div><div class="build-faq__list">{questions.map(([question, answer], index) => <details><summary><span>{String(index + 1).padStart(2, '0')}</span>{question}<b aria-hidden="true">+</b></summary><p>{answer}</p></details>)}</div></div></section>
+
+  <section id="diagnostico" class="build-section build-contact" aria-labelledby="contact-title"><div class="build-shell build-contact__grid"><div><p class="build-eyebrow">11 / VAMOS ENTENDER SEU DESAFIO</p><h2 id="contact-title">Sua operação tem um problema. Vamos desenhar <em>a solução certa.</em></h2><p>Conte o que atrasa sua equipe, limita seus sistemas ou gera retrabalho. Vamos avaliar se faz mais sentido integrar, modernizar ou construir.</p><p class="build-contact__note">Conversa inicial sem compromisso de contratação. O envio é uma solicitação de contato, não uma reunião confirmada.</p></div><LeadForm id="build-form" offer="Tactia Build — diagnóstico de software" heading="Conte sobre seu projeto" intro="Compartilhe o desafio para prepararmos uma conversa útil." submitLabel="Quero conversar sobre meu projeto" contextLabel="Qual desafio você quer resolver?" contextPlaceholder="Descreva o processo ou sistema atual e o que você gostaria de melhorar." requireContext successHeading="Recebemos seu contato." successMessage="Vamos analisar as informações e retornar pelos dados informados para combinar os próximos passos." /></div></section>
+  <div class="build-signoff"><div class="build-shell"><span>TACTIA / BUILD</span><strong>Software sob medida para sua operação.</strong></div></div>
 </SiteLayout>
+
+<script>
+  const emit = (event: string, details: Record<string, string> = {}) => window.dispatchEvent(new CustomEvent('tactia:funnel', { detail: { event, ...details } }));
+  emit('build_page_view');
+  const header = document.querySelector<HTMLElement>('.workforce-header');
+  const updateHeader = () => header?.classList.toggle('build-header--compact', window.scrollY > 40);
+  updateHeader();
+  window.addEventListener('scroll', updateHeader, { passive: true });
+  document.querySelectorAll<HTMLAnchorElement>('[data-build-cta]').forEach((link) => {
+    link.addEventListener('click', () => {
+      emit('build_cta_click', { section: link.dataset.buildCta || 'unknown', cta_label: link.textContent?.trim() || '' });
+      const interest = link.dataset.buildInterest;
+      if (interest) {
+        const diagnosis = document.querySelector<HTMLInputElement>('#build-form [name="diagnosis"]');
+        const context = document.querySelector<HTMLTextAreaElement>('#build-form [name="context"]');
+        if (diagnosis) diagnosis.value = `Interesse em: ${interest}`;
+        if (context && !context.value.trim()) context.placeholder = `Conte sobre o desafio em ${interest} que sua empresa quer resolver.`;
+      }
+    });
+  });
+  window.addEventListener('tactia:funnel', (event) => {
+    if (!(event instanceof CustomEvent) || event.detail?.offer !== 'Tactia Build — diagnóstico de software') return;
+    if (event.detail.event === 'form_started') emit('build_form_start', { form_id: 'build-form' });
+    if (event.detail.event === 'lead_submitted') emit('build_form_submit');
+  });
+</script>
