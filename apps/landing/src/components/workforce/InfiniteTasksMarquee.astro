@@ -1,0 +1,14 @@
+---
+import { tasks } from '../../data/workforce';
+---
+<div class="wf-marquee" aria-label="Exemplos de tarefas por área">
+  {tasks.map(({ area, items }, index) => <div class="wf-marquee__column" style={`--duration: ${43 + index * 4}s`}>
+    <div class="wf-marquee__track">
+      {[false, true].map(copy => <div class="wf-marquee__group" aria-hidden={copy ? 'true' : undefined}>
+        <p class="wf-label">{area}</p>
+        <ul>{items.map(item => <li><span aria-hidden="true">↗</span>{item}</li>)}</ul>
+      </div>)}
+    </div>
+  </div>)}
+</div>
+<button class="wf-motion-toggle" type="button" aria-pressed="false">Pausar movimento</button>

@@ -73,11 +73,11 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
         ) : workforce ? (
           <nav aria-label="Navegação da Workforce">
             <SolutionsMenu current="workforce" />
-            <a href="#funcionarios">Funcionários digitais</a>
+            <a href="#tarefas">O que fazemos</a>
             <a href="#como-funciona">Como funciona</a>
-            <a href="#planos">Contratação</a>
+            <a href="#calculadora">Calculadora</a>
             <a href="#duvidas">Dúvidas</a>
-            <a class="nav-action" href="#diagnostico"><span class="nav-action__full">Montar minha Workforce</span><span class="nav-action__short">Montar</span> <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
+            <a class="nav-action" href="#diagnostico" data-wf-cta="header"><span class="nav-action__full">Delegar tarefas</span><span class="nav-action__short">Delegar</span> <span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
           </nav>
         ) : intelligence ? (
           <nav aria-label="Navegação da Intelligence">
@@ -127,7 +127,7 @@ const headerLogo = theme === 'dark' ? '/tactia-logo-white.svg' : '/tactia-logo-b
           </div>
         ) : workforce ? (
           <div class="footer-links">
-            <a href="#funcionarios">Funcionários digitais</a>
+            <a href="#tarefas">O que fazemos</a>
             <a href="#como-funciona">Como funciona</a>
             <a href="#diagnostico">Solicitar avaliação</a>
             <a href="/academy">Academy</a>

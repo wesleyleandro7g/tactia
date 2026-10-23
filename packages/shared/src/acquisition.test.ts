@@ -68,9 +68,9 @@ describe('short consultation form', () => {
         ...short,
         source: 'web',
         status: 'scheduled',
-        attribution: { utm_source: ' google ', unknown: 'ignored' },
+        attribution: { utm_source: ' google ', gclid: 'google-click', fbclid: 'meta-click', unknown: 'ignored' },
       }),
-    ).toMatchObject({ attribution: { utm_source: 'google' } });
+    ).toMatchObject({ attribution: { utm_source: 'google', gclid: 'google-click', fbclid: 'meta-click' } });
     const parsed = consultationLeadSchema.parse({ ...short, source: 'web', status: 'scheduled' });
     expect(parsed).not.toHaveProperty('source');
     expect(parsed).not.toHaveProperty('status');

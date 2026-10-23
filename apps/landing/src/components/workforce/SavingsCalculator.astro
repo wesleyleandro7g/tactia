@@ -1,0 +1,27 @@
+---
+import Action from './Action.astro';
+import { calculatorConfig as config, calculateSavings, formatMoney, formatNumber } from '../../lib/workforce-calculator';
+const initial = calculateSavings(config.hours.initial, config.cost.initial, config.percent.initial);
+---
+<div class="wf-calculator" data-calculator>
+  <div class="wf-calculator__inputs">
+    <p class="wf-label">SUA ROTINA, EM NÚMEROS</p>
+    <label for="wf-hours">Quantas horas sua equipe gasta por semana com tarefas repetitivas?</label>
+    <div class="wf-number-field"><input id="wf-hours" type="number" min={config.hours.min} max={config.hours.max} step="1" value={config.hours.initial} inputmode="numeric" /><span>horas / semana</span></div>
+    <input id="wf-hours-range" aria-label="Ajustar horas semanais" type="range" min={config.hours.min} max={config.hours.max} value={config.hours.initial} />
+    <div class="wf-range-labels" aria-hidden="true"><span>1 hora</span><span>80 horas</span></div>
+    <label for="wf-cost">Quanto custa, em média, uma hora desse trabalho?</label>
+    <div class="wf-number-field"><span>R$</span><input id="wf-cost" type="number" min="0" step="0.01" value={config.cost.initial} inputmode="decimal" aria-describedby="wf-cost-help" /><span>/ hora</span></div>
+    <p id="wf-cost-help" class="wf-small">Considere salário, encargos e outros custos envolvidos na execução.</p>
+    <details class="wf-estimate"><summary>Ajustar estimativa · <span data-percent-label>70%</span> delegável</summary><label for="wf-percent">Percentual estimado de tempo delegável</label><input id="wf-percent" type="range" min={config.percent.min} max={config.percent.max} value={config.percent.initial} /><div class="wf-range-labels"><span>30%</span><span>90%</span></div></details>
+  </div>
+  <div class="wf-calculator__results" aria-live="polite" aria-atomic="true">
+    <p>Você poderia liberar aproximadamente</p>
+    <p class="wf-calculator__main"><strong data-result="hours">{formatNumber(initial.releasedHours)}</strong><span>horas por mês</span></p>
+    <div class="wf-calculator__money"><p>Essas horas representam aproximadamente</p><strong data-result="money">{formatMoney(initial.monthlyValue)}</strong><span>por mês em valor estimado do tempo liberado</span></div>
+    <p class="wf-calculator__annual">Em um ano, isso representa até <strong><span data-result="annual">{formatNumber(initial.annualHours)}</span> horas recuperadas.</strong></p>
+    <Action placement="calculator" label="Quero recuperar esse tempo" />
+  </div>
+</div>
+<p class="wf-small wf-disclaimer">Estimativa ilustrativa. O tempo efetivamente liberado depende dos processos, sistemas e volume de tarefas da sua empresa. O valor do tempo não representa necessariamente redução direta de despesas.</p>
+<noscript><p>Ative o JavaScript para ajustar a estimativa. Os valores acima consideram 20 horas semanais, R$ 35 por hora e 70% de tempo delegável.</p></noscript>

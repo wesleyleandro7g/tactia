@@ -137,7 +137,7 @@ const { id, offer, heading, intro, submitLabel, compact = false, successHeading 
 
       const params = new URLSearchParams(window.location.search);
       const attribution: Record<string, string> = {};
-      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((key) => {
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'].forEach((key) => {
         const value = params.get(key)?.trim().slice(0, 200);
         if (value) attribution[key] = value;
       });

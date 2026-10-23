@@ -112,6 +112,8 @@ export const consultationLeadSchema = acquisitionFields
         utm_campaign: text(200).optional(),
         utm_content: text(200).optional(),
         utm_term: text(200).optional(),
+        gclid: text(200).optional(),
+        fbclid: text(200).optional(),
       })
       .optional(),
   });

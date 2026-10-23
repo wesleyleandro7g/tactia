@@ -1,0 +1,6 @@
+---
+import Icon from '../Icon.astro';
+interface Props { label?: string; placement: string }
+const { label = 'Quero delegar minhas tarefas', placement } = Astro.props;
+---
+<a class="wf-button" href="#diagnostico" data-wf-cta={placement}>{label}<span aria-hidden="true"><Icon name="arrow-up-right" /></span></a>
