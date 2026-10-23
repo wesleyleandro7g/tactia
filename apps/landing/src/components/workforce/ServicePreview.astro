@@ -1,0 +1,18 @@
+---
+interface Props { index: number }
+const { index } = Astro.props;
+const labels = ['CONCILIAÇÃO', 'DOCUMENTO FISCAL', 'COBRANÇA', 'RELATÓRIO', 'ORÇAMENTOS', 'PEDIDO'];
+---
+
+<div class="wf-service-preview" data-variant={index} aria-hidden="true">
+  <div class="wf-service-preview__top"><span>PRÉVIA ILUSTRATIVA</span><span>0{index + 1} / 06</span></div>
+  <div class="wf-service-preview__scene">
+    {index === 0 && <><span class="wf-service-preview__ledger"><i></i><i></i><i></i></span><span class="wf-service-preview__link">↔</span><span class="wf-service-preview__ledger wf-service-preview__ledger--match"><i></i><i></i><i></i></span></>}
+    {index === 1 && <><span class="wf-service-preview__paper"><i></i><i></i><i></i><b>NF</b></span><span class="wf-service-preview__link">→</span><span class="wf-service-preview__stamp">✓</span></>}
+    {index === 2 && <><span class="wf-service-preview__bubble"><i></i><i></i><i></i></span><span class="wf-service-preview__link">→</span><span class="wf-service-preview__bubble wf-service-preview__bubble--sent">✓</span></>}
+    {index === 3 && <><span class="wf-service-preview__chart"><i></i><i></i><i></i><i></i></span><span class="wf-service-preview__link">→</span><span class="wf-service-preview__paper wf-service-preview__paper--report"><i></i><i></i><i></i></span></>}
+    {index === 4 && <><span class="wf-service-preview__pipeline"><i></i><i></i><i></i></span><span class="wf-service-preview__link">→</span><span class="wf-service-preview__stamp">↗</span></>}
+    {index === 5 && <><span class="wf-service-preview__paper"><i></i><i></i><i></i></span><span class="wf-service-preview__link">→</span><span class="wf-service-preview__ledger wf-service-preview__ledger--match"><i></i><i></i><i></i></span></>}
+  </div>
+  <div class="wf-service-preview__bottom"><span>{labels[index]}</span><span>ENTREGA / DEFINIDA</span></div>
+</div>

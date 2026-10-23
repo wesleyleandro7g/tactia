@@ -1,0 +1,36 @@
+---
+import { tasks } from '../../data/workforce';
+
+const paths = [
+  ['M5 24h26M9 13h18M13 5h10M9 34h18', 'M18 5v29'],
+  ['M7 5h17l5 5v25H7zM24 5v6h5', 'M11 17h14M11 22h14M11 27h9'],
+  ['M6 10h26M6 19h19M6 28h14', 'm24 24 7 4-7 4'],
+  ['M5 9h28v22H5zM5 16h28', 'M11 23h9M26 22v5'],
+  ['M10 5h21v25H10zM5 11v24h21', 'M15 12h11M15 18h11M15 24h8'],
+];
+const outputs = ['Conferido', 'Organizado', 'Acompanhado', 'Atualizado', 'Encaminhado'];
+---
+
+<div class="wf-task-atlas">
+  {tasks.map(({ area, items }, index) => (
+    <details class="wf-task-card" style={`--wf-card-index: ${index}`}>
+      <summary>
+        <span class="wf-task-card__meta"><span>0{index + 1} / ÁREA</span><span>{String(items.length).padStart(2, '0')} ROTINAS</span></span>
+        <span class="wf-task-card__visual" aria-hidden="true">
+          <span class="wf-task-card__document">
+            <svg viewBox="0 0 38 40" fill="none"><path d={paths[index][0]} stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d={paths[index][1]} stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="wf-task-card__flowline"><i></i></span>
+          <span class="wf-task-card__stamp">✓</span>
+        </span>
+        <span class="wf-task-card__name">{area}</span>
+        <span class="wf-task-card__output">{outputs[index]} <span aria-hidden="true">↗</span></span>
+        <span class="wf-task-card__teaser">{items.slice(0, 2).join(' · ')}</span>
+        <span class="wf-task-card__expand">Ver todas as tarefas <span aria-hidden="true">+</span></span>
+      </summary>
+      <div class="wf-task-card__details">
+        <ul>{items.map(item => <li>{item}</li>)}</ul>
+      </div>
+    </details>
+  ))}
+</div>

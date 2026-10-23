@@ -16,6 +16,11 @@ const initial = calculateSavings(config.hours.initial, config.cost.initial, conf
     <details class="wf-estimate"><summary>Ajustar estimativa · <span data-percent-label>70%</span> delegável</summary><label for="wf-percent">Percentual estimado de tempo delegável</label><input id="wf-percent" type="range" min={config.percent.min} max={config.percent.max} value={config.percent.initial} /><div class="wf-range-labels"><span>30%</span><span>90%</span></div></details>
   </div>
   <div class="wf-calculator__results" aria-live="polite" aria-atomic="true">
+    <div class="wf-calculator__diagram" aria-hidden="true">
+      <div class="wf-calculator__diagram-head"><span>MAPA DO TEMPO / ESTIMATIVA</span><strong data-bar-label>{initial.delegablePercent}%</strong></div>
+      <div class="wf-calculator__bar"><span data-bar-share style={`width: ${initial.delegablePercent}%`}></span></div>
+      <div class="wf-calculator__diagram-foot"><span>Tempo semanal informado</span><span>Parcela potencialmente delegável</span></div>
+    </div>
     <p>Você poderia liberar aproximadamente</p>
     <p class="wf-calculator__main"><strong data-result="hours">{formatNumber(initial.releasedHours)}</strong><span>horas por mês</span></p>
     <div class="wf-calculator__money"><p>Essas horas representam aproximadamente</p><strong data-result="money">{formatMoney(initial.monthlyValue)}</strong><span>por mês em valor estimado do tempo liberado</span></div>

@@ -21,6 +21,8 @@ function update(source: HTMLInputElement) {
   result = calculateSavings(hours.valueAsNumber, cost.valueAsNumber, percent.valueAsNumber);
   range.value = String(result.weeklyHours);
   document.querySelector('[data-percent-label]')!.textContent = `${result.delegablePercent}%`;
+  document.querySelector<HTMLElement>('[data-bar-share]')!.style.width = `${result.delegablePercent}%`;
+  document.querySelector('[data-bar-label]')!.textContent = `${result.delegablePercent}%`;
   const outputs = { hours: formatNumber(result.releasedHours), money: formatMoney(result.monthlyValue), annual: formatNumber(result.annualHours) };
   Object.entries(outputs).forEach(([key, value]) => { document.querySelector(`[data-result="${key}"]`)!.textContent = value; });
   updateContact();
@@ -47,13 +49,32 @@ document.querySelectorAll<HTMLElement>('[data-wf-cta]').forEach(link => link.add
 document.querySelectorAll<HTMLDetailsElement>('[data-faq]').forEach(faq => faq.addEventListener('toggle', () => {
   if (faq.open) emit('workforce_faq_open', { question_id: faq.dataset.faq! });
 }));
-const toggle = document.querySelector<HTMLButtonElement>('.wf-motion-toggle')!;
-toggle.addEventListener('click', () => {
-  const paused = toggle.getAttribute('aria-pressed') !== 'true';
-  toggle.setAttribute('aria-pressed', String(paused));
-  toggle.textContent = paused ? 'Retomar movimento' : 'Pausar movimento';
-  document.querySelector('.wf-marquee')?.classList.toggle('is-paused', paused);
-});
+const flow = document.querySelector<HTMLElement>('[data-wf-flow]');
+const flowToggle = document.querySelector<HTMLButtonElement>('.wf-flow__toggle');
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+let flowVisible = true;
+let userPaused = false;
+function updateFlowMotion() {
+  if (!flow || !flowToggle) return;
+  if (reducedMotion.matches) {
+    flow.removeAttribute('data-motion');
+    flowToggle.hidden = true;
+    return;
+  }
+  flowToggle.hidden = false;
+  flow.dataset.motion = !userPaused && flowVisible && !document.hidden ? 'playing' : 'paused';
+  flowToggle.setAttribute('aria-pressed', String(userPaused));
+  flowToggle.setAttribute('aria-label', userPaused ? 'Retomar animação do fluxo' : 'Pausar animação do fluxo');
+  flowToggle.innerHTML = `<span aria-hidden="true">${userPaused ? '▶' : 'Ⅱ'}</span> ${userPaused ? 'Retomar animação' : 'Pausar animação'}`;
+}
+flowToggle?.addEventListener('click', () => { userPaused = !userPaused; updateFlowMotion(); });
+document.addEventListener('visibilitychange', updateFlowMotion);
+reducedMotion.addEventListener('change', updateFlowMotion);
+if (flow && 'IntersectionObserver' in window) {
+  const flowObserver = new IntersectionObserver(([entry]) => { flowVisible = entry.isIntersecting; updateFlowMotion(); }, { threshold: .05 });
+  flowObserver.observe(flow);
+}
+updateFlowMotion();
 if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
   const observer = new IntersectionObserver(entries => entries.forEach(entry => {
     if (entry.isIntersecting) { entry.target.classList.add('wf-revealed'); observer.unobserve(entry.target); }

@@ -1,0 +1,53 @@
+---
+import Icon from '../Icon.astro';
+---
+
+<div class="wf-flow" data-wf-flow aria-label="Exemplo ilustrativo: fontes autorizadas passam por uma rotina, uma divergência é encaminhada para revisão e um relatório fica pronto para entrega.">
+  <div class="wf-flow__topline">
+    <span><i aria-hidden="true"></i> ROTINA EM FOCO / RELATÓRIO</span>
+    <span>SIMULAÇÃO 01</span>
+  </div>
+
+  <div class="wf-flow__canvas">
+    <div class="wf-flow__sources" aria-hidden="true">
+      <div class="wf-flow__source wf-flow__source--file" data-wf-animate>
+        <svg viewBox="0 0 36 36" fill="none"><path d="M9 5h13l5 5v21H9zM22 5v6h5M13 17h10M13 22h10M13 27h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>ARQUIVO</span>
+      </div>
+      <div class="wf-flow__source wf-flow__source--system" data-wf-animate>
+        <svg viewBox="0 0 36 36" fill="none"><rect x="5" y="7" width="26" height="22" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M5 14h26M12 20h5M12 24h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>SISTEMA</span>
+      </div>
+      <div class="wf-flow__source wf-flow__source--time" data-wf-animate>
+        <svg viewBox="0 0 36 36" fill="none"><rect x="6" y="8" width="24" height="22" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M6 15h24M12 5v6M24 5v6M12 21h5M12 25h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>AGENDA</span>
+      </div>
+    </div>
+
+    <div class="wf-flow__rail wf-flow__rail--in" aria-hidden="true"><i data-wf-animate></i></div>
+
+    <div class="wf-flow__engine" data-wf-animate>
+      <div class="wf-flow__engine-mark" aria-hidden="true"><span>t.</span><i></i></div>
+      <div><span class="wf-flow__eyebrow">TACTIA / EXECUÇÃO</span><strong>O trabalho anda.</strong><small>Consulta · organiza · confere</small></div>
+      <span class="wf-flow__engine-index" aria-hidden="true">02 / 04</span>
+    </div>
+
+    <div class="wf-flow__rail wf-flow__rail--out" aria-hidden="true"><i data-wf-animate></i></div>
+
+    <div class="wf-flow__outcomes">
+      <div class="wf-flow__review" data-wf-animate>
+        <div class="wf-flow__outcome-symbol" aria-hidden="true">!</div>
+        <div><span class="wf-flow__eyebrow">PONTO DE REVISÃO</span><strong>Uma divergência</strong><small>Encaminhada para uma pessoa</small></div>
+      </div>
+      <div class="wf-flow__delivery" data-wf-animate>
+        <div class="wf-flow__outcome-symbol" aria-hidden="true"><Icon name="check" /></div>
+        <div><span class="wf-flow__eyebrow">ENTREGÁVEL</span><strong>Relatório pronto</strong><small>Conforme o escopo combinado</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-flow__footer">
+    <p>Exemplo ilustrativo de execução.</p>
+    <button class="wf-flow__toggle" type="button" aria-pressed="false" aria-label="Pausar animação do fluxo" hidden><span aria-hidden="true">Ⅱ</span> Pausar animação</button>
+  </div>
+</div>

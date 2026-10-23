@@ -89,20 +89,6 @@ html[data-brand='workforce'] .workforce-footer { background: #111612; border-top
 
 .wf-hero { grid-template-columns: 1.2fr .8fr; gap: 70px; }
 .wf-hero h1 { max-width: 710px; }
-.wf-execution { min-width: 0; transform: rotate(-2deg); padding: 22px; border: 1px solid var(--wl-line); background: radial-gradient(ellipse at top right, #43513a55, transparent), #202823; box-shadow: 16px 16px 0 #101612; }
-.wf-execution__header { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 22px; font-size: 9px; letter-spacing: .1em; }
-.wf-execution__list { display: grid; gap: 8px; }
-.wf-activity { display: grid; grid-template-columns: 22px 1fr 75px; gap: 9px; align-items: center; padding: 16px 10px; border: 1px solid #52604e; background: #29362b; font-size: 12px; }
-.wf-activity__icon { color: #d3e4bc; }
-.wf-activity__status { display: grid; font-size: 9px; text-align: right; }
-.wf-activity__status > * { grid-area: 1 / 1; font-style: normal; font-weight: 400; }
-.wf-activity__status i { animation: wf-working 4s var(--delay) both; }
-.wf-activity__status b { color: #d3e4bc; animation: wf-done 4s var(--delay) both; }
-@keyframes wf-working { 0%, 65% { opacity: 1; } 75%, 100% { opacity: 0; } }
-@keyframes wf-done { 0%, 65% { opacity: 0; } 75%, 100% { opacity: 1; } }
-.wf-execution__end { display: flex; gap: 20px; align-items: center; padding: 24px 0 16px; font-family: var(--wf-display); font-size: 28px; line-height: 1.05; letter-spacing: -.04em; }
-.wf-execution__end > span { font-size: 55px; color: var(--wl-orange); }
-.wf-execution__end strong { font-weight: 500; color: var(--wl-orange); }
 .wf-small { font-size: 12px; line-height: 1.6; color: var(--wl-muted); }
 .wf-pain__grid { grid-template-columns: repeat(3, 1fr); }
 .wf-pain__grid article { min-height: 180px; }
@@ -110,18 +96,6 @@ html[data-brand='workforce'] .workforce-footer { background: #111612; border-top
 .wf-closing { margin-top: 32px; font-size: 18px; }
 .wf-closing strong { color: #98421c; }
 .wf-tasks { background: radial-gradient(ellipse at center, #34442e66, transparent 70%), var(--wl-bg); }
-.wf-marquee { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; height: 510px; overflow: hidden; mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent); }
-.wf-marquee__column { min-width: 0; }
-.wf-marquee__track { animation: wf-marquee var(--duration) linear infinite; will-change: transform; }
-.wf-marquee__column:nth-child(even) .wf-marquee__track { animation-direction: reverse; }
-.wf-marquee__group { padding-bottom: 12px; }
-.wf-marquee__group > p { height: 50px; display: flex; align-items: center; }
-.wf-marquee ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
-.wf-marquee li { display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 15px 12px; background: #28312a; border: 1px solid #4a594b; font-size: 13px; line-height: 1.3; }
-.wf-marquee li span { color: #c3d0b7; }
-@keyframes wf-marquee { to { transform: translate3d(0, -50%, 0); } }
-.wf-marquee:hover .wf-marquee__track, .wf-marquee.is-paused .wf-marquee__track { animation-play-state: paused; }
-.wf-motion-toggle { display: block; margin: 20px auto; background: transparent; border: 1px solid var(--wl-line); border-radius: 3px; color: var(--wl-muted); min-height: 44px; padding: 10px 18px; font-size: 12px; }
 .wf-tasks__closing { max-width: 600px; margin: 42px auto 0; text-align: center; }
 .wf-tasks__closing h3 { font-size: 36px; letter-spacing: -.04em; }
 .wf-tasks__closing p { color: var(--wl-muted); margin: 14px 0 25px; }
@@ -188,11 +162,8 @@ html[data-brand='workforce'] :focus-visible { outline: 3px solid #b96936; outlin
 @media (max-width: 1050px) {
   .wf-shell { width: calc(100% - 56px); }
   .wf-hero { gap: 35px; }
-  .wf-marquee { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .wf-marquee__column:nth-child(n+4) { display: none; }
   .wf-heading--split, .wf-faq__grid, .wf-contact__grid, .wf-delivery__grid { gap: 35px; }
   .wf-calculator__inputs, .wf-calculator__results { padding: 28px; }
-  .wf-activity { font-size: 11px; gap: 5px; padding-inline: 8px; }
 }
 @media (max-width: 760px) {
   .wf-shell { width: calc(100% - 40px); }
@@ -205,8 +176,6 @@ html[data-brand='workforce'] :focus-visible { outline: 3px solid #b96936; outlin
   .wf-hero h1 { font-size: clamp(3rem, 11.3vw, 5.5rem); margin-block: 22px; }
   .wf-hero__intro { font-size: 14px; line-height: 1.6; }
   .wf-hero .wf-label { font-size: 9px; letter-spacing: .1em; }
-  .wf-execution { width: min(100% - 14px, 440px); margin-inline: auto; }
-  .wf-activity { font-size: 12px; }
   .wf-strip .wf-shell { font-size: 8px; letter-spacing: .05em; }
   .wf-pain__grid { grid-template-columns: repeat(2, 1fr); }
   .wf-pain__grid article { padding: 18px; }
@@ -226,9 +195,6 @@ html[data-brand='workforce'] :focus-visible { outline: 3px solid #b96936; outlin
   .wf-contact__grid > div:first-child { padding-top: 0; }
 }
 @media (max-width: 480px) {
-  .wf-marquee { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; height: 410px; }
-  .wf-marquee__column:nth-child(n+3) { display: none; }
-  .wf-marquee li { font-size: 12px; padding-inline: 10px; }
   .wf-actions { align-items: stretch; flex-direction: column; gap: 12px; margin-top: 24px; }
   .wf-actions .wf-link { align-self: flex-start; }
   .wf-button { gap: 16px; text-align: left; }
@@ -239,14 +205,9 @@ html[data-brand='workforce'] :focus-visible { outline: 3px solid #b96936; outlin
   .wf-calculator__inputs, .wf-calculator__results { padding: 24px 20px; }
   .wf-report { padding: 23px; }
   .wf-benefits { grid-template-columns: 1fr; }
-  .wf-execution__header { font-size: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html[data-brand='workforce'] { scroll-behavior: auto; }
-  .wf-hero__copy, .wf-revealed, .wf-activity__status > *, .wf-marquee__track { animation: none; }
-  .wf-activity__status i { display: none; }
-  .wf-marquee { height: 410px; overflow-y: auto; mask-image: none; }
-  .wf-marquee__group[aria-hidden='true'] { display: none; }
-  .wf-motion-toggle { display: none; }
+  .wf-hero__copy, .wf-revealed { animation: none; }
   html[data-brand='workforce'] *, html[data-brand='workforce'] *::before { transition: none; }
 }
