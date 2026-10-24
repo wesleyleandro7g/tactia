@@ -19,6 +19,9 @@ try {
     }
     if (width === 1440) await page.screenshot({ path: '/tmp/workforce-desktop.png', fullPage: true });
   }
+  assert.match(await page.locator('#planos').innerText(), /R\$ 500[\s\S]*Por rotina definida/);
+  assert.match(await page.locator('#seguranca').innerText(), /Acessos e limites[\s\S]*Teste antes da rotina[\s\S]*Revisão quando importa/);
+  assert.match(await page.locator('.wf-report').innerText(), /SIMULAÇÃO · NÚMEROS FICTÍCIOS/);
   assert.equal(await page.locator('[data-result="hours"]').textContent(), '61');
   await page.locator('#wf-hours').fill('40');
   await page.locator('#wf-hours').press('Tab');
@@ -28,7 +31,6 @@ try {
   assert.equal(await page.locator('#wf-cost').inputValue(), '0');
   await page.locator('#wf-cost').fill('35');
   await page.locator('#wf-cost').press('Tab');
-  await page.locator('.wf-estimate summary').click();
   await page.locator('#wf-percent').focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('[data-percent-label]').textContent(), '71%');
@@ -36,13 +38,10 @@ try {
   assert.match(await page.locator('[name="diagnosis"]').inputValue(), /40 horas\/semana.*71%/);
   await page.locator('[data-faq="1"] summary').click();
   await page.waitForFunction(() => window.funnelEvents.some(event => event.event === 'workforce_faq_open'));
-  await page.locator('.wf-motion-toggle').click();
-  assert.equal(await page.locator('.wf-marquee__track').first().evaluate(el => getComputedStyle(el).animationPlayState), 'paused');
-  const directions = await page.locator('.wf-marquee__track').evaluateAll(elements => elements.map(el => getComputedStyle(el).animationDirection));
-  assert.deepEqual(directions, ['normal', 'reverse', 'normal', 'reverse', 'normal']);
-  assert.equal(await page.locator('.wf-marquee__group[aria-hidden="true"]').count(), 5);
+  await page.locator('.wf-flow__toggle').click();
+  assert.equal(await page.locator('[data-wf-flow]').getAttribute('data-motion'), 'paused');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  assert.equal(await page.locator('.wf-marquee__track').first().evaluate(el => getComputedStyle(el).animationName), 'none');
+  assert.equal(await page.locator('.wf-flow__source').first().evaluate(el => getComputedStyle(el).animationName), 'none');
   let payload;
   await page.route('**/api/v1/consultation-leads', async route => { payload = route.request().postDataJSON(); await route.fulfill({ json: { data: { received: true } } }); });
   await page.locator('#workforce-form-name').fill('Teste de interface');
@@ -54,8 +53,9 @@ try {
   await page.locator('.lead-form__success').waitFor({ state: 'visible' });
   assert.deepEqual(payload.attribution, { utm_source: 'test', gclid: 'google-test', fbclid: 'meta-test' });
   assert.match(payload.context, /40 horas\/semana.*71%/);
+  assert.match(payload.context, /não representa economia financeira garantida/);
   const events = await page.evaluate(() => window.funnelEvents.map(event => event.event));
-  for (const expected of ['workforce_cta_click', 'workforce_calculator_interaction', 'workforce_calculator_cta', 'workforce_faq_open']) assert.ok(events.includes(expected), expected);
+  for (const expected of ['workforce_cta_click', 'workforce_calculator_interaction', 'workforce_calculator_cta', 'workforce_faq_open', 'workforce_form_start', 'workforce_form_submit']) assert.ok(events.includes(expected), expected);
   assert.deepEqual(errors, []);
-  console.log('PASS: responsive layouts, calculator, input validation, keyboard, CTA summary, FAQ, motion, attribution, mocked contact submission, analytics, no page errors.');
+  console.log('PASS: responsive layouts, price, control, illustrative proof, calculator, CTA summary, FAQ, motion, attribution, mocked contact submission, analytics, no page errors.');
 } finally { await browser.close(); }

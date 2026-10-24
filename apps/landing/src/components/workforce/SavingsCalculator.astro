@@ -13,7 +13,7 @@ const initial = calculateSavings(config.hours.initial, config.cost.initial, conf
     <label for="wf-cost">Quanto custa, em média, uma hora desse trabalho?</label>
     <div class="wf-number-field"><span>R$</span><input id="wf-cost" type="number" min="0" step="0.01" value={config.cost.initial} inputmode="decimal" aria-describedby="wf-cost-help" /><span>/ hora</span></div>
     <p id="wf-cost-help" class="wf-small">Considere salário, encargos e outros custos envolvidos na execução.</p>
-    <details class="wf-estimate"><summary>Ajustar estimativa · <span data-percent-label>70%</span> delegável</summary><label for="wf-percent">Percentual estimado de tempo delegável</label><input id="wf-percent" type="range" min={config.percent.min} max={config.percent.max} value={config.percent.initial} /><div class="wf-range-labels"><span>30%</span><span>90%</span></div></details>
+    <div class="wf-estimate"><label for="wf-percent">Hipótese inicial: <strong data-percent-label>70%</strong> do tempo delegável</label><p id="wf-percent-help" class="wf-small">Ajuste esta hipótese para explorar cenários. Ela não representa uma taxa comprovada para sua empresa.</p><input id="wf-percent" type="range" min={config.percent.min} max={config.percent.max} value={config.percent.initial} aria-describedby="wf-percent-help" /><div class="wf-range-labels"><span>30%</span><span>90%</span></div></div>
   </div>
   <div class="wf-calculator__results" aria-live="polite" aria-atomic="true">
     <div class="wf-calculator__diagram" aria-hidden="true">
@@ -21,12 +21,12 @@ const initial = calculateSavings(config.hours.initial, config.cost.initial, conf
       <div class="wf-calculator__bar"><span data-bar-share style={`width: ${initial.delegablePercent}%`}></span></div>
       <div class="wf-calculator__diagram-foot"><span>Tempo semanal informado</span><span>Parcela potencialmente delegável</span></div>
     </div>
-    <p>Você poderia liberar aproximadamente</p>
+    <p>Neste cenário, haveria potencial de liberar</p>
     <p class="wf-calculator__main"><strong data-result="hours">{formatNumber(initial.releasedHours)}</strong><span>horas por mês</span></p>
-    <div class="wf-calculator__money"><p>Essas horas representam aproximadamente</p><strong data-result="money">{formatMoney(initial.monthlyValue)}</strong><span>por mês em valor estimado do tempo liberado</span></div>
-    <p class="wf-calculator__annual">Em um ano, isso representa até <strong><span data-result="annual">{formatNumber(initial.annualHours)}</span> horas recuperadas.</strong></p>
-    <Action placement="calculator" label="Quero recuperar esse tempo" />
+    <div class="wf-calculator__money"><p>Valor estimado desse tempo</p><strong data-result="money">{formatMoney(initial.monthlyValue)}</strong><span>por mês · não é economia financeira garantida</span></div>
+    <p class="wf-calculator__annual">Se a hipótese se mantiver por 12 meses: <strong><span data-result="annual">{formatNumber(initial.annualHours)}</span> horas potencialmente liberadas.</strong></p>
+    <Action placement="calculator" label="Avaliar esta rotina" />
   </div>
 </div>
-<p class="wf-small wf-disclaimer">Estimativa ilustrativa. O tempo efetivamente liberado depende dos processos, sistemas e volume de tarefas da sua empresa. O valor do tempo não representa necessariamente redução direta de despesas.</p>
-<noscript><p>Ative o JavaScript para ajustar a estimativa. Os valores acima consideram 20 horas semanais, R$ 35 por hora e 70% de tempo delegável.</p></noscript>
+<p class="wf-small wf-disclaimer">Estimativa ilustrativa calculada com os dados informados e uma hipótese ajustável de tempo delegável. O tempo efetivamente liberado depende do diagnóstico, dos processos, sistemas e volume de tarefas. O valor do tempo não representa redução direta de despesas nem retorno garantido.</p>
+<noscript><p>Ative o JavaScript para ajustar a estimativa. Os valores acima usam 20 horas semanais, R$ 35 por hora e a hipótese ilustrativa de 70% do tempo delegável.</p></noscript>

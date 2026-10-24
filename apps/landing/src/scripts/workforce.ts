@@ -7,7 +7,7 @@ const percent = document.querySelector<HTMLInputElement>('#wf-percent')!;
 let result = calculateSavings(20, 35, 70);
 let attachEstimate = false;
 function summary() {
-  return `Estimativa ilustrativa: ${result.weeklyHours} horas/semana; ${formatMoney(result.hourlyCost)}/hora; ${result.delegablePercent}% delegável; aproximadamente ${formatNumber(result.releasedHours)} horas mensais potencialmente liberadas.`;
+  return `Estimativa ilustrativa com hipótese ajustável: ${result.weeklyHours} horas/semana; ${formatMoney(result.hourlyCost)}/hora; ${result.delegablePercent}% do tempo potencialmente delegável; cerca de ${formatNumber(result.releasedHours)} horas/mês e ${formatMoney(result.monthlyValue)}/mês em valor estimado desse tempo. Sujeita a diagnóstico; não representa economia financeira garantida.`;
 }
 function updateContact() {
   if (!attachEstimate) return;
@@ -49,6 +49,11 @@ document.querySelectorAll<HTMLElement>('[data-wf-cta]').forEach(link => link.add
 document.querySelectorAll<HTMLDetailsElement>('[data-faq]').forEach(faq => faq.addEventListener('toggle', () => {
   if (faq.open) emit('workforce_faq_open', { question_id: faq.dataset.faq! });
 }));
+window.addEventListener('tactia:funnel', (event) => {
+  if (!(event instanceof CustomEvent) || event.detail?.offer !== 'Tactia Workforce — avaliação de rotina') return;
+  if (event.detail.event === 'form_started') emit('workforce_form_start', { form_id: 'workforce-form' });
+  if (event.detail.event === 'lead_submitted') emit('workforce_form_submit');
+});
 const flow = document.querySelector<HTMLElement>('[data-wf-flow]');
 const flowToggle = document.querySelector<HTMLButtonElement>('.wf-flow__toggle');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');

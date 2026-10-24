@@ -34,6 +34,7 @@ export const questions = [
   ['Vocês conseguem executar qualquer tarefa?', 'Nem toda operação pode ser automatizada de forma segura. Avaliamos cada processo, seus sistemas, limitações e necessidade de aprovação.'],
   ['Como sei o que foi feito?', 'As operações contratadas podem gerar registros, relatórios e notificações de execução.'],
   ['E se alguma tarefa apresentar um problema?', 'Configuramos validações, registros e tratamento de exceções conforme o processo contratado. Casos que não possam ser resolvidos com segurança são encaminhados para revisão.'],
-  ['Como funciona a contratação?', 'Primeiro entendemos suas tarefas, avaliamos a viabilidade e apresentamos o escopo, o investimento e os próximos passos.'],
+  ['Como funciona a contratação e quanto custa?', 'Uma rotina simples, com escopo definido, começa a partir de R$ 500 por mês. Avaliamos frequência, volume, sistemas, suporte e eventual implantação ou integração antes de apresentar o valor final na proposta.'],
+  ['Como são tratados os acessos e meus dados?', 'Avaliamos os acessos necessários e os limites da rotina antes da implantação. Permissões, aprovações, registros, tratamento e retenção de dados são definidos para cada operação na proposta e no contrato, conforme a LGPD. Não envie credenciais pelo formulário.'],
 ];
 export const summary = ['83 transações conciliadas', '24 cobranças acompanhadas', '18 notas processadas', '12 pedidos cadastrados', '3 relatórios enviados'];

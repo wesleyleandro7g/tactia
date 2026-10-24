@@ -39,6 +39,18 @@ html[data-brand='workforce'] .workforce-footer { background: #111612; border-top
 .wf-strip { background: #d3d9cc; border-block: 1px solid #aeb9a9; color: #35473a; }
 .wf-strip .wf-shell { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 64px; font-size: 10px; letter-spacing: .13em; }
 .wf-strip i { color: #a84b20; font-size: 17px; font-style: normal; }
+.wf-price { padding-block: 76px; background: radial-gradient(circle at 10% 90%, #46563a77, transparent 38%), #213126; border-bottom: 1px solid #647a62; }
+.wf-price__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; align-items: center; }
+.wf-price h2 { max-width: 580px; margin: 17px 0 22px; font-size: clamp(2.8rem, 4.8vw, 5rem); line-height: 1.02; letter-spacing: -.06em; }
+.wf-price h2 em { color: var(--wl-orange); font-style: normal; }
+.wf-price__grid > div:first-child > p:last-child { max-width: 440px; color: var(--wl-muted); font-size: 15px; }
+.wf-price__offer { padding: 32px 36px; border: 1px solid #abbba5; border-left: 5px solid var(--wl-orange); background: #e8ecdf; color: #253328; box-shadow: 13px 13px 0 #111b14; }
+.wf-price__offer > span { color: #8d431d; font-size: 10px; letter-spacing: .14em; }
+.wf-price__amount { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 16px 0 20px; padding-bottom: 18px; border-bottom: 1px solid #bac7b7; font-family: var(--wf-display); font-size: 21px; line-height: 1.1; }
+.wf-price__amount strong { font-size: clamp(3.4rem, 6vw, 5.4rem); font-weight: 500; letter-spacing: -.07em; white-space: nowrap; }
+.wf-price__amount span { font-size: 22px; }
+.wf-price__offer > p:not(.wf-price__amount) { max-width: 520px; color: #4e6051; font-size: 13px; line-height: 1.65; }
+.wf-price__offer .wf-button { margin-top: 24px; }
 
 .wf-pain, .wf-demo, .wf-method, .wf-pricing { color: #223026; background: var(--wl-paper); }
 .wf-pain .wf-label, .wf-demo .wf-label, .wf-method .wf-label, .wf-pricing .wf-label, .wf-faq .wf-label { color: #98421c; }
@@ -120,8 +132,9 @@ html[data-brand='workforce'] .workforce-footer { background: #111612; border-top
 .wf-calculator input[type='range'] { width: 100%; min-height: 44px; accent-color: var(--wl-orange); cursor: pointer; }
 .wf-range-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--wl-muted); }
 .wf-calculator__inputs .wf-small { margin-top: 10px; }
-.wf-estimate { margin-top: 28px; border-top: 1px solid var(--wl-line); padding-top: 16px; font-size: 13px; }
-.wf-estimate summary { cursor: pointer; min-height: 44px; padding-block: 10px; }
+.wf-estimate { margin-top: 28px; border-top: 1px solid var(--wl-line); padding-top: 6px; font-size: 13px; }
+.wf-estimate label { margin-bottom: 4px; }
+.wf-estimate label strong { color: var(--wl-orange); font-family: var(--wf-display); font-size: 21px; font-weight: 500; }
 .wf-calculator__results { background: #e3e8d9; color: #223026; padding: 40px; }
 .wf-calculator__results > p:first-child { font-size: 15px; }
 .wf-calculator__main { display: flex; align-items: baseline; flex-wrap: wrap; gap: 15px; font-family: var(--wf-display); margin: 10px 0 28px; }
@@ -133,8 +146,44 @@ html[data-brand='workforce'] .workforce-footer { background: #111612; border-top
 .wf-calculator__annual { font-size: 14px; margin: 24px 0; }
 .wf-calculator__annual strong { display: block; }
 .wf-disclaimer { max-width: 900px; margin-top: 20px; }
+.wf-control { background: #1a2720; }
+.wf-control__grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 70px; align-items: start; }
+.wf-control__steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid #6b7e6b; }
+.wf-control__steps li { display: grid; grid-template-columns: 118px 1fr; gap: 18px; padding: 23px 0; border-bottom: 1px solid #6b7e6b; }
+.wf-control__steps li > span { color: var(--wl-orange); font-size: 10px; letter-spacing: .1em; padding-top: 5px; }
+.wf-control__steps h3 { font-family: var(--wf-display); font-size: 25px; font-weight: 500; letter-spacing: -.04em; }
+.wf-control__steps p { margin-top: 7px; color: var(--wl-muted); font-size: 13px; }
+.wf-control__visual { overflow: hidden; border: 1px solid #80937f; background: #e8ecdf; color: #203026; box-shadow: 14px 14px 0 #0e1912; }
+.wf-control__visual-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 15px 23px; background: #cbd6c6; border-bottom: 1px solid #aabbaa; color: #405d45; font-size: 10px; letter-spacing: .1em; }
+.wf-control__visual-head span:last-child { color: #8a411c; }
+.wf-control__visual-body { padding: 16px 23px 10px; }
+.wf-control__event { display: grid; grid-template-columns: 33px 1fr 22px; gap: 14px; align-items: center; min-height: 72px; border-bottom: 1px solid #c0cdbd; }
+.wf-control__event > span { color: #8e4b27; font-size: 11px; }
+.wf-control__event small { display: block; color: #617460; font-size: 9px; letter-spacing: .1em; }
+.wf-control__event strong { display: block; margin-top: 4px; font-family: var(--wf-display); font-size: 18px; font-weight: 500; }
+.wf-control__event b { color: #3b6a3a; font-size: 17px; font-weight: 500; text-align: center; }
+.wf-control__event--review { margin-inline: -10px; padding-inline: 10px; background: #efddca; border-left: 2px solid #b95928; }
+.wf-control__event--review b { color: #a54a1d; }
+.wf-control__event--pending { border-bottom: 0; }
+.wf-control__visual > p { padding: 14px 23px 18px; border-top: 1px solid #c0cdbd; color: #566858; font-size: 11px; }
+.wf-control__note { max-width: 950px; margin-top: 34px; padding-top: 18px; border-top: 1px solid #647a62; color: #c0d0bd; font-size: 12px; }
+.wf-difference { background: #dfe5d9; color: #223026; }
+.wf-difference .wf-label { color: #98421c; }
+.wf-difference h2 em { color: #a64a1e; }
+.wf-difference__grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 85px; align-items: center; }
+.wf-difference__grid > div:first-child > p:not(.wf-label) { max-width: 510px; margin: 22px 0 28px; color: #516153; font-size: 15px; }
+.wf-difference__ledger { border-top: 2px solid #8b4a28; }
+.wf-difference__ledger > div { display: flex; justify-content: space-between; gap: 12px; padding-block: 13px; color: #8a451e; font-size: 9px; letter-spacing: .12em; }
+.wf-difference__ledger p { display: grid; grid-template-columns: 38px 1fr; gap: 1px 12px; padding: 20px 0; border-top: 1px solid #aebdae; }
+.wf-difference__ledger p strong { grid-row: span 2; color: #8a451e; font-size: 11px; font-weight: 500; padding-top: 5px; }
+.wf-difference__ledger p span { font-family: var(--wf-display); font-size: 21px; line-height: 1.1; }
+.wf-difference__ledger p small { color: #516153; font-size: 12px; margin-top: 5px; }
 .wf-delivery { background: #242e26; }
 .wf-delivery__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+.wf-delivery__check { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid #657b64; }
+.wf-delivery__check li { display: flex; gap: 15px; padding: 12px 0; border-bottom: 1px solid #657b64; font-size: 13px; }
+.wf-delivery__check li::before { content: '↗'; color: var(--wl-orange); }
+.wf-delivery .wf-heading > .wf-small { margin-top: 16px; font-size: 11px; }
 .wf-report { padding: 30px; background: #e5eadf; color: #243226; border-radius: 4px 4px 4px 0; box-shadow: 12px 12px 0 #111b14; }
 .wf-report__header { display: flex; gap: 14px; align-items: center; padding-bottom: 23px; border-bottom: 1px solid #bccab8; }
 .wf-report__avatar { display: grid; place-items: center; width: 42px; height: 42px; background: #283f2d; color: #f5f3eb; border-radius: 50%; font-size: 28px; }
@@ -164,6 +213,7 @@ html[data-brand='workforce'] :focus-visible { outline: 3px solid #b96936; outlin
   .wf-hero { gap: 35px; }
   .wf-heading--split, .wf-faq__grid, .wf-contact__grid, .wf-delivery__grid { gap: 35px; }
   .wf-calculator__inputs, .wf-calculator__results { padding: 28px; }
+  .wf-price__grid, .wf-control__grid, .wf-difference__grid { gap: 36px; }
 }
 @media (max-width: 760px) {
   .wf-shell { width: calc(100% - 40px); }
@@ -176,6 +226,9 @@ html[data-brand='workforce'] :focus-visible { outline: 3px solid #b96936; outlin
   .wf-hero h1 { font-size: clamp(3rem, 11.3vw, 5.5rem); margin-block: 22px; }
   .wf-hero__intro { font-size: 14px; line-height: 1.6; }
   .wf-hero .wf-label { font-size: 9px; letter-spacing: .1em; }
+  .wf-price { padding-block: 62px; }
+  .wf-price__grid, .wf-control__grid, .wf-difference__grid { grid-template-columns: 1fr; }
+  .wf-price h2 { font-size: clamp(2.6rem, 9vw, 4rem); }
   .wf-strip .wf-shell { font-size: 8px; letter-spacing: .05em; }
   .wf-pain__grid { grid-template-columns: repeat(2, 1fr); }
   .wf-pain__grid article { padding: 18px; }
@@ -205,6 +258,12 @@ html[data-brand='workforce'] :focus-visible { outline: 3px solid #b96936; outlin
   .wf-calculator__inputs, .wf-calculator__results { padding: 24px 20px; }
   .wf-report { padding: 23px; }
   .wf-benefits { grid-template-columns: 1fr; }
+  .wf-price__offer { padding: 25px 20px; box-shadow: 8px 8px 0 #111b14; }
+  .wf-price__amount strong { font-size: 3.7rem; }
+  .wf-control__steps li { grid-template-columns: 1fr; gap: 5px; }
+  .wf-control__visual-head { font-size: 8px; }
+  .wf-control__visual-body { padding-inline: 15px; }
+  .wf-control__visual > p { padding-inline: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html[data-brand='workforce'] { scroll-behavior: auto; }
